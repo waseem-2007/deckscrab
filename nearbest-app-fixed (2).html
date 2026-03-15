@@ -1,0 +1,2271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Deckscrab — Find Local Businesses</title>
+<link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{
+  --bg:#07090F;--sur:#111827;--card:#1A2235;--card2:#212D42;
+  --bor:rgba(255,255,255,.09);--gold:#F5C518;--gold2:#D4A017;
+  --grn:#22D47A;--rose:#FF4C6A;--vio:#8B5CF6;--teal:#00D4B4;
+  --blue:#4C8BFF;--ora:#FF8C42;
+  --txt:rgba(255,255,255,.9);--mut:rgba(255,255,255,.44);--wht:#fff;
+  --r:14px;--rs:9px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 55% 38% at 18% 8%,rgba(139,92,246,.08),transparent 55%),
+             radial-gradient(ellipse 45% 32% at 82% 82%,rgba(0,212,180,.06),transparent 50%)}
+button,input,select,textarea{font-family:'DM Sans',sans-serif;cursor:pointer}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:300;height:58px;display:flex;align-items:center;
+  justify-content:space-between;padding:0 clamp(12px,3vw,32px);
+  background:rgba(7,9,15,.96);backdrop-filter:blur(22px);border-bottom:1px solid var(--bor)}
+.logo{font-family:'Clash Display',sans-serif;font-size:1.35rem;font-weight:700;
+  color:var(--wht);display:flex;align-items:center;gap:8px;letter-spacing:-.02em;cursor:pointer}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--gold);
+  box-shadow:0 0 10px var(--gold);animation:glow 2s ease infinite;flex-shrink:0}
+@keyframes glow{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.5)}}
+.ntabs{display:flex;gap:2px}
+.ntab{background:none;border:none;padding:6px 12px;border-radius:999px;
+  font-size:.78rem;font-weight:600;color:var(--mut);transition:.2s}
+.ntab:hover{color:var(--wht);background:rgba(255,255,255,.06)}
+.ntab.on{color:var(--gold);background:rgba(245,197,24,.1);border:1px solid rgba(245,197,24,.28)}
+.nav-r{display:flex;align-items:center;gap:8px}
+.nav-loc{display:flex;align-items:center;gap:5px;background:rgba(0,212,180,.08);
+  border:1px solid rgba(0,212,180,.22);border-radius:999px;padding:5px 12px;
+  font-size:.72rem;font-weight:600;color:var(--teal);cursor:pointer;max-width:155px}
+.nav-loc:hover{background:rgba(0,212,180,.15)}
+.nav-loc .ld{width:6px;height:6px;border-radius:50%;background:var(--grn);
+  box-shadow:0 0 6px var(--grn);flex-shrink:0}
+.nav-loc .lt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-add{background:var(--gold);color:var(--bg);border:none;border-radius:999px;
+  padding:6px 15px;font-size:.77rem;font-weight:700;transition:.2s;white-space:nowrap}
+.nav-add:hover{background:var(--gold2)}
+
+/* PAGES */
+.page{display:none}.page.on{display:block}
+
+/* ── HOME ── */
+.home-hero{position:relative;z-index:1;text-align:center;padding:52px 20px 36px}
+.hpill{display:inline-flex;align-items:center;gap:6px;background:rgba(245,197,24,.08);
+  border:1px solid rgba(245,197,24,.2);border-radius:999px;padding:5px 14px;
+  font-size:.69rem;font-weight:700;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px}
+.home-hero h1{font-family:'Clash Display',sans-serif;font-size:clamp(2rem,6vw,3.8rem);
+  font-weight:700;color:var(--wht);letter-spacing:-.04em;margin-bottom:10px;line-height:1.05}
+.home-hero h1 em{font-style:normal;background:linear-gradient(120deg,var(--gold),var(--ora));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.home-hero p{font-size:.94rem;color:var(--mut);line-height:1.75;max-width:460px;margin:0 auto 28px}
+
+/* home search bar */
+.hsearch{max-width:600px;margin:0 auto 10px;display:flex;background:var(--sur);
+  border:1.5px solid rgba(255,255,255,.1);border-radius:var(--r);overflow:hidden;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);transition:.25s}
+.hsearch:focus-within{border-color:rgba(245,197,24,.45);box-shadow:0 0 0 4px rgba(245,197,24,.07)}
+.hgps{width:46px;display:flex;align-items:center;justify-content:center;
+  border-right:1px solid var(--bor);font-size:1.05rem;color:var(--mut);flex-shrink:0}
+.hgps:hover{background:rgba(0,212,180,.08);color:var(--teal);cursor:pointer}
+.hgps.spin{animation:spin .7s linear infinite;color:var(--gold)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hloc{flex:0 0 150px;display:flex;align-items:center;padding:0 10px;border-right:1px solid var(--bor)}
+.hloc input{background:none;border:none;outline:none;font-size:.85rem;color:var(--txt);
+  width:100%;caret-color:var(--gold)}
+.hloc input::placeholder{color:var(--mut)}
+.hmain{flex:1;display:flex;align-items:center;padding:0 12px}
+.hmain input{flex:1;background:none;border:none;outline:none;font-size:.9rem;
+  color:var(--txt);caret-color:var(--gold)}
+.hmain input::placeholder{color:var(--mut)}
+.hgo{background:var(--gold);color:var(--bg);border:none;padding:14px 20px;
+  font-size:.87rem;font-weight:700;transition:.2s;white-space:nowrap;flex-shrink:0}
+.hgo:hover{background:var(--gold2)}
+.locbar{display:flex;align-items:center;justify-content:center;gap:7px;
+  font-size:.73rem;color:var(--mut);min-height:20px;margin-bottom:8px}
+.lb{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.lb.g{background:var(--grn);box-shadow:0 0 6px var(--grn)}
+.lb.a{background:var(--gold);box-shadow:0 0 6px var(--gold);animation:glow 1.5s ease infinite}
+.lb.r{background:var(--rose);box-shadow:0 0 6px var(--rose)}
+.chips{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin-top:6px}
+.chip{background:rgba(255,255,255,.05);border:1px solid var(--bor);border-radius:999px;
+  padding:5px 12px;font-size:.74rem;font-weight:500;color:var(--mut);transition:.2s}
+.chip:hover{background:rgba(245,197,24,.1);border-color:rgba(245,197,24,.35);color:var(--gold);cursor:pointer}
+.qpick{background:var(--sur);border:1px solid var(--bor);border-radius:999px;padding:6px 13px;font-size:.78rem;font-weight:600;color:var(--txt);cursor:pointer;transition:.2s}
+.qpick:hover,.qpick:active{background:rgba(245,197,24,.1);border-color:rgba(245,197,24,.45);color:var(--gold)}
+
+/* stats */
+.hstats{display:flex;justify-content:center;gap:28px;padding:16px clamp(12px,4vw,36px);
+  border-top:1px solid var(--bor);border-bottom:1px solid var(--bor);flex-wrap:wrap;
+  position:relative;z-index:1}
+.hst{text-align:center}
+.hsn{font-family:'Clash Display',sans-serif;font-size:1.6rem;font-weight:700;
+  color:var(--wht);display:block;letter-spacing:-.02em}
+.hsn .ac{color:var(--gold)}
+.hsl{font-size:.64rem;color:var(--mut);text-transform:uppercase;letter-spacing:.07em;margin-top:1px}
+
+/* category tiles */
+.cat-sect{position:relative;z-index:1;padding:26px clamp(12px,4vw,36px)}
+.sect-title{font-family:'Clash Display',sans-serif;font-size:1.2rem;font-weight:700;
+  color:var(--wht);margin-bottom:14px;letter-spacing:-.02em;display:flex;align-items:center;justify-content:space-between}
+.see-all{font-size:.77rem;font-weight:600;color:var(--teal);background:none;border:none;transition:.2s}
+.see-all:hover{color:var(--wht)}
+.cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px}
+.cat-tile{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);
+  padding:13px 9px;text-align:center;cursor:pointer;transition:.2s}
+.cat-tile:hover{border-color:rgba(245,197,24,.35);background:rgba(245,197,24,.06);transform:translateY(-2px)}
+.ct-ico{font-size:1.65rem;margin-bottom:5px}
+.ct-nm{font-size:.76rem;font-weight:600;color:var(--txt)}
+.ct-cnt{font-size:.64rem;color:var(--mut);margin-top:2px}
+
+/* listing grid */
+.list-sect{position:relative;z-index:1;padding:0 clamp(12px,4vw,36px) 60px}
+.lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:6px}
+.lcard{background:var(--sur);border:1.5px solid var(--bor);border-radius:var(--r);
+  overflow:hidden;cursor:pointer;transition:.25s}
+.lcard:hover{border-color:rgba(245,197,24,.3);box-shadow:0 8px 24px rgba(0,0,0,.4);transform:translateY(-3px)}
+.lcard.usr{border-color:rgba(139,92,246,.28)}
+.lc-top{height:88px;background:linear-gradient(135deg,#1A2235,#212D42);
+  display:flex;align-items:center;justify-content:center;font-size:2.4rem;position:relative}
+.lc-ob{position:absolute;top:8px;right:8px;border-radius:999px;padding:2px 8px;
+  font-size:.59rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.lc-ob.open{background:rgba(34,212,122,.18);border:1px solid rgba(34,212,122,.3);color:var(--grn)}
+.lc-ob.closed{background:rgba(255,76,106,.14);border:1px solid rgba(255,76,106,.28);color:var(--rose)}
+.lc-ob.soon{background:rgba(245,197,24,.14);border:1px solid rgba(245,197,24,.28);color:var(--gold)}
+.lc-body{padding:11px 13px}
+.lc-cat{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--teal);margin-bottom:3px}
+.lc-name{font-family:'Clash Display',sans-serif;font-size:.92rem;font-weight:700;
+  color:var(--wht);margin-bottom:4px;line-height:1.2}
+.lc-addr{font-size:.7rem;color:var(--mut);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lc-foot{display:flex;align-items:center;justify-content:space-between;font-size:.69rem}
+.lc-dist{color:var(--teal);font-weight:600}
+.lc-price{color:var(--gold);font-weight:700}
+.empty-grid{text-align:center;padding:36px 20px;color:var(--mut);grid-column:1/-1}
+.empty-grid .ei{font-size:2.4rem;margin-bottom:8px}
+.empty-grid .et{font-family:'Clash Display',sans-serif;font-size:1rem;color:var(--wht);margin-bottom:5px}
+
+/* ── DISCOVER ── */
+.disc-top{position:relative;z-index:1;background:var(--sur);border-bottom:1px solid var(--bor);
+  padding:10px clamp(12px,3vw,28px);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.disc-locinfo{display:flex;align-items:center;gap:7px;flex:1;min-width:0}
+.dli-nm{font-size:.88rem;font-weight:700;color:var(--wht);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dli-ac{font-size:.67rem;color:var(--mut);margin-top:1px}
+.ch-loc{background:rgba(245,197,24,.1);border:1px solid rgba(245,197,24,.28);
+  border-radius:999px;padding:5px 12px;font-size:.72rem;font-weight:700;color:var(--gold);transition:.2s}
+.ch-loc:hover{background:rgba(245,197,24,.2)}
+.disc-sbar{display:flex;gap:8px;padding:10px clamp(12px,3vw,28px);
+  border-bottom:1px solid var(--bor);position:relative;z-index:1;flex-wrap:wrap}
+.dsb{flex:1;display:flex;min-width:190px;background:var(--sur);
+  border:1.5px solid var(--bor);border-radius:var(--r);overflow:hidden;transition:.2s}
+.dsb:focus-within{border-color:rgba(245,197,24,.4)}
+.dsb input{flex:1;background:none;border:none;outline:none;padding:9px 12px;
+  font-size:.87rem;color:var(--txt);caret-color:var(--gold)}
+.dsb input::placeholder{color:var(--mut)}
+.dsb button{background:var(--gold);color:var(--bg);border:none;padding:0 15px;
+  font-size:.81rem;font-weight:700;transition:.2s}
+.dsb button:hover{background:var(--gold2)}
+.drad{display:flex;align-items:center;gap:5px}
+.drad label{font-size:.68rem;color:var(--mut);white-space:nowrap}
+.drad select{background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);
+  padding:7px 8px;font-size:.76rem;color:var(--txt);outline:none}
+.drad select option{background:var(--card2)}
+.disc-cats{padding:8px clamp(12px,3vw,28px);display:flex;gap:6px;overflow-x:auto;
+  border-bottom:1px solid var(--bor);scrollbar-width:none;position:relative;z-index:1}
+.disc-cats::-webkit-scrollbar{display:none}
+.dcat{background:var(--sur);border:1.5px solid var(--bor);border-radius:999px;
+  padding:5px 12px;font-size:.75rem;font-weight:600;color:var(--mut);white-space:nowrap;flex-shrink:0;transition:.2s}
+.dcat:hover{border-color:rgba(245,197,24,.3);color:var(--txt)}
+.dcat.on{background:rgba(245,197,24,.1);border-color:rgba(245,197,24,.45);color:var(--gold)}
+/* split layout */
+.dlayout{display:grid;grid-template-columns:1fr 380px;position:relative;z-index:1;
+  height:calc(100vh - 230px);min-height:480px}
+.dlist{overflow-y:auto;padding:10px clamp(8px,2vw,14px);
+  scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent}
+.dlist::-webkit-scrollbar{width:3px}
+.dlist::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
+.dmap{position:relative;background:var(--card);border-left:1px solid var(--bor)}
+#discMap{width:100%;height:100%}
+/* result hdr */
+.rhdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:5px}
+.rhdr-l{font-size:.79rem;color:var(--mut)}.rhdr-l strong{color:var(--wht)}
+.sorts{display:flex;gap:3px}
+.srt{background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);
+  padding:4px 9px;font-size:.68rem;font-weight:600;color:var(--mut);transition:.2s}
+.srt:hover,.srt.on{border-color:rgba(245,197,24,.35);color:var(--gold);background:rgba(245,197,24,.07)}
+/* biz card */
+.bcard{background:var(--sur);border:1.5px solid var(--bor);border-radius:var(--r);
+  margin-bottom:7px;cursor:pointer;transition:.22s;overflow:hidden;
+  animation:cIn .28s ease both;position:relative}
+@keyframes cIn{from{opacity:0;transform:translateX(-7px)}to{opacity:1;transform:translateX(0)}}
+.bcard:hover{border-color:rgba(245,197,24,.3);box-shadow:0 6px 20px rgba(0,0,0,.4);transform:translateX(3px)}
+.bcard.hi{border-color:var(--gold);box-shadow:0 0 0 2px rgba(245,197,24,.14)}
+.bcard.usr{border-color:rgba(139,92,246,.28)}
+.bcard.usr:hover{border-color:rgba(139,92,246,.55)}
+.ubdg{position:absolute;top:6px;left:6px;z-index:3;background:rgba(139,92,246,.2);
+  border:1px solid rgba(139,92,246,.45);border-radius:999px;padding:2px 6px;
+  font-size:.58rem;font-weight:700;color:#C4B5FD;letter-spacing:.05em;text-transform:uppercase}
+.binn{display:flex;gap:9px;padding:10px}
+.bthumb{width:62px;height:62px;border-radius:8px;overflow:hidden;flex-shrink:0;
+  background:var(--card);display:flex;align-items:center;justify-content:center;font-size:1.7rem}
+.binfo{flex:1;min-width:0}
+.btop{display:flex;align-items:flex-start;justify-content:space-between;gap:4px;margin-bottom:2px}
+.bnm{font-family:'Clash Display',sans-serif;font-size:.9rem;font-weight:700;
+  color:var(--wht);line-height:1.2;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ob{border-radius:999px;padding:2px 6px;font-size:.58rem;font-weight:700;
+  letter-spacing:.05em;text-transform:uppercase;flex-shrink:0}
+.ob.open{background:rgba(34,212,122,.15);border:1px solid rgba(34,212,122,.26);color:var(--grn)}
+.ob.closed{background:rgba(255,76,106,.12);border:1px solid rgba(255,76,106,.24);color:var(--rose)}
+.ob.reg{background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.24);color:#C4B5FD}
+.bmeta{font-size:.66rem;color:var(--mut);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bfoot{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:.67rem}
+.bdist{color:var(--teal);font-weight:600}
+.bprice{color:var(--gold);font-weight:700;margin-left:auto}
+.favbtn{position:absolute;bottom:8px;right:8px;width:23px;height:23px;border-radius:50%;
+  background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.1);
+  display:flex;align-items:center;justify-content:center;font-size:.7rem;cursor:pointer;transition:.2s;z-index:2}
+.favbtn:hover,.favbtn.fon{border-color:rgba(255,76,106,.4);color:var(--rose)}
+.skel{background:linear-gradient(90deg,var(--sur) 25%,var(--card) 50%,var(--sur) 75%);
+  background-size:200% 100%;animation:shim 1.2s infinite;border-radius:var(--r);height:84px;margin-bottom:7px}
+@keyframes shim{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.empty{text-align:center;padding:32px 14px;color:var(--mut)}
+.empty .ei{font-size:2rem;margin-bottom:6px}
+.empty .et{font-family:'Clash Display',sans-serif;font-size:.94rem;color:var(--wht);margin-bottom:4px}
+/* map legend */
+.mleg{position:absolute;top:10px;right:10px;background:rgba(7,9,15,.92);
+  backdrop-filter:blur(8px);border:1px solid var(--bor);border-radius:var(--rs);
+  padding:8px 11px;z-index:800;font-size:.65rem}
+.ml-t{color:var(--mut);text-transform:uppercase;letter-spacing:.07em;font-weight:700;margin-bottom:4px}
+.ml-r{display:flex;align-items:center;gap:5px;color:var(--txt);margin-bottom:3px}
+.ml-d{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+/* Leaflet */
+.leaflet-container{background:#0B0F1A!important}
+.leaflet-popup-content-wrapper{background:#1A2235!important;border:1px solid rgba(255,255,255,.1)!important;border-radius:12px!important;color:rgba(255,255,255,.9)!important;box-shadow:0 8px 24px rgba(0,0,0,.6)!important}
+.leaflet-popup-tip{background:#1A2235!important}
+.leaflet-popup-close-button{color:rgba(255,255,255,.5)!important}
+.leaflet-popup-content{margin:10px 12px;font-family:'DM Sans',sans-serif;font-size:.8rem}
+.leaflet-popup-content b{color:#fff;font-family:'Clash Display',sans-serif;font-size:.88rem;display:block;margin-bottom:3px}
+.leaflet-control-zoom a{background:#1A2235!important;color:var(--txt)!important;border-color:rgba(255,255,255,.12)!important;font-weight:700}
+.leaflet-control-zoom a:hover{background:#253050!important}
+.leaflet-bar{border:1px solid rgba(255,255,255,.1)!important;box-shadow:0 4px 12px rgba(0,0,0,.4)!important}
+.leaflet-control-attribution{background:rgba(7,9,15,.8)!important;color:rgba(255,255,255,.3)!important;font-size:.58rem!important}
+.leaflet-control-attribution a{color:var(--teal)!important}
+.pop-reg{color:#C4B5FD;font-weight:700}.pop-open{color:var(--grn);font-weight:700}.pop-closed{color:var(--rose);font-weight:700}
+.pop-btn{background:var(--gold);color:var(--bg);border:none;border-radius:6px;padding:4px 9px;font-size:.69rem;font-weight:700;cursor:pointer;margin-top:6px;display:inline-block}
+
+/* ── REGISTER ── */
+.reg-hero{position:relative;z-index:1;text-align:center;padding:38px 20px 26px}
+.reg-hero h1{font-family:'Clash Display',sans-serif;font-size:clamp(1.7rem,4.5vw,2.8rem);
+  font-weight:700;color:var(--wht);letter-spacing:-.04em;margin-bottom:7px}
+.reg-hero h1 em{font-style:normal;background:linear-gradient(120deg,var(--vio),var(--teal));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.reg-hero p{font-size:.87rem;color:var(--mut);line-height:1.7}
+.prog{display:flex;align-items:center;justify-content:center;max-width:680px;margin:0 auto 20px;padding:0 14px}
+.ps{display:flex;flex-direction:column;align-items:center;gap:3px}
+.psc{width:28px;height:28px;border-radius:50%;border:2px solid var(--bor);background:var(--sur);
+  display:flex;align-items:center;justify-content:center;font-size:.71rem;font-weight:700;color:var(--mut);transition:.3s}
+.ps.a .psc{background:var(--vio);border-color:var(--vio);color:#fff}
+.ps.d .psc{background:var(--grn);border-color:var(--grn);color:var(--bg);font-size:.83rem}
+.psl{font-size:.56rem;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.ps.a .psl{color:var(--vio)}.ps.d .psl{color:var(--grn)}
+.pcn{flex:1;height:2px;background:var(--bor);transition:.35s;margin-bottom:11px;min-width:18px;max-width:48px}
+.pcn.d{background:var(--grn)}
+.rwrap{max-width:680px;margin:0 auto;padding:0 14px 80px;position:relative;z-index:1}
+.rsp{display:none}.rsp.on{display:block;animation:fadeUp .25s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.sc{background:var(--sur);border:1.5px solid var(--bor);border-radius:var(--r);overflow:hidden}
+.sch{padding:15px 18px 11px;border-bottom:1px solid var(--bor)}
+.sch h2{font-family:'Clash Display',sans-serif;font-size:1.05rem;font-weight:700;color:var(--wht);margin-bottom:3px;letter-spacing:-.02em}
+.sch p{font-size:.77rem;color:var(--mut)}
+.scb{padding:15px 18px}
+/* sector */
+.secsrch{display:flex;align-items:center;gap:7px;background:var(--bg);border:1.5px solid var(--bor);
+  border-radius:var(--rs);padding:0 10px;margin-bottom:12px;transition:.2s}
+.secsrch:focus-within{border-color:rgba(139,92,246,.5)}
+.secsrch input{flex:1;background:none;border:none;outline:none;padding:9px 4px;
+  font-size:.86rem;color:var(--txt);caret-color:var(--gold)}
+.secsrch input::placeholder{color:var(--mut)}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(138px,1fr));gap:8px}
+.scard{background:var(--bg);border:1.5px solid var(--bor);border-radius:var(--r);
+  padding:11px 9px;cursor:pointer;transition:.2s;text-align:center;position:relative}
+.scard:hover{border-color:rgba(139,92,246,.4);background:rgba(139,92,246,.04)}
+.scard.sel{border-color:var(--vio);background:rgba(139,92,246,.1)}
+.scard .sci{font-size:1.45rem;margin-bottom:4px}
+.scard .scn{font-size:.77rem;font-weight:600;color:var(--wht);margin-bottom:2px}
+.scard .scd{font-size:.64rem;color:var(--mut);line-height:1.4}
+.scard .sck{position:absolute;top:6px;right:6px;font-size:.6rem;padding:1px 5px;
+  border-radius:999px;background:rgba(139,92,246,.2);color:#C4B5FD;font-weight:700;display:none}
+.scard.sel .sck{display:block}
+.no-res{text-align:center;padding:28px;color:var(--mut);font-size:.84rem;grid-column:1/-1}
+/* fields */
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+.fg .full{grid-column:1/-1}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:.72rem;font-weight:600;color:var(--txt)}
+.field label .req{color:var(--rose);margin-left:2px}
+.field label .opt{color:var(--mut);font-weight:400;margin-left:4px;font-size:.67rem}
+.field input,.field select,.field textarea{background:var(--bg);border:1.5px solid var(--bor);
+  border-radius:var(--rs);padding:9px 11px;font-size:.86rem;color:var(--txt);outline:none;
+  transition:.2s;width:100%;appearance:none;caret-color:var(--gold)}
+.field input::placeholder,.field textarea::placeholder{color:var(--mut)}
+.field input:focus,.field select:focus,.field textarea:focus{
+  border-color:rgba(139,92,246,.55);background:rgba(139,92,246,.04);box-shadow:0 0 0 3px rgba(139,92,246,.07)}
+.field.err input,.field.err select,.field.err textarea{border-color:var(--rose)!important}
+.field.err .em{display:block}.em{font-size:.67rem;color:var(--rose);display:none;margin-top:1px}
+.field textarea{resize:vertical;min-height:76px}
+.field select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='rgba(255,255,255,.4)' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+.field select option{background:var(--card2)}
+/* map pick */
+.mpw{position:relative;border-radius:var(--rs);overflow:hidden;border:1.5px solid var(--bor);transition:.2s}
+.mpw.pinned{border-color:rgba(34,212,122,.5)}
+#pickMap{width:100%;height:200px}
+.mhint{position:absolute;top:8px;left:50%;transform:translateX(-50%);
+  background:rgba(7,9,15,.9);backdrop-filter:blur(8px);border:1px solid var(--bor);
+  border-radius:999px;padding:5px 12px;font-size:.68rem;color:var(--txt);
+  white-space:nowrap;pointer-events:none;z-index:500;transition:.25s}
+.mhint.hi{opacity:0}
+.pinf{display:none;align-items:center;gap:6px;background:rgba(34,212,122,.09);
+  border:1px solid rgba(34,212,122,.22);border-radius:var(--rs);padding:7px 11px;
+  font-size:.71rem;color:var(--grn);margin-top:7px}
+.pinf.show{display:flex}
+.crow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.gpsbtn{display:flex;align-items:center;gap:7px;background:rgba(0,212,180,.08);
+  border:1.5px solid rgba(0,212,180,.22);border-radius:var(--rs);padding:8px 12px;
+  font-size:.8rem;font-weight:600;color:var(--teal);cursor:pointer;transition:.2s;width:100%;margin-bottom:8px}
+.gpsbtn:hover{background:rgba(0,212,180,.15)}
+/* products */
+.prlist{display:flex;flex-direction:column;gap:7px;margin-bottom:8px}
+.prrow{display:grid;grid-template-columns:1fr 95px 80px 26px;gap:6px;align-items:center}
+.prrow input,.prrow select{background:var(--bg);border:1.5px solid var(--bor);border-radius:var(--rs);
+  padding:7px 8px;font-size:.8rem;color:var(--txt);outline:none;width:100%;appearance:none;caret-color:var(--gold)}
+.prrow input::placeholder{color:var(--mut)}
+.prrow input:focus,.prrow select:focus{border-color:rgba(139,92,246,.5)}
+.prrow select option{background:var(--card2)}
+.del-r{width:25px;height:25px;background:rgba(255,76,106,.1);border:1px solid rgba(255,76,106,.2);
+  border-radius:var(--rs);display:flex;align-items:center;justify-content:center;
+  font-size:.72rem;color:var(--rose);cursor:pointer;transition:.2s;flex-shrink:0}
+.del-r:hover{background:rgba(255,76,106,.22)}
+.add-pr{display:flex;align-items:center;gap:7px;background:rgba(139,92,246,.07);
+  border:1.5px dashed rgba(139,92,246,.25);border-radius:var(--rs);padding:8px 12px;
+  font-size:.79rem;font-weight:600;color:#C4B5FD;cursor:pointer;transition:.2s;width:100%}
+.add-pr:hover{background:rgba(139,92,246,.13);border-color:rgba(139,92,246,.45)}
+/* hours */
+.hgrid{display:flex;flex-direction:column;gap:5px}
+.hrow{display:grid;grid-template-columns:80px 1fr 1fr 64px;gap:5px;align-items:center}
+.hrow .dl{font-size:.77rem;font-weight:600;color:var(--txt)}
+.hrow input[type=time]{background:var(--bg);border:1.5px solid var(--bor);
+  border-radius:var(--rs);padding:7px 8px;font-size:.79rem;color:var(--txt);outline:none;width:100%}
+.hrow input[type=time]:focus{border-color:rgba(139,92,246,.5)}
+.cltog{display:flex;align-items:center;gap:4px;font-size:.73rem;font-weight:500;color:var(--mut);cursor:pointer;user-select:none}
+.cltog input[type=checkbox]{accent-color:var(--vio);width:13px;height:13px}
+.cltog.cl{color:var(--rose)}
+/* uploads */
+.uzg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:7px}
+.uz{border:2px dashed rgba(255,255,255,.09);border-radius:var(--rs);padding:14px 8px;
+  text-align:center;transition:.2s;background:var(--bg);position:relative;overflow:hidden;cursor:pointer}
+.uz:hover{border-color:rgba(139,92,246,.4);background:rgba(139,92,246,.06)}
+.uz input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;padding:0;border:none}
+.uz.done{border-color:rgba(34,212,122,.38);background:rgba(34,212,122,.07)}
+.uzi{font-size:1.3rem;margin-bottom:3px}
+.uzl{font-size:.69rem;font-weight:600;color:var(--txt);display:block;margin-bottom:1px}
+.uzs{font-size:.59rem;color:var(--mut)}
+/* social */
+.socrow{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.soci{width:29px;height:29px;border-radius:var(--rs);display:flex;align-items:center;justify-content:center;font-size:.88rem;flex-shrink:0}
+.si-wa{background:rgba(37,211,102,.13);border:1px solid rgba(37,211,102,.25)}
+.si-ig{background:rgba(225,48,108,.13);border:1px solid rgba(225,48,108,.25)}
+.si-fb{background:rgba(24,119,242,.13);border:1px solid rgba(24,119,242,.25)}
+.si-yt{background:rgba(255,0,0,.13);border:1px solid rgba(255,0,0,.25)}
+.si-up{background:rgba(139,92,246,.13);border:1px solid rgba(139,92,246,.25)}
+.socrow input{flex:1;background:var(--bg);border:1.5px solid var(--bor);border-radius:var(--rs);
+  padding:8px 10px;font-size:.81rem;color:var(--txt);outline:none;caret-color:var(--gold)}
+.socrow input::placeholder{color:var(--mut)}
+.socrow input:focus{border-color:rgba(139,92,246,.5)}
+/* toggles */
+.togrow{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bor)}
+.togrow:last-child{border-bottom:none}
+.tl{font-size:.81rem;font-weight:500;color:var(--txt)}
+.ts2{font-size:.67rem;color:var(--mut);margin-top:1px}
+.tsw{position:relative;width:38px;height:21px;flex-shrink:0}
+.tsw input{display:none}
+.tsw .sl{position:absolute;inset:0;background:rgba(255,255,255,.1);border-radius:999px;
+  cursor:pointer;transition:.25s;border:1px solid var(--bor)}
+.tsw input:checked+.sl{background:var(--vio)}
+.tsw .sl::after{content:'';position:absolute;width:15px;height:15px;border-radius:50%;
+  background:#fff;top:2px;left:2px;transition:.25s}
+.tsw input:checked+.sl::after{transform:translateX(17px)}
+/* nav */
+.snav{display:flex;gap:8px;margin-top:15px}
+.btn-n{flex:1;padding:11px 15px;background:var(--vio);color:#fff;border:none;
+  border-radius:var(--rs);font-size:.86rem;font-weight:700;cursor:pointer;transition:.2s}
+.btn-n:hover{background:#7C3AED;transform:translateY(-1px)}
+.btn-b{padding:11px 15px;background:none;border:1.5px solid var(--bor);color:var(--mut);
+  border-radius:var(--rs);font-size:.86rem;font-weight:600;cursor:pointer;transition:.2s}
+.btn-b:hover{border-color:rgba(255,255,255,.22);color:var(--wht)}
+.btn-sub{flex:1;padding:12px 15px;background:linear-gradient(135deg,var(--vio),#6D28D9);
+  color:#fff;border:none;border-radius:var(--rs);font-size:.89rem;font-weight:700;
+  cursor:pointer;transition:.3s;box-shadow:0 8px 24px rgba(139,92,246,.26);
+  display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-sub:hover{transform:translateY(-2px);box-shadow:0 14px 34px rgba(139,92,246,.38)}
+.btn-sub .arr{transition:.2s}.btn-sub:hover .arr{transform:translateX(4px)}
+.tip{display:flex;align-items:flex-start;gap:7px;background:rgba(245,197,24,.05);
+  border:1px solid rgba(245,197,24,.14);border-radius:var(--rs);padding:8px 11px;margin-top:4px}
+.tip-i{font-size:.86rem;flex-shrink:0;margin-top:1px}
+.tip-t{font-size:.71rem;color:rgba(255,255,255,.58);line-height:1.6}
+
+/* ── PROFILE ── */
+.prof-acts{max-width:860px;margin:0 auto;padding:10px clamp(12px,4vw,32px);
+  display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--bor);position:relative;z-index:1}
+.back-btn{display:flex;align-items:center;gap:5px;font-size:.79rem;font-weight:600;
+  color:var(--mut);background:none;border:none;cursor:pointer;transition:.2s;padding:5px 10px;border-radius:var(--rs)}
+.back-btn:hover{color:var(--wht);background:rgba(255,255,255,.06)}
+.live-pill{display:flex;align-items:center;gap:5px;font-size:.72rem;font-weight:600;color:var(--grn)}
+.bid{background:rgba(0,212,180,.08);border:1px solid rgba(0,212,180,.2);border-radius:999px;
+  padding:2px 8px;font-size:.62rem;font-weight:700;color:var(--teal);font-family:monospace;margin-left:5px}
+.pa-sh{background:var(--gold);color:var(--bg);border:none;border-radius:var(--rs);
+  padding:6px 13px;font-size:.76rem;font-weight:700;cursor:pointer;transition:.2s;margin-left:auto}
+.pa-sh:hover{background:var(--gold2)}
+.prof-hero{position:relative;height:185px;overflow:hidden;background:linear-gradient(135deg,#1A2235,#212D42);
+  display:flex;align-items:center;justify-content:center}
+.phbg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:6.5rem;opacity:.16}
+.phov{position:absolute;inset:0;background:linear-gradient(to top,rgba(7,9,15,.97),rgba(7,9,15,.05))}
+.phcnt{position:absolute;bottom:13px;left:clamp(12px,4vw,32px);right:clamp(12px,4vw,32px);z-index:2}
+.ph-badge{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 9px;
+  font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;
+  background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.32);color:#C4B5FD}
+.ph-name{font-family:'Clash Display',sans-serif;font-size:clamp(1.4rem,5vw,2rem);
+  font-weight:700;color:var(--wht);letter-spacing:-.03em;line-height:1.1;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.verified{font-size:.7rem;font-weight:700;color:var(--grn)}
+.prof-body{max-width:860px;margin:0 auto;padding:0 clamp(12px,4vw,32px) 60px}
+.pquick{display:flex;gap:10px;flex-wrap:wrap;padding:13px 0;border-bottom:1px solid var(--bor);margin-bottom:17px}
+.pq{display:flex;align-items:center;gap:5px;font-size:.8rem}
+.pqv{color:var(--wht);font-weight:600}.pqm{color:var(--mut)}
+.op-pill{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 11px;font-size:.7rem;font-weight:700;letter-spacing:.04em}
+.op-pill.open{background:rgba(34,212,122,.13);border:1px solid rgba(34,212,122,.26);color:var(--grn)}
+.op-pill.closed{background:rgba(255,76,106,.12);border:1px solid rgba(255,76,106,.24);color:var(--rose)}
+.p2col{display:grid;grid-template-columns:1fr 310px;gap:20px}
+.ptit{font-family:'Clash Display',sans-serif;font-size:.95rem;font-weight:700;color:var(--wht);margin:0 0 10px;letter-spacing:-.01em}
+.pdesc{font-size:.84rem;color:var(--mut);line-height:1.75;margin-bottom:17px}
+.ptbl{width:100%;border-collapse:collapse;margin-bottom:17px}
+.ptbl th{font-size:.67rem;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.07em;padding:5px 9px;text-align:left;border-bottom:1px solid var(--bor)}
+.ptbl td{padding:7px 9px;font-size:.81rem;border-bottom:1px solid rgba(255,255,255,.04)}
+.ptbl td.price{text-align:right;font-weight:700;color:var(--gold)}
+.ptbl tr:last-child td{border-bottom:none}
+.ptbl tr:hover td{background:rgba(255,255,255,.025)}
+.htbl{width:100%;border-collapse:collapse;margin-bottom:17px}
+.htbl td{padding:6px 9px;font-size:.8rem;border-bottom:1px solid rgba(255,255,255,.04)}
+.htbl td:first-child{font-weight:600;color:var(--txt);width:95px}
+.htbl td:last-child{color:var(--mut);text-align:right}
+.htbl tr.cl td{color:rgba(255,76,106,.6)}
+.htbl tr:last-child td{border-bottom:none}
+/* contact */
+.cc{background:var(--sur);border:1.5px solid var(--bor);border-radius:var(--r);
+  padding:14px;margin-bottom:13px;position:sticky;top:67px}
+.cc-t{font-family:'Clash Display',sans-serif;font-size:.9rem;font-weight:700;color:var(--wht);margin-bottom:10px}
+.cc-btn{display:flex;align-items:center;gap:7px;width:100%;padding:10px 12px;
+  border:none;border-radius:var(--rs);font-size:.81rem;font-weight:700;
+  cursor:pointer;transition:.2s;margin-bottom:6px;text-align:left}
+.cc-btn:last-of-type{margin-bottom:0}
+.cc-btn.wa{background:rgba(37,211,102,.13);color:#4ade80}.cc-btn.wa:hover{background:rgba(37,211,102,.22)}
+.cc-btn.ph{background:rgba(245,197,24,.1);color:var(--gold)}.cc-btn.ph:hover{background:rgba(245,197,24,.2)}
+.cc-btn.mp{background:rgba(76,139,255,.1);color:#7EB3FF}.cc-btn.mp:hover{background:rgba(76,139,255,.2)}
+.cc-btn.sh{background:rgba(255,255,255,.05);color:var(--txt)}.cc-btn.sh:hover{background:rgba(255,255,255,.09)}
+.ci-row{display:flex;align-items:flex-start;gap:6px;padding:6px 0;border-bottom:1px solid var(--bor);font-size:.78rem}
+.ci-row:last-child{border-bottom:none}
+.ci-lbl{color:var(--mut);width:70px;flex-shrink:0}
+.ci-val{color:var(--txt);font-weight:500;flex:1;word-break:break-all}
+.pmini{height:150px;border-radius:var(--rs);overflow:hidden;border:1px solid var(--bor);margin-bottom:13px}
+#profMapEl{width:100%;height:100%}
+.sl-wrap{display:flex;gap:7px;flex-wrap:wrap;margin-top:5px}
+.sl-btn{display:flex;align-items:center;gap:5px;padding:5px 11px;
+  border-radius:999px;font-size:.74rem;font-weight:600;cursor:pointer;transition:.2s;border:none}
+.sl-btn:hover{filter:brightness(1.15)}
+.sl-ig{background:rgba(225,48,108,.13);color:#f472b6;border:1px solid rgba(225,48,108,.25)}
+.sl-fb{background:rgba(24,119,242,.13);color:#60a5fa;border:1px solid rgba(24,119,242,.25)}
+.sl-yt{background:rgba(255,0,0,.13);color:#f87171;border:1px solid rgba(255,0,0,.25)}
+
+/* ── MY SHOPS ── */
+.myw{max-width:820px;margin:0 auto;padding:26px clamp(12px,4vw,32px) 80px;position:relative;z-index:1}
+.myh{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:9px}
+.myh h1{font-family:'Clash Display',sans-serif;font-size:1.6rem;font-weight:700;color:var(--wht);letter-spacing:-.03em}
+.shgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:11px}
+.shcard{background:var(--sur);border:1.5px solid rgba(139,92,246,.22);border-radius:var(--r);overflow:hidden;transition:.22s}
+.shcard:hover{border-color:rgba(139,92,246,.5);transform:translateY(-3px);box-shadow:0 10px 24px rgba(0,0,0,.4)}
+.shbanner{height:84px;background:linear-gradient(135deg,#1e1a3a,#2d1f5e);
+  display:flex;align-items:center;justify-content:center;font-size:2.3rem}
+.shbody{padding:10px 12px}
+.shname{font-family:'Clash Display',sans-serif;font-size:.88rem;font-weight:700;color:var(--wht);margin-bottom:2px}
+.shcat{font-size:.62rem;font-weight:700;color:#C4B5FD;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
+.shaddr{font-size:.67rem;color:var(--mut);margin-bottom:3px;line-height:1.5;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.shcoord{font-size:.63rem;color:var(--teal);margin-bottom:5px}
+.shmeta{font-size:.64rem;color:var(--mut);margin-bottom:6px}
+.shacts{display:flex;gap:5px}
+.msb{flex:1;padding:5px 0;border-radius:6px;font-size:.67rem;font-weight:700;border:none;text-align:center;cursor:pointer;transition:.2s}
+.msb.view{background:var(--gold);color:var(--bg)}.msb.view:hover{background:var(--gold2)}
+.msb.maps{background:rgba(76,139,255,.12);border:1px solid rgba(76,139,255,.25);color:#7EB3FF}.msb.maps:hover{background:rgba(76,139,255,.2)}
+.msb.del{background:rgba(255,76,106,.12);border:1px solid rgba(255,76,106,.25);color:var(--rose)}.msb.del:hover{background:rgba(255,76,106,.2)}
+.noshops{text-align:center;padding:46px 20px}
+.noshops .ni{font-size:2.3rem;margin-bottom:9px}
+.noshops h2{font-family:'Clash Display',sans-serif;font-size:1.05rem;color:var(--wht);margin-bottom:5px}
+.noshops p{font-size:.79rem;color:var(--mut);margin-bottom:15px;line-height:1.6;max-width:310px;margin-left:auto;margin-right:auto}
+
+/* ── MODAL ── */
+.mov{display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.86);
+  backdrop-filter:blur(12px);padding:16px;overflow-y:auto;align-items:flex-start;justify-content:center}
+.mov.open{display:flex;animation:fadeIn .2s ease both}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.mbox{background:var(--sur);border:1px solid var(--bor);border-radius:20px;
+  width:100%;max-width:560px;margin:auto;box-shadow:0 32px 72px rgba(0,0,0,.8);
+  animation:mIn .28s cubic-bezier(.34,1.2,.64,1) both;overflow:hidden}
+@keyframes mIn{from{opacity:0;transform:scale(.93)}to{opacity:1;transform:scale(1)}}
+.mhero{height:160px;position:relative;overflow:hidden;background:var(--card);
+  display:flex;align-items:center;justify-content:center;font-size:3.5rem}
+.mhov{position:absolute;inset:0;background:linear-gradient(to top,rgba(7,9,15,.97),rgba(7,9,15,.05))}
+.mcls{position:absolute;top:10px;right:10px;z-index:2;width:27px;height:27px;
+  background:rgba(0,0,0,.6);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.14);
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:.78rem;color:var(--mut);cursor:pointer;transition:.2s}
+.mcls:hover{color:#fff;background:rgba(255,76,106,.3)}
+.mhcnt{position:absolute;bottom:11px;left:14px;right:14px;z-index:2}
+.msrc{display:inline-flex;align-items:center;gap:3px;border-radius:999px;padding:2px 8px;
+  font-size:.59rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
+.msrc.reg{background:rgba(139,92,246,.14);border:1px solid rgba(139,92,246,.28);color:#C4B5FD}
+.mtit{font-family:'Clash Display',sans-serif;font-size:1.35rem;font-weight:700;color:#fff;letter-spacing:-.03em;line-height:1.1}
+.mbody{padding:14px}
+.mquick{display:flex;gap:8px;flex-wrap:wrap;padding-bottom:11px;border-bottom:1px solid var(--bor);margin-bottom:11px}
+.mqi{display:flex;flex-direction:column;gap:2px;min-width:66px}
+.mqlab{font-size:.6rem;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.mqval{font-size:.81rem;font-weight:600;color:#fff}
+.mstit{font-family:'Clash Display',sans-serif;font-size:.86rem;font-weight:600;color:#fff;margin:10px 0 5px}
+.mdesc{font-size:.81rem;color:var(--mut);line-height:1.7}
+.mmini{height:120px;border-radius:var(--rs);border:1px solid var(--bor);overflow:hidden}
+#miniMap{width:100%;height:100%}
+.macts{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.mact{flex:1;min-width:80px;padding:9px 10px;border-radius:var(--rs);font-size:.79rem;font-weight:700;cursor:pointer;transition:.2s;border:none;text-align:center}
+.mact.p{background:var(--gold);color:var(--bg)}.mact.p:hover{background:var(--gold2)}
+.mact.s{background:none;border:1.5px solid var(--bor);color:var(--txt)}.mact.s:hover{background:rgba(255,255,255,.04)}
+.mact.m{background:rgba(76,139,255,.11);border:1.5px solid rgba(76,139,255,.25);color:#7EB3FF}.mact.m:hover{background:rgba(76,139,255,.2)}
+
+/* toast */
+.toast{position:fixed;bottom:17px;left:50%;transform:translateX(-50%) translateY(68px);
+  background:var(--card2);border:1px solid var(--bor);border-radius:999px;
+  padding:8px 16px;font-size:.76rem;font-weight:600;color:var(--txt);
+  box-shadow:0 8px 22px rgba(0,0,0,.5);z-index:9999;
+  transition:.28s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;pointer-events:none}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+@media(max-width:860px){.dlayout{grid-template-columns:1fr;height:auto}.dmap{height:300px}.ntabs{display:none}.p2col{grid-template-columns:1fr}.cc{position:static}}
+@media(max-width:540px){.fg{grid-template-columns:1fr}.uzg{grid-template-columns:1fr 1fr}.hrow{grid-template-columns:70px 1fr 1fr 58px;gap:4px}.prrow{grid-template-columns:1fr 82px 23px}.prrow .pru{display:none}.cat-grid{grid-template-columns:repeat(auto-fill,minmax(88px,1fr))}.hstats{gap:15px}.sgrid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}.hloc{display:none}}
+</style>
+</head>
+<body>
+<!-- NAV -->
+<nav>
+  <div class="logo" onclick="goTo('home')"><div class="logo-dot"></div>Deckscrab</div>
+  <div class="ntabs">
+    <button class="ntab on" id="tab-home" onclick="goTo('home')">🏠 Home</button>
+    <button class="ntab" id="tab-discover" onclick="goTo('discover')">🔍 Discover</button>
+    <button class="ntab" id="tab-register" onclick="goTo('register')">🏪 Register</button>
+    <button class="ntab" id="tab-myshops" onclick="goTo('myshops')">📋 My Shops</button>
+  </div>
+  <div class="nav-r">
+    <div class="nav-loc" onclick="openLocModal()">
+      <div class="ld"></div><span class="lt" id="navLoc">Set Location</span>
+    </div>
+    <button class="nav-add" onclick="goTo('register')">+ Add Shop</button>
+  </div>
+</nav>
+
+<!-- ════ HOME ════ -->
+<div id="page-home" class="page on">
+  <div class="home-hero">
+    <div class="hpill">📍 Free · Instant · 81+ Business Types</div>
+    <h1>Find The <em>Best Local</em><br/>Businesses Near You</h1>
+    <p>Search shops, restaurants, hospitals, welders and every local business — with real prices and distance.</p>
+    <div class="hsearch">
+      <div class="hgps" id="hgpsBtn" onclick="startGPS('home')" title="Use my exact GPS location">📡</div>
+      <div class="hloc">
+        <input type="text" id="hLocIn" placeholder="Your area…"
+          onkeydown="if(event.key==='Enter')doHomeSearch()"/>
+      </div>
+      <div class="hmain">
+        <input type="text" id="hSearchIn" placeholder="Search business, shop, service…"
+          onkeydown="if(event.key==='Enter')doHomeSearch()"/>
+      </div>
+      <button class="hgo" onclick="doHomeSearch()">🔍 Search</button>
+    </div>
+    <div class="locbar" id="locBar"><div class="lb a"></div><span id="locMsg">Click 📡 or type your area to start</span></div>
+    <div class="chips">
+      <div class="chip" onclick="quickSearch('restaurant')">🍛 Restaurant</div>
+      <div class="chip" onclick="quickSearch('grocery')">🛒 Grocery</div>
+      <div class="chip" onclick="quickSearch('welder')">⚡ Welder</div>
+      <div class="chip" onclick="quickSearch('hospital')">🏥 Hospital</div>
+      <div class="chip" onclick="quickSearch('pharmacy')">💊 Pharmacy</div>
+      <div class="chip" onclick="quickSearch('mechanic')">🔧 Mechanic</div>
+      <div class="chip" onclick="quickSearch('salon')">💇 Salon</div>
+    </div>
+  </div>
+  <div class="hstats">
+    <div class="hst"><span class="hsn" id="statBiz">0</span><div class="hsl">Businesses Listed</div></div>
+    <div class="hst"><span class="hsn">81</span><div class="hsl">Business Sectors</div></div>
+    <div class="hst"><span class="hsn" id="statCities">—</span><div class="hsl">Cities</div></div>
+    <div class="hst"><span class="hsn">Free<span class="ac">∞</span></span><div class="hsl">Always Free</div></div>
+  </div>
+  <div class="cat-sect">
+    <div class="sect-title">Browse by Category <button class="see-all" onclick="goTo('discover')">See all →</button></div>
+    <div class="cat-grid" id="catGrid"></div>
+  </div>
+  <div class="list-sect">
+    <div class="sect-title">Recently Listed Businesses <button class="see-all" onclick="goTo('discover')">View all →</button></div>
+    <div class="lgrid" id="recentGrid"></div>
+  </div>
+</div>
+
+<!-- ════ DISCOVER ════ -->
+<div id="page-discover" class="page">
+  <div class="disc-top">
+    <div class="disc-locinfo">
+      <div>
+        <div class="dli-nm" id="discLocNm">Set your location</div>
+        <div class="dli-ac" id="discLocAc">to find businesses near you</div>
+      </div>
+    </div>
+    <button class="ch-loc" onclick="openLocModal()">📍 Change Location</button>
+  </div>
+  <div class="disc-sbar">
+    <div class="dsb">
+      <input type="text" id="discSearchIn" placeholder="Search shops, services, business name…"
+        onkeydown="if(event.key==='Enter')discSearch()"/>
+      <button onclick="discSearch()">Search</button>
+    </div>
+    <div class="drad">
+      <label>Radius</label>
+      <select id="discRad" onchange="discSearch()">
+        <option value="0.5">500m</option><option value="1" selected>1km</option>
+        <option value="2">2km</option><option value="5">5km</option><option value="10">10km</option>
+      </select>
+    </div>
+  </div>
+  <div class="disc-cats">
+    <button class="dcat on" onclick="fCat(this,'')">🌟 All</button>
+    <button class="dcat" onclick="fCat(this,'food')">🍛 Food</button>
+    <button class="dcat" onclick="fCat(this,'retail')">🛒 Shops</button>
+    <button class="dcat" onclick="fCat(this,'health')">🏥 Health</button>
+    <button class="dcat" onclick="fCat(this,'service')">🔧 Services</button>
+    <button class="dcat" onclick="fCat(this,'beauty')">💇 Beauty</button>
+    <button class="dcat" onclick="fCat(this,'education')">🏫 Education</button>
+    <button class="dcat" onclick="fCat(this,'finance')">🏦 Finance</button>
+  </div>
+  <div class="dlayout">
+    <div class="dlist" id="dlist">
+      <div class="rhdr">
+        <div class="rhdr-l"><strong id="discCount">0</strong> businesses found</div>
+        <div class="sorts">
+          <button class="srt on" onclick="sortBy(this,'newest')">🆕 Newest</button>
+          <button class="srt" onclick="sortBy(this,'name')">🔤 Name</button>
+          <button class="srt" onclick="sortBy(this,'distance')">📍 Distance</button>
+        </div>
+      </div>
+      <div id="discCards">
+        <div class="empty"><div class="ei">📍</div><div class="et">Set Your Location</div>
+          <div>Click "Change Location" to find businesses near you.</div></div>
+      </div>
+    </div>
+    <div class="dmap">
+      <div id="discMap"></div>
+      <div class="mleg">
+        <div class="ml-t">Legend</div>
+        <div class="ml-r"><div class="ml-d" style="background:var(--vio)"></div>Registered Shop</div>
+        <div class="ml-r"><div class="ml-d" style="background:var(--grn)"></div>Open Now</div>
+        <div class="ml-r"><div class="ml-d" style="background:var(--rose)"></div>Closed</div>
+        <div class="ml-r"><div class="ml-d" style="background:var(--blue)"></div>You</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ REGISTER ════ -->
+<div id="page-register" class="page">
+  <div class="reg-hero">
+    <div class="hpill" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.28);color:#C4B5FD">🏪 Free Business Registration</div>
+    <h1>Register Your <em>Business</em></h1>
+    <p>Pin your location, add details, go live instantly. 100% free forever.</p>
+  </div>
+  <div class="prog" id="regProg">
+    <div class="ps a" id="rps0"><div class="psc">1</div><div class="psl">Sector</div></div>
+    <div class="pcn" id="rpc0"></div>
+    <div class="ps" id="rps1"><div class="psc">2</div><div class="psl">Details</div></div>
+    <div class="pcn" id="rpc1"></div>
+    <div class="ps" id="rps2"><div class="psc">3</div><div class="psl">Location</div></div>
+    <div class="pcn" id="rpc2"></div>
+    <div class="ps" id="rps3"><div class="psc">4</div><div class="psl">Products</div></div>
+    <div class="pcn" id="rpc3"></div>
+    <div class="ps" id="rps4"><div class="psc">5</div><div class="psl">Hours</div></div>
+    <div class="pcn" id="rpc4"></div>
+    <div class="ps" id="rps5"><div class="psc">6</div><div class="psl">Photos</div></div>
+    <div class="pcn" id="rpc5"></div>
+    <div class="ps" id="rps6"><div class="psc">7</div><div class="psl">Contact</div></div>
+  </div>
+  <div class="rwrap">
+    <!-- Step 0 Sector -->
+    <div class="rsp on" id="rs0"><div class="sc">
+      <div class="sch"><h2>Choose Your Business Sector</h2><p>81+ categories — search or browse</p></div>
+      <div class="scb">
+        <div class="secsrch"><span>🔍</span>
+          <input type="text" id="secQ" placeholder="Search… welder, grocery, doctor, salon, mechanic…" oninput="filterSecs(this.value)"/></div>
+        <div class="sgrid" id="secGrid"></div>
+        <div class="snav"><button class="btn-n" onclick="rNext(0)">Next: Business Details →</button></div>
+      </div>
+    </div></div>
+    <!-- Step 1 Details -->
+    <div class="rsp" id="rs1"><div class="sc">
+      <div class="sch"><h2>Business Details</h2><p>Tell customers about your business</p></div>
+      <div class="scb">
+        <div class="fg">
+          <div class="field full" id="fw-nm"><label>Business Name <span class="req">*</span></label>
+            <input type="text" id="f-nm" placeholder="e.g. Sri Murugan Provision Store"/>
+            <div class="em">Please enter your business name.</div></div>
+          <div class="field" id="fw-ow"><label>Owner Name <span class="req">*</span></label>
+            <input type="text" id="f-ow" placeholder="Full name"/>
+            <div class="em">Please enter owner name.</div></div>
+          <div class="field"><label>Est. Year <span class="opt">(optional)</span></label>
+            <input type="number" id="f-yr" placeholder="e.g. 2015" min="1900" max="2025"/></div>
+          <div class="field full" id="fw-ds"><label>Description <span class="req">*</span></label>
+            <textarea id="f-ds" placeholder="What do you offer? What makes you special? Mention your best products/services…"></textarea>
+            <div class="em">Add a description (min 20 chars).</div></div>
+          <div class="field"><label>Price Range</label>
+            <select id="f-pr"><option value="1">₹ Budget</option><option value="2" selected>₹₹ Mid-range</option><option value="3">₹₹₹ Premium</option></select></div>
+          <div class="field"><label>Search Keywords <span class="opt">(optional)</span></label>
+            <input type="text" id="f-kw" placeholder="e.g. fresh, home delivery, 24/7"/></div>
+        </div>
+        <div class="snav"><button class="btn-b" onclick="rPrev(1)">← Back</button><button class="btn-n" onclick="rNext(1)">Next: Location →</button></div>
+      </div>
+    </div></div>
+    <!-- Step 2 Location -->
+    <div class="rsp" id="rs2"><div class="sc">
+      <div class="sch"><h2>Business Location</h2><p>Pin your exact spot — address auto-fills from the map</p></div>
+      <div class="scb">
+        <div class="fg">
+          <div class="field full" id="fw-ad"><label>Street Address <span class="req">*</span></label>
+            <input type="text" id="f-ad" placeholder="Shop No., Street Name, Area"/>
+            <div class="em">Please enter your address.</div></div>
+          <div class="field" id="fw-ct"><label>City / Town <span class="req">*</span></label>
+            <input type="text" id="f-ct" placeholder="e.g. Arakkonam"/>
+            <div class="em">Please enter your city.</div></div>
+          <div class="field" id="fw-pc"><label>Pincode <span class="req">*</span></label>
+            <input type="number" id="f-pc" placeholder="e.g. 631101"/>
+            <div class="em">Enter a valid pincode.</div></div>
+          <div class="field"><label>District</label><input type="text" id="f-di" placeholder="e.g. Vellore"/></div>
+          <div class="field"><label>State</label>
+            <select id="f-st"><option>Tamil Nadu</option><option>Karnataka</option><option>Kerala</option>
+              <option>Andhra Pradesh</option><option>Telangana</option><option>Maharashtra</option><option>Other</option></select></div>
+        </div>
+        <button class="gpsbtn" onclick="regGPS()" id="regGpsBtn"><span id="regGpsIco">📡</span><span>Use my GPS location</span></button>
+        <div class="field" style="margin-bottom:6px"><label>📍 Click the map to pin your shop's exact location <span class="req">*</span></label></div>
+        <div class="mpw" id="mpw"><div id="pickMap"></div>
+          <div class="mhint" id="mhint">🖱️ Click anywhere on the map to drop your shop pin</div></div>
+        <div class="pinf" id="pinf"><span>✅</span><span id="pintx">Location pinned!</span></div>
+        <div class="crow">
+          <div class="field"><label>Latitude (manual)</label><input type="number" id="f-la" placeholder="auto-filled" step="any" oninput="manPin()"/></div>
+          <div class="field"><label>Longitude (manual)</label><input type="number" id="f-lo" placeholder="auto-filled" step="any" oninput="manPin()"/></div>
+        </div>
+        <div class="snav"><button class="btn-b" onclick="rPrev(2)">← Back</button><button class="btn-n" onclick="rNext(2)">Next: Products →</button></div>
+      </div>
+    </div></div>
+    <!-- Step 3 Products -->
+    <div class="rsp" id="rs3"><div class="sc">
+      <div class="sch"><h2 id="s3t">Products & Prices</h2><p id="s3s">Add items with prices — enables comparison for customers</p></div>
+      <div class="scb">
+        <div class="prlist" id="prList"></div>
+        <button class="add-pr" onclick="addPR()">+ Add Product / Service / Item</button>
+        <div class="tip" style="margin-top:10px"><div class="tip-i">💡</div><div class="tip-t">Add real prices. Customers compare across shops — accurate pricing = more visits. You can update anytime.</div></div>
+        <div class="snav"><button class="btn-b" onclick="rPrev(3)">← Back</button><button class="btn-n" onclick="rNext(3)">Next: Business Hours →</button></div>
+      </div>
+    </div></div>
+    <!-- Step 4 Hours -->
+    <div class="rsp" id="rs4"><div class="sc">
+      <div class="sch"><h2>Business Hours</h2><p>Let customers know when you're open</p></div>
+      <div class="scb">
+        <div class="hgrid" id="hgrid"></div>
+        <div class="field" style="margin-top:11px"><label>Special Note <span class="opt">(optional)</span></label>
+          <input type="text" id="f-hn" placeholder="e.g. Closed on public holidays"/></div>
+        <div class="snav"><button class="btn-b" onclick="rPrev(4)">← Back</button><button class="btn-n" onclick="rNext(4)">Next: Photos →</button></div>
+      </div>
+    </div></div>
+    <!-- Step 5 Photos -->
+    <div class="rsp" id="rs5"><div class="sc">
+      <div class="sch"><h2>Business Photos</h2><p>Photos attract 3× more customers — all optional</p></div>
+      <div class="scb">
+        <div class="uzg">
+          <div class="uz" id="uz0"><input type="file" accept="image/*" onchange="upZ(this,'uz0')"/>
+            <div class="uzi">🖼️</div><span class="uzl">Logo</span><span class="uzs">PNG/JPG</span></div>
+          <div class="uz" id="uz1"><input type="file" accept="image/*" onchange="upZ(this,'uz1')"/>
+            <div class="uzi">🏪</div><span class="uzl">Storefront</span><span class="uzs">Outside</span></div>
+          <div class="uz" id="uz2"><input type="file" accept="image/*" onchange="upZ(this,'uz2')"/>
+            <div class="uzi">🏠</div><span class="uzl">Interior</span><span class="uzs">Inside</span></div>
+          <div class="uz" id="uz3"><input type="file" accept="image/*" onchange="upZ(this,'uz3')"/>
+            <div class="uzi">📦</div><span class="uzl">Product 1</span><span class="uzs">Best item</span></div>
+          <div class="uz" id="uz4"><input type="file" accept="image/*" onchange="upZ(this,'uz4')"/>
+            <div class="uzi">🛍️</div><span class="uzl">Product 2</span><span class="uzs">Another</span></div>
+          <div class="uz" id="uz5"><input type="file" accept="image/*" onchange="upZ(this,'uz5')"/>
+            <div class="uzi">📋</div><span class="uzl">Price Board</span><span class="uzs">Menu/list</span></div>
+        </div>
+        <div class="tip"><div class="tip-i">📸</div><div class="tip-t">Skip photos now — add them later from your profile. Good lighting = more trust.</div></div>
+        <div class="snav"><button class="btn-b" onclick="rPrev(5)">← Back</button><button class="btn-n" onclick="rNext(5)">Next: Contact →</button></div>
+      </div>
+    </div></div>
+    <!-- Step 6 Contact -->
+    <div class="rsp" id="rs6"><div class="sc">
+      <div class="sch"><h2>Contact & Social Media</h2><p>How customers reach you</p></div>
+      <div class="scb">
+        <div class="fg" style="margin-bottom:12px">
+          <div class="field" id="fw-ph"><label>Phone Number <span class="req">*</span></label>
+            <input type="tel" id="f-ph" placeholder="e.g. 9876543210"/>
+            <div class="em">Enter a valid phone number.</div></div>
+          <div class="field"><label>Alternate Phone <span class="opt">(optional)</span></label>
+            <input type="tel" id="f-p2" placeholder="Second number"/></div>
+          <div class="field"><label>Email <span class="opt">(optional)</span></label>
+            <input type="email" id="f-em" placeholder="you@example.com"/></div>
+          <div class="field"><label>Website <span class="opt">(optional)</span></label>
+            <input type="text" id="f-wb" placeholder="https://..."/></div>
+        </div>
+        <div class="field" style="margin-bottom:10px"><label>WhatsApp for Orders</label>
+          <div class="socrow"><div class="soci si-wa">💬</div>
+            <input type="tel" id="f-wa" placeholder="WhatsApp number for customer orders"/></div></div>
+        <div class="field" style="margin-bottom:10px"><label>UPI ID <span class="opt">(optional)</span></label>
+          <div class="socrow"><div class="soci si-up">💳</div>
+            <input type="text" id="f-up" placeholder="name@upi or 9876543210@paytm"/></div></div>
+        <div class="field" style="margin-bottom:13px"><label>Social Media <span class="opt">(optional)</span></label>
+          <div class="socrow"><div class="soci si-ig">📷</div><input type="text" id="f-ig" placeholder="Instagram username or link"/></div>
+          <div class="socrow"><div class="soci si-fb">📘</div><input type="text" id="f-fb" placeholder="Facebook page name or link"/></div>
+          <div class="socrow"><div class="soci si-yt">▶️</div><input type="text" id="f-yt" placeholder="YouTube channel link"/></div></div>
+        <div style="background:var(--bg);border:1px solid var(--bor);border-radius:var(--rs);padding:2px 12px">
+          <div class="togrow"><div><div class="tl">Delivery Available</div><div class="ts2">Customers can order for home delivery</div></div>
+            <label class="tsw"><input type="checkbox" id="tg-d" checked/><span class="sl"></span></label></div>
+          <div class="togrow"><div><div class="tl">WhatsApp Orders</div><div class="ts2">Accept orders via WhatsApp</div></div>
+            <label class="tsw"><input type="checkbox" id="tg-o" checked/><span class="sl"></span></label></div>
+          <div class="togrow"><div><div class="tl">Show Phone Publicly</div><div class="ts2">Visible to all users on your profile</div></div>
+            <label class="tsw"><input type="checkbox" id="tg-sp" checked/><span class="sl"></span></label></div>
+        </div>
+        <div class="snav">
+          <button class="btn-b" onclick="rPrev(6)">← Back</button>
+          <button class="btn-sub" onclick="submitReg()">🎉 Register & Go Live <span class="arr">→</span></button>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<!-- ════ PROFILE ════ -->
+<div id="page-profile" class="page">
+  <div class="prof-acts">
+    <button class="back-btn" onclick="goTo('home')">🏠 Home</button>
+    <button class="back-btn" onclick="goTo('discover')">🔍 Discover</button>
+    <button class="back-btn" onclick="goTo('myshops')">📋 My Shops</button>
+    <div class="live-pill">✅ Live on Deckscrab<span class="bid" id="profBizId"></span></div>
+    <button class="pa-sh" onclick="waShare()">💬 Share</button>
+  </div>
+  <div class="prof-hero">
+    <div class="phbg" id="profEmoji"></div>
+    <div class="phov"></div>
+    <div class="phcnt">
+      <div class="ph-badge" id="profSector"></div>
+      <div class="ph-name"><span id="profNameTxt"></span><span class="verified">✓ Verified</span></div>
+    </div>
+  </div>
+  <div class="prof-body">
+    <div class="pquick" id="profQuick"></div>
+    <div class="p2col">
+      <div>
+        <div class="ptit">About</div>
+        <div class="pdesc" id="profDesc"></div>
+        <div id="prodSec" style="display:none">
+          <div class="ptit" id="prodSecTit">Products & Prices</div>
+          <table class="ptbl"><thead><tr><th>Item</th><th>Unit</th><th style="text-align:right">Price</th></tr></thead>
+            <tbody id="prodBody"></tbody></table>
+        </div>
+        <div class="ptit">Business Hours</div>
+        <table class="htbl" id="hoursTbl"></table>
+        <div id="socSec" style="display:none">
+          <div class="ptit">Follow Us</div>
+          <div class="sl-wrap" id="socLinks"></div>
+        </div>
+      </div>
+      <div>
+        <div class="cc">
+          <div class="cc-t">Contact & Visit</div>
+          <button class="cc-btn wa" id="waBtn" onclick="profWA()">💬 Order on WhatsApp</button>
+          <button class="cc-btn ph" id="callBtn" onclick="profCall()">📞 Call Now</button>
+          <button class="cc-btn mp" onclick="profMaps()">🗺️ Open in Maps</button>
+          <button class="cc-btn sh" onclick="waShare()">🔗 Share Profile</button>
+          <div style="margin-top:10px;border-top:1px solid var(--bor);padding-top:10px">
+            <div class="ci-row"><span class="ci-lbl">Address</span><span class="ci-val" id="profAddr"></span></div>
+            <div class="ci-row" id="upiRow" style="display:none"><span class="ci-lbl">UPI</span><span class="ci-val" id="profUPI"></span></div>
+            <div class="ci-row" id="emlRow" style="display:none"><span class="ci-lbl">Email</span><span class="ci-val" id="profEmail"></span></div>
+            <div class="ci-row" id="webRow" style="display:none"><span class="ci-lbl">Website</span><span class="ci-val" id="profWeb"></span></div>
+          </div>
+        </div>
+        <div class="pmini"><div id="profMapEl"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ MY SHOPS ════ -->
+<div id="page-myshops" class="page">
+  <div class="myw">
+    <div class="myh">
+      <h1>🏪 My Listed Businesses</h1>
+      <button class="nav-add" onclick="goTo('register')">+ Register New</button>
+    </div>
+    <div id="myShopsContent"></div>
+  </div>
+</div>
+
+<!-- LOCATION MODAL -->
+<div class="mov" id="locModal" onclick="if(event.target===this)closeLocModal()">
+  <div class="mbox" style="max-width:460px">
+    <div style="padding:16px 18px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bor)">
+      <div style="font-family:'Clash Display',sans-serif;font-size:1rem;font-weight:700;color:var(--wht)">📍 Set Your Location</div>
+      <button onclick="closeLocModal()" style="background:rgba(255,255,255,.07);border:1px solid var(--bor);border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--mut);cursor:pointer;flex-shrink:0">✕</button>
+    </div>
+    <div style="padding:14px 18px 18px">
+
+      <!-- GPS BUTTON - big, clear, mobile friendly -->
+      <button id="gpsModalBtn" onclick="startGPS('modal')"
+        style="width:100%;padding:13px 16px;background:rgba(0,212,180,.1);border:2px solid rgba(0,212,180,.38);
+          border-radius:var(--r);cursor:pointer;transition:.2s;display:flex;align-items:center;gap:12px;margin-bottom:14px;text-align:left">
+        <span id="gpsModalIco" style="font-size:1.6rem;flex-shrink:0">📡</span>
+        <span>
+          <div style="font-size:.9rem;font-weight:700;color:var(--teal);margin-bottom:2px" id="gpsModalTxt">Use My Current Location</div>
+          <div style="font-size:.71rem;color:rgba(0,212,180,.65)">Tap → allow location → finds businesses near you</div>
+        </span>
+      </button>
+
+      <!-- DIVIDER -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <div style="flex:1;height:1px;background:var(--bor)"></div>
+        <span style="font-size:.68rem;color:var(--mut);font-weight:700;letter-spacing:.08em">OR SEARCH</span>
+        <div style="flex:1;height:1px;background:var(--bor)"></div>
+      </div>
+
+      <!-- SEARCH BOX -->
+      <div style="display:flex;gap:7px;margin-bottom:8px">
+        <input type="text" id="locIn"
+          placeholder="Type city or area name…"
+          autocomplete="off"
+          oninput="locAC(this.value)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();doLocSearch();}"
+          style="flex:1;background:var(--bg);border:1.5px solid var(--bor);border-radius:var(--rs);
+            padding:10px 12px;font-size:.88rem;color:var(--txt);outline:none;caret-color:var(--gold);min-width:0"/>
+        <button onclick="doLocSearch()" id="findBtn"
+          style="background:var(--gold);color:var(--bg);border:none;border-radius:var(--rs);
+            padding:0 16px;font-size:.84rem;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">Search</button>
+      </div>
+
+      <!-- AUTOCOMPLETE DROP -->
+      <div id="locAcDrop" style="margin-bottom:10px"></div>
+
+      <!-- QUICK PICK -->
+      <div style="font-size:.68rem;color:var(--mut);font-weight:700;letter-spacing:.07em;margin-bottom:7px;text-transform:uppercase">Quick pick city</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        <button onclick="pickCity('Arakkonam',13.0772,79.6712)" class="qpick">Arakkonam</button>
+        <button onclick="pickCity('Vellore',12.9165,79.1325)" class="qpick">Vellore</button>
+        <button onclick="pickCity('Katpadi',12.9725,79.1442)" class="qpick">Katpadi</button>
+        <button onclick="pickCity('Ranipet',12.9270,79.3333)" class="qpick">Ranipet</button>
+        <button onclick="pickCity('Ambur',12.7933,78.7172)" class="qpick">Ambur</button>
+        <button onclick="pickCity('Chennai',13.0827,80.2707)" class="qpick">Chennai</button>
+        <button onclick="pickCity('Coimbatore',11.0168,76.9558)" class="qpick">Coimbatore</button>
+        <button onclick="pickCity('Bangalore',12.9716,77.5946)" class="qpick">Bangalore</button>
+        <button onclick="pickCity('Tiruvannamalai',12.2253,79.0747)" class="qpick">Tiruvannamalai</button>
+        <button onclick="pickCity('Madurai',9.9252,78.1198)" class="qpick">Madurai</button>
+        <button onclick="pickCity('Salem',11.6643,78.1460)" class="qpick">Salem</button>
+        <button onclick="pickCity('Trichy',10.7905,78.7047)" class="qpick">Trichy</button>
+        <button onclick="pickCity('Erode',11.3410,77.7172)" class="qpick">Erode</button>
+        <button onclick="pickCity('Tiruppur',11.1085,77.3411)" class="qpick">Tiruppur</button>
+        <button onclick="pickCity('Mumbai',19.0760,72.8777)" class="qpick">Mumbai</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="mov" id="detailModal" onclick="if(event.target===this)closeDetail()">
+  <div class="mbox">
+    <div class="mhero" id="dHero">
+      <div class="mhov"></div>
+      <button class="mcls" onclick="closeDetail()">✕</button>
+      <div class="mhcnt">
+        <div class="msrc reg" id="dSrc"></div>
+        <div class="mtit" id="dName"></div>
+      </div>
+    </div>
+    <div class="mbody">
+      <div class="mquick" id="dQuick"></div>
+      <div class="mstit">📝 About</div>
+      <div class="mdesc" id="dDesc"></div>
+      <div id="dProdSec" style="display:none">
+        <div class="mstit">🛒 Products & Prices</div>
+        <table class="ptbl" style="margin-bottom:0"><thead><tr><th>Item</th><th>Unit</th><th style="text-align:right">Price</th></tr></thead>
+          <tbody id="dProdBody"></tbody></table>
+      </div>
+      <div class="mstit">📍 Location</div>
+      <div class="mmini"><div id="miniMap"></div></div>
+      <div class="macts">
+        <button class="mact p" id="dCallBtn">📞 Call</button>
+        <button class="mact m" onclick="detailMaps()">🗺️ Maps</button>
+        <button class="mact s" onclick="detailShare()">🔗 Share</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toastEl"></div>
+<script>
+'use strict';
+// ═══════════════════════════════════════
+//  API CONFIG — change this URL after deploying backend
+// ═══════════════════════════════════════
+const API_BASE = localStorage.getItem('nb_api_url') || 'https://deckscrab-backend-production.up.railway.app';
+
+// Device ID — unique per browser, used for favourites sync
+const DEVICE_ID = (() => {
+  let id = localStorage.getItem('nb_device_id');
+  if (!id) { id = 'dev_' + Date.now() + '_' + Math.random().toString(36).slice(2); localStorage.setItem('nb_device_id', id); }
+  return id;
+})();
+
+// ═══ API HELPERS ═══
+async function apiGet(path) {
+  try {
+    const r = await fetch(API_BASE + path);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  } catch(e) {
+    return null;
+  }
+}
+async function apiPost(path, body) {
+  try {
+    const r = await fetch(API_BASE + path, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  } catch(e) {
+    console.warn('API POST failed:', path, e.message);
+    return null;
+  }
+}
+async function apiDelete(path, body) {
+  try {
+    const r = await fetch(API_BASE + path, {
+      method: 'DELETE', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    return await r.json();
+  } catch(e) { return null; }
+}
+async function apiPut(path, body) {
+  try {
+    const r = await fetch(API_BASE + path, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    return await r.json();
+  } catch(e) { return null; }
+}
+
+// ═══ LOCAL FALLBACK — works offline if API is down ═══
+const LOCAL = {
+  get shops(){ return JSON.parse(localStorage.getItem('nb_local_shops')||'[]'); },
+  save(arr){ localStorage.setItem('nb_local_shops', JSON.stringify(arr)); },
+  add(s){ const a=this.shops; a.unshift(s); this.save(a); },
+  del(id){ this.save(this.shops.filter(x=>x.id!==id)); },
+  get favs(){ return new Set(JSON.parse(localStorage.getItem('nb_favs')||'[]')); },
+  saveFavs(s){ localStorage.setItem('nb_favs', JSON.stringify([...s])); }
+};
+
+// API status indicator
+let apiOnline = false;
+async function checkAPI() {
+  const r = await apiGet('/');
+  apiOnline = !!(r && r.status === 'running');
+  const dot = document.querySelector('.nav-loc .ld');
+  if (dot) dot.style.background = apiOnline ? 'var(--grn)' : 'var(--gold)';
+  if (apiOnline) showToast('✅ Connected to Deckscrab server');
+  else showToast('📱 Server unreachable — running in offline mode');
+  return apiOnline;
+}
+
+// ═══ 81 SECTORS ═══
+const SECTORS = [
+  {id:'grocery',e:'🛒',n:'Grocery / Kirana',d:'Daily provisions, vegetables',g:'retail',c:'var(--grn)'},
+  {id:'pharmacy',e:'💊',n:'Medical / Pharmacy',d:'Medicines, health products',g:'health',c:'#C4B5FD'},
+  {id:'clothes',e:'👗',n:'Clothing / Garments',d:'Sarees, shirts, fashion',g:'retail',c:'#f9a8d4'},
+  {id:'electronics',e:'📱',n:'Electronics / Mobile',d:'Phones, laptops, gadgets',g:'retail',c:'#67e8f9'},
+  {id:'hardware',e:'🔩',n:'Hardware Store',d:'Tools, pipes, materials',g:'retail',c:'#fcd34d'},
+  {id:'bakery',e:'🥐',n:'Bakery / Sweets',d:'Bread, cakes, sweets',g:'retail',c:'#fbbf24'},
+  {id:'stationery',e:'📚',n:'Stationery / Books',d:'Books, pens, supplies',g:'retail',c:'var(--grn)'},
+  {id:'jewellery',e:'💍',n:'Jewellery',d:'Gold, silver, ornaments',g:'retail',c:'#fcd34d'},
+  {id:'furniture',e:'🪑',n:'Furniture',d:'Chairs, tables, beds',g:'retail',c:'#d4a574'},
+  {id:'supermarket',e:'🏬',n:'Supermarket / Mart',d:'Large retail, all items',g:'retail',c:'#67e8f9'},
+  {id:'fruits',e:'🍎',n:'Fruits & Vegetables',d:'Fresh produce, farm fresh',g:'retail',c:'var(--grn)'},
+  {id:'dairy',e:'🥛',n:'Dairy / Milk Shop',d:'Milk, curd, ghee, butter',g:'retail',c:'#fef3c7'},
+  {id:'flowers',e:'🌸',n:'Flower Shop',d:'Fresh flowers, garlands',g:'retail',c:'#f9a8d4'},
+  {id:'gifts',e:'🎁',n:'Gift Shop',d:'Gifts, toys, novelty',g:'retail',c:'#C4B5FD'},
+  {id:'shoes',e:'👟',n:'Footwear / Shoes',d:'Chappals, shoes, sandals',g:'retail',c:'#fbbf24'},
+  {id:'opticals',e:'👓',n:'Opticals',d:'Spectacles, contact lens',g:'retail',c:'#67e8f9'},
+  {id:'restaurant',e:'🍛',n:'Restaurant / Hotel',d:'Full meals, North & South Indian',g:'food',c:'#fda4af'},
+  {id:'tiffin',e:'🫓',n:'Tiffin / Mess',d:'Idli, dosa, breakfast, meals',g:'food',c:'#fcd34d'},
+  {id:'biryani',e:'🍲',n:'Biryani / Non-Veg',d:'Biryani, chicken, mutton',g:'food',c:'#fda4af'},
+  {id:'fastfood',e:'🍔',n:'Fast Food',d:'Burgers, rolls, sandwiches',g:'food',c:'#fbbf24'},
+  {id:'cafe',e:'☕',n:'Café / Tea Shop',d:'Tea, coffee, beverages',g:'food',c:'#d4a574'},
+  {id:'juice',e:'🥤',n:'Juice / Beverages',d:'Fresh juices, shakes, lassi',g:'food',c:'var(--grn)'},
+  {id:'sweets',e:'🍮',n:'Sweets / Mithai',d:'Traditional sweets, halwa',g:'food',c:'#fcd34d'},
+  {id:'icecream',e:'🍦',n:'Ice Cream Parlour',d:'Ice cream, kulfi, desserts',g:'food',c:'#C4B5FD'},
+  {id:'catering',e:'🍽️',n:'Catering',d:'Events, marriages, parties',g:'food',c:'#fda4af'},
+  {id:'cakeshop',e:'🎂',n:'Cake / Bakery Shop',d:'Cakes, pastries, custom cakes',g:'food',c:'#f9a8d4'},
+  {id:'doctor',e:'👨‍⚕️',n:'General Doctor',d:'GP, family doctor, physician',g:'health',c:'#C4B5FD'},
+  {id:'dentist',e:'🦷',n:'Dentist / Dental',d:'Tooth, dental care, braces',g:'health',c:'#67e8f9'},
+  {id:'ent',e:'👂',n:'ENT Specialist',d:'Ear, nose, throat',g:'health',c:'var(--grn)'},
+  {id:'eye',e:'👁️',n:'Eye Hospital',d:'Eye check, cataract, vision',g:'health',c:'#C4B5FD'},
+  {id:'hospital',e:'🏥',n:'Hospital',d:'Multi-speciality, emergency',g:'health',c:'#fda4af'},
+  {id:'lab',e:'🧪',n:'Diagnostic Lab',d:'Blood tests, X-ray, scanning',g:'health',c:'#67e8f9'},
+  {id:'physio',e:'🤸',n:'Physiotherapy',d:'Physio, rehabilitation',g:'health',c:'var(--grn)'},
+  {id:'ayur',e:'🌿',n:'Ayurvedic / Herbal',d:'Ayurvedic treatment, herbs',g:'health',c:'var(--grn)'},
+  {id:'homeo',e:'💉',n:'Homeopathy',d:'Homeopathic clinic',g:'health',c:'#C4B5FD'},
+  {id:'vet',e:'🐕',n:'Veterinary / Pet',d:'Animal doctor, pet clinic',g:'health',c:'#fbbf24'},
+  {id:'nursing',e:'🏩',n:'Nursing Home',d:'In-patient, small hospital',g:'health',c:'#fda4af'},
+  {id:'welder',e:'⚡',n:'Welder / Fabrication',d:'Welding, grills, gates, iron',g:'service',c:'#fcd34d'},
+  {id:'plumber',e:'🚿',n:'Plumber',d:'Water pipes, taps, bathrooms',g:'service',c:'#67e8f9'},
+  {id:'electrician',e:'🔌',n:'Electrician',d:'Wiring, fuse, AC, electrical',g:'service',c:'#fcd34d'},
+  {id:'mechanic',e:'🔧',n:'Mechanic / Garage',d:'Car, bike, auto repair',g:'service',c:'#fbbf24'},
+  {id:'carpenter',e:'🪚',n:'Carpenter',d:'Wood work, furniture, doors',g:'service',c:'#d4a574'},
+  {id:'painter',e:'🎨',n:'Painter',d:'House painting, exterior',g:'service',c:'#C4B5FD'},
+  {id:'tailor',e:'🧵',n:'Tailor',d:'Stitching, alterations, blouse',g:'service',c:'#f9a8d4'},
+  {id:'acrepair',e:'❄️',n:'AC / Appliance Repair',d:'AC, fridge, washing machine',g:'service',c:'#67e8f9'},
+  {id:'mobilerepair',e:'📲',n:'Mobile / TV Repair',d:'Phone screen, TV repair',g:'service',c:'var(--grn)'},
+  {id:'cleaning',e:'🧹',n:'Cleaning Service',d:'House cleaning, pest control',g:'service',c:'#fbbf24'},
+  {id:'taxi',e:'🚗',n:'Taxi / Auto',d:'Auto, cab, hire vehicle',g:'service',c:'#fcd34d'},
+  {id:'courier',e:'📦',n:'Courier / Delivery',d:'Parcel, cargo, delivery',g:'service',c:'#fbbf24'},
+  {id:'salon_l',e:'💇',n:"Ladies Salon",d:'Facial, threading, hair styling',g:'beauty',c:'#f9a8d4'},
+  {id:'salon_m',e:'✂️',n:"Men's Saloon",d:'Haircut, shaving, beard trim',g:'beauty',c:'#93c5fd'},
+  {id:'spa',e:'🧖',n:'Spa / Massage',d:'Spa, massage, wellness',g:'beauty',c:'#C4B5FD'},
+  {id:'gym',e:'🏋️',n:'Gym / Fitness',d:'Gym, yoga, fitness training',g:'beauty',c:'var(--grn)'},
+  {id:'yoga',e:'🧘',n:'Yoga / Meditation',d:'Yoga classes, meditation',g:'beauty',c:'#C4B5FD'},
+  {id:'cosmetics',e:'💄',n:'Cosmetics / Beauty',d:'Makeup, skincare, beauty',g:'beauty',c:'#f9a8d4'},
+  {id:'school',e:'🏫',n:'School',d:'Primary, high school, CBSE',g:'education',c:'var(--grn)'},
+  {id:'tuition',e:'📖',n:'Tuition / Coaching',d:'Private tuition, coaching',g:'education',c:'#C4B5FD'},
+  {id:'computer',e:'💻',n:'Computer / IT Training',d:'DTP, Tally, coding',g:'education',c:'#67e8f9'},
+  {id:'driving',e:'🚘',n:'Driving School',d:'Car, two-wheeler lessons',g:'education',c:'#fbbf24'},
+  {id:'music',e:'🎵',n:'Music / Dance Classes',d:'Classical music, dance, arts',g:'education',c:'#f9a8d4'},
+  {id:'library',e:'📕',n:'Library',d:'Book library, reading room',g:'education',c:'var(--grn)'},
+  {id:'bank',e:'🏦',n:'Bank / ATM',d:'Banking, loans, ATM',g:'finance',c:'#67e8f9'},
+  {id:'insurance',e:'🛡️',n:'Insurance Agent',d:'Life, health, vehicle insurance',g:'finance',c:'#C4B5FD'},
+  {id:'ca',e:'📊',n:'CA / Accountant',d:'Tax, GST, accounting, audit',g:'finance',c:'#fbbf24'},
+  {id:'lawyer',e:'⚖️',n:'Lawyer / Advocate',d:'Legal services, court',g:'finance',c:'#fcd34d'},
+  {id:'realestate',e:'🏠',n:'Real Estate',d:'Property buy, sell, rent',g:'finance',c:'var(--grn)'},
+  {id:'travel',e:'✈️',n:'Travel / Tourism',d:'Tickets, tours, visa',g:'finance',c:'#67e8f9'},
+  {id:'printing',e:'🖨️',n:'Printing / Xerox',d:'Printing, photocopying, DTP',g:'finance',c:'#fbbf24'},
+  {id:'photo',e:'📸',n:'Photography / Studio',d:'Wedding, event, studio photos',g:'finance',c:'#C4B5FD'},
+  {id:'temple',e:'🛕',n:'Temple / Kovil',d:'Hindu temple, pooja services',g:'religious',c:'#fcd34d'},
+  {id:'church',e:'⛪',n:'Church',d:'Christian church, prayer centre',g:'religious',c:'var(--grn)'},
+  {id:'mosque',e:'🕌',n:'Mosque',d:'Muslim mosque, masjid',g:'religious',c:'var(--grn)'},
+  {id:'pooja',e:'🪔',n:'Pooja Items',d:'Agarbathi, lamps, idols',g:'religious',c:'#fcd34d'},
+  {id:'cement',e:'🧱',n:'Building Materials',d:'Cement, sand, bricks, tiles',g:'construction',c:'#d4a574'},
+  {id:'tiles',e:'⬜',n:'Tiles / Flooring',d:'Floor tiles, marble, wall tiles',g:'construction',c:'#fbbf24'},
+  {id:'interiors',e:'🛋️',n:'Interior Design',d:'Home décor, interior planning',g:'construction',c:'#C4B5FD'},
+  {id:'pest',e:'🐜',n:'Pest Control',d:'Cockroach, termite, rat control',g:'construction',c:'var(--grn)'},
+  {id:'agri',e:'🌾',n:'Agriculture / Farm',d:'Seeds, fertiliser, farm tools',g:'agri',c:'var(--grn)'},
+  {id:'tractor',e:'🚜',n:'Tractor / Farm Hire',d:'Tractor hire, farm machinery',g:'agri',c:'#fcd34d'},
+  {id:'mill',e:'🏭',n:'Rice Mill / Flour Mill',d:'Rice, flour, oil processing',g:'agri',c:'#fbbf24'},
+];
+
+const CAT_GROUPS = {
+  retail:'Retail & Shops', food:'Food & Restaurants', health:'Health & Medical',
+  service:'Services & Trades', beauty:'Beauty & Wellness', education:'Education',
+  finance:'Finance & Professional', religious:'Religious & Community',
+  construction:'Construction & Home', agri:'Agriculture'
+};
+
+function secEmoji(id){return SECTORS.find(s=>s.id===id)?.e||'🏪';}
+function secName(id){return SECTORS.find(s=>s.id===id)?.n||'Business';}
+function secGroup(id){return SECTORS.find(s=>s.id===id)?.g||'other';}
+
+// ═══ STATE ═══
+let uLat=null,uLng=null,uLocName='',uLocSource='';
+let discMap=null,pickMap=null,pickMarker=null,uMarker=null,profMap=null,miniMapInst=null;
+let dMarkers=[];
+let shown=[],sortMode='newest',catFilter='';
+let selSector=null,pinnedLat=null,pinnedLng=null;
+let regData=null,viewingBiz=null;
+let curStep=0;
+const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+let hrsData={};DAYS.forEach(d=>{hrsData[d]={open:'09:00',close:'21:00',closed:false};});
+let prc=0;
+const TILE='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const TATT='© <a href="https://openstreetmap.org">OSM</a> © <a href="https://carto.com">CARTO</a>';
+
+// ═══ PAGE NAVIGATION ═══
+function goTo(pg){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  const t=document.getElementById('page-'+pg);if(t)t.classList.add('on');
+  document.querySelectorAll('.ntab').forEach(b=>b.classList.remove('on'));
+  const tb=document.getElementById('tab-'+pg);if(tb)tb.classList.add('on');
+  if(pg==='myshops')renderMyShops();
+  if(pg==='discover'){renderDisc();setTimeout(()=>{if(discMap)discMap.invalidateSize();},300);}
+  if(pg==='register')setTimeout(()=>{if(!pickMap)initPickMap();else pickMap.invalidateSize();},300);
+  if(pg==='home'){updateHomeStats();renderRecentGrid();buildCatGrid();}
+  window.scrollTo(0,0);
+}
+
+// ═══════════════════════════════════════
+//  LOCATION SYSTEM — GPS + Search + Quick Pick
+// ═══════════════════════════════════════
+
+let gpsWatch = null;
+
+// ── startGPS: works on mobile, asks permission properly ──
+function startGPS(calledFrom) {
+  const btn = calledFrom === 'modal'
+    ? document.getElementById('gpsModalBtn')
+    : document.getElementById('hgpsBtn');
+  const ico = calledFrom === 'modal'
+    ? document.getElementById('gpsModalIco')
+    : btn;
+  const txt = document.getElementById('gpsModalTxt');
+
+  if (btn) btn.disabled = true;
+  if (ico) ico.textContent = '⏳';
+  if (txt) txt.textContent = 'Getting location…';
+  setLocBar('a', 'Requesting GPS access…');
+
+  if (!navigator.geolocation) {
+    if (btn) btn.disabled = false;
+    if (ico) ico.textContent = '📡';
+    if (txt) txt.textContent = 'Use My Current Location';
+    setLocBar('r', 'GPS not supported in this browser');
+    showToast('GPS not available — type your city name below');
+    return;
+  }
+
+  // Clear any existing watch
+  if (gpsWatch) { navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; }
+
+  let bestAcc = Infinity;
+
+  // Phase 1: quick coarse fix (fast, gets something immediately)
+  navigator.geolocation.getCurrentPosition(
+    function onQuickFix(pos) {
+      const { latitude: lat, longitude: lng, accuracy: acc } = pos.coords;
+      bestAcc = acc;
+      uLat = lat; uLng = lng; uLocSource = 'gps';
+      setLocBar('g', '📡 Located · accuracy ~' + Math.round(acc) + 'm');
+      if (ico) ico.textContent = '📡';
+      if (txt) txt.textContent = 'Location found! Refining…';
+      doReverseGeocode(lat, lng);
+      if (discMap) { discMap.setView([lat, lng], 15); placeUMarker(); }
+      renderDisc();
+
+      // Phase 2: watch for better accuracy
+      gpsWatch = navigator.geolocation.watchPosition(
+        function onRefine(pos2) {
+          const { latitude: la, longitude: ln, accuracy: ac } = pos2.coords;
+          if (ac < bestAcc) {
+            bestAcc = ac; uLat = la; uLng = ln;
+            const tag = ac <= 20 ? '✓ Precise' : ac <= 60 ? 'Good' : 'Improving…';
+            setLocBar('g', '📡 GPS ' + tag + ' (~' + Math.round(ac) + 'm)');
+            doReverseGeocode(la, ln);
+            if (discMap) { discMap.setView([la, ln], 15); placeUMarker(); }
+            if (ac <= 20) { stopGPS(); renderDisc(); }
+          }
+        },
+        function() { stopGPS(); },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      );
+      // Stop watching after 15s regardless
+      setTimeout(stopGPS, 15000);
+
+      // Close modal if GPS worked
+      closeLocModal();
+      if (btn) btn.disabled = false;
+    },
+    function onError(err) {
+      if (btn) btn.disabled = false;
+      if (ico) ico.textContent = '📡';
+      if (txt) txt.textContent = 'Use My Current Location';
+      let msg = 'Location access denied';
+      if (err.code === 1) msg = 'Allow location → browser Settings → Reload';
+      if (err.code === 2) msg = 'GPS weak — go outside & retry';
+      if (err.code === 3) msg = 'Timed out — try again';
+      setLocBar('r', msg);
+      showToast('⚠️ ' + msg);
+    },
+    { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+  );
+}
+
+function stopGPS() {
+  if (gpsWatch) { navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; }
+  const btn = document.getElementById('hgpsBtn');
+  if (btn) btn.classList.remove('spin');
+}
+
+function doReverseGeocode(lat, lng) {
+  fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng +
+    '&format=json&zoom=16&accept-language=en')
+    .then(r => r.json())
+    .then(d => {
+      const a = d.address || {};
+      uLocName = a.hamlet || a.suburb || a.neighbourhood || a.village || a.town || a.city || a.county || 'Your Location';
+      updateLocUI();
+    })
+    .catch(() => {
+      uLocName = 'GPS Location';
+      updateLocUI();
+    });
+}
+
+function setLocBar(t, msg) {
+  const b = document.getElementById('locBar');
+  if (b) { b.querySelector('.lb').className = 'lb ' + t; document.getElementById('locMsg').textContent = msg; }
+}
+
+function updateLocUI() {
+  const n = uLocName.split(',')[0];
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  set('navLoc', n);
+  set('discLocNm', uLocName);
+  set('discLocAc', uLocSource === 'gps' ? '📡 GPS — most accurate' : '📍 Location set');
+  const hl = document.getElementById('homeLoc');
+  if (hl) hl.value = uLocName || '';
+}
+
+// ── LOCATION MODAL ──
+function openLocModal() {
+  const m = document.getElementById('locModal');
+  m.classList.add('open');
+  const inp = document.getElementById('locIn');
+  if (inp) { inp.value = ''; setTimeout(() => inp.focus(), 350); }
+  document.getElementById('locAcDrop').innerHTML = '';
+}
+function closeLocModal() {
+  document.getElementById('locModal').classList.remove('open');
+}
+
+// ── QUICK PICK: instant, no API needed ──
+function pickCity(name, lat, lng) {
+  setLoc(lat, lng, name, 'typed');
+  closeLocModal();
+  showToast('📍 ' + name + ' selected');
+  goTo('discover');
+}
+
+// ── SEARCH: type city name ──
+let acTmr = null;
+function locAC(q) {
+  clearTimeout(acTmr);
+  const drop = document.getElementById('locAcDrop');
+  if (q.length < 2) { drop.innerHTML = ''; return; }
+  acTmr = setTimeout(() => geocodeQ(q, true), 300);
+}
+
+function doLocSearch() {
+  const q = document.getElementById('locIn').value.trim();
+  if (!q) { showToast('Please type your city or area name'); return; }
+  const btn = document.getElementById('findBtn');
+  if (btn) { btn.textContent = '…'; btn.disabled = true; }
+  geocodeQ(q, false).finally(() => {
+    if (btn) { btn.textContent = 'Search'; btn.disabled = false; }
+  });
+}
+
+// ── CITY DATABASE (instant offline lookup) ──
+const CITY_DB = {
+  arakkonam:     [13.0772, 79.6712, 'Arakkonam, Vellore'],
+  vellore:       [12.9165, 79.1325, 'Vellore, Tamil Nadu'],
+  katpadi:       [12.9725, 79.1442, 'Katpadi, Vellore'],
+  walajapet:     [12.9233, 79.3604, 'Walajapet, Ranipet'],
+  ranipet:       [12.9270, 79.3333, 'Ranipet, Tamil Nadu'],
+  ambur:         [12.7933, 78.7172, 'Ambur, Vellore'],
+  vaniyambadi:   [12.6847, 78.6220, 'Vaniyambadi, Vellore'],
+  tiruvannamalai:[12.2253, 79.0747, 'Tiruvannamalai, Tamil Nadu'],
+  kanchipuram:   [12.8342, 79.7036, 'Kanchipuram, Tamil Nadu'],
+  chennai:       [13.0827, 80.2707, 'Chennai, Tamil Nadu'],
+  coimbatore:    [11.0168, 76.9558, 'Coimbatore, Tamil Nadu'],
+  madurai:       [9.9252,  78.1198, 'Madurai, Tamil Nadu'],
+  trichy:        [10.7905, 78.7047, 'Tiruchirappalli, Tamil Nadu'],
+  tiruchirappalli:[10.7905,78.7047, 'Tiruchirappalli, Tamil Nadu'],
+  salem:         [11.6643, 78.1460, 'Salem, Tamil Nadu'],
+  erode:         [11.3410, 77.7172, 'Erode, Tamil Nadu'],
+  tiruppur:      [11.1085, 77.3411, 'Tiruppur, Tamil Nadu'],
+  bangalore:     [12.9716, 77.5946, 'Bangalore, Karnataka'],
+  bengaluru:     [12.9716, 77.5946, 'Bengaluru, Karnataka'],
+  mysore:        [12.2958, 76.6394, 'Mysore, Karnataka'],
+  mumbai:        [19.0760, 72.8777, 'Mumbai, Maharashtra'],
+  pune:          [18.5204, 73.8567, 'Pune, Maharashtra'],
+  delhi:         [28.6139, 77.2090, 'New Delhi'],
+  hyderabad:     [17.3850, 78.4867, 'Hyderabad, Telangana'],
+  kochi:         [9.9312,  76.2673, 'Kochi, Kerala'],
+  kolkata:       [22.5726, 88.3639, 'Kolkata, West Bengal'],
+};
+
+function cityLookup(q) {
+  const k = q.toLowerCase().trim();
+  if (CITY_DB[k]) return CITY_DB[k];
+  for (const [ck, cv] of Object.entries(CITY_DB)) {
+    if (k.startsWith(ck) || ck.startsWith(k) || k.includes(ck)) return cv;
+  }
+  return null;
+}
+
+async function geocodeQ(q, forAC) {
+  // 1. Local instant DB
+  const local = cityLookup(q);
+  if (local && !forAC) {
+    setLoc(local[0], local[1], local[2], 'typed');
+    closeLocModal();
+    return;
+  }
+  if (local && forAC) {
+    showACResults([{ lat: local[0], lng: local[1], name: local[2].split(',')[0], sub: local[2].split(',').slice(1).join(',').trim() }]);
+  }
+
+  // 2. Photon geocoding API
+  try {
+    const url = 'https://photon.komoot.io/api/?q=' + encodeURIComponent(q) + '&limit=' + (forAC ? 5 : 1) + '&lang=en';
+    const resp = await fetch(url);
+    const data = await resp.json();
+    const feats = (data.features || []).filter(f => f.properties && f.properties.name);
+    if (feats.length) {
+      if (forAC) {
+        showACResults(feats.map(f => {
+          const p = f.properties;
+          return {
+            lat: f.geometry.coordinates[1],
+            lng: f.geometry.coordinates[0],
+            name: p.name || '',
+            sub: [p.city || p.county || '', p.state || ''].filter(Boolean).join(', ')
+          };
+        }));
+      } else {
+        const f = feats[0];
+        setLoc(f.geometry.coordinates[1], f.geometry.coordinates[0], f.properties.name || q, 'typed');
+        closeLocModal();
+      }
+      return;
+    }
+  } catch (e) {}
+
+  // 3. Nominatim fallback
+  try {
+    const url = 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(q) +
+      '&format=json&limit=' + (forAC ? 5 : 1) + '&accept-language=en&countrycodes=in';
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (data && data.length) {
+      if (forAC) {
+        showACResults(data.map(item => {
+          const parts = (item.display_name || '').split(',');
+          return { lat: parseFloat(item.lat), lng: parseFloat(item.lon), name: parts[0].trim(), sub: parts.slice(1, 3).join(',').trim() };
+        }));
+      } else {
+        const item = data[0];
+        const nm = (item.display_name || q).split(',')[0].trim();
+        setLoc(parseFloat(item.lat), parseFloat(item.lon), nm, 'typed');
+        closeLocModal();
+      }
+      return;
+    }
+  } catch (e) {}
+
+  if (!forAC) showToast('Cannot find "' + q + '" — try: Vellore, Chennai, Arakkonam');
+}
+
+function showACResults(items) {
+  const drop = document.getElementById('locAcDrop');
+  if (!items || !items.length) { drop.innerHTML = ''; return; }
+  drop.innerHTML = items.slice(0, 5).map(item => {
+    const nm = (item.name || '').replace(/'/g, "\'");
+    const sb = (item.sub || '').replace(/'/g, "\'");
+    return '<button onclick="setLocFromAC(' + item.lat + ',' + item.lng + ',\'' + nm + '\',\'' + sb + '\')" ' +
+      'style="width:100%;text-align:left;padding:9px 12px;background:var(--sur);border:1px solid var(--bor);' +
+      'border-radius:var(--rs);cursor:pointer;font-size:.84rem;color:var(--txt);display:flex;gap:8px;align-items:center;margin-bottom:4px">' +
+      '<span style="flex-shrink:0">📍</span>' +
+      '<span><strong style="color:var(--wht)">' + item.name + '</strong>' +
+      (item.sub ? '<span style="color:var(--mut);font-size:.75rem;margin-left:6px">' + item.sub + '</span>' : '') +
+      '</span></button>';
+  }).join('');
+}
+
+function setLocFromAC(lat, lng, name, sub) {
+  setLoc(parseFloat(lat), parseFloat(lng), name + (sub ? ', ' + sub.split(',')[0] : ''), 'typed');
+  closeLocModal();
+}
+
+function setLoc(lat, lng, name, src) {
+  uLat = lat; uLng = lng; uLocName = name; uLocSource = src;
+  updateLocUI();
+  setLocBar('g', '📍 ' + name);
+  if (discMap) { discMap.setView([lat, lng], 14); placeUMarker(); }
+}
+
+async function renderDisc(){
+  if(typeof L==='undefined'){setTimeout(renderDisc,200);return;}
+  initDiscMap();
+  const q=(document.getElementById('discSearchIn')?.value||'').trim().toLowerCase();
+  const rad=parseFloat(document.getElementById('discRad')?.value||'1');
+
+  // Show loading
+  document.getElementById('discCards').innerHTML='<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
+
+  let shops = [];
+
+  if(apiOnline){
+    // Fetch from server
+    const params = new URLSearchParams();
+    if(q) params.set('q', q);
+    if(uLat) params.set('lat', uLat);
+    if(uLng) params.set('lng', uLng);
+    if(uLat) params.set('radius', rad);
+    if(catFilter){
+      // Map group to sector keywords
+      const grpMap={food:'restaurant',retail:'grocery',health:'hospital',
+        service:'welder',beauty:'salon_l',education:'school',finance:'bank',religious:'temple',construction:'cement',agri:'agri'};
+      if(grpMap[catFilter]) params.set('sector', grpMap[catFilter]);
+    }
+    params.set('limit', '60');
+    const result = await apiGet('/api/businesses?' + params.toString());
+    if(result && result.businesses) shops = result.businesses;
+    else shops = LOCAL.shops; // fallback to local if API fails
+  } else {
+    // Offline: use local storage
+    shops = LOCAL.shops;
+    if(q) shops=shops.filter(s=>s.name?.toLowerCase().includes(q)||s.description?.toLowerCase().includes(q)||s.city?.toLowerCase().includes(q));
+    if(catFilter) shops=shops.filter(s=>secGroup(s.sector)===catFilter);
+    if(uLat) shops=shops.filter(s=>{
+      if(!s.lat||!s.lng)return true;
+      return km(uLat,uLng,s.lat,s.lng)<=rad;
+    });
+  }
+
+  // Sort locally
+  if(sortMode==='newest') shops.sort((a,b)=>(b.registeredAt||0)-(a.registeredAt||0));
+  if(sortMode==='name') shops.sort((a,b)=>a.name.localeCompare(b.name));
+  if(sortMode==='distance'&&uLat) shops.sort((a,b)=>{
+    const da=a.lat&&a.lng?km(uLat,uLng,a.lat,a.lng):999;
+    const db2=b.lat&&b.lng?km(uLat,uLng,b.lat,b.lng):999;
+    return da-db2;
+  });
+
+  shown=shops;
+  renderDiscCards();
+  renderDiscMarkers();
+  document.getElementById('discCount').textContent=shops.length;
+  const first=shops.find(s=>s.lat&&s.lng);
+  if(first&&discMap)discMap.setView([first.lat,first.lng],uLat?14:15);
+}
+function renderDiscCards(){
+  const el=document.getElementById('discCards');
+  if(!shown.length){
+    el.innerHTML='<div class="empty"><div class="ei">🔍</div><div class="et">No Results</div><div>Try wider radius or different keywords.</div></div>';
+    return;
+  }
+  el.innerHTML=shown.map((s,i)=>{
+    const isOpen=checkOpen(s);
+    const dist=uLat&&s.lat&&s.lng?km(uLat,uLng,s.lat,s.lng):null;
+    const favs=DB.favs; const isFav=favs.has(s.id);
+    return`<div class="bcard usr${isFav?' fav':''}" id="bc-${s.id}" onclick="openDetail('${s.id}')" style="animation-delay:${Math.min(i*30,250)}ms">
+      <div class="ubdg">📍 Listed</div>
+      <div class="binn">
+        <div class="bthumb">${secEmoji(s.sector)}</div>
+        <div class="binfo">
+          <div class="btop">
+            <div class="bnm" title="${s.name}">${s.name}</div>
+            <span class="ob ${isOpen?'open':'closed'}">${isOpen?'● Open':'● Closed'}</span>
+          </div>
+          <div class="bmeta">${secName(s.sector)} · ${s.city||''}</div>
+          <div class="bmeta">${s.address||''}</div>
+          <div class="bfoot">
+            ${dist?`<span class="bdist">📍 ${fmtDist(dist)}</span>`:''}
+            ${s.phone?`<span style="color:var(--mut)">📞 ${s.phone}</span>`:''}
+            <span class="bprice">${'₹'.repeat(parseInt(s.priceLevel)||2)}</span>
+          </div>
+        </div>
+      </div>
+      <button class="favbtn${isFav?' fon':''}" onclick="event.stopPropagation();togFav('${s.id}',this)">${isFav?'❤️':'🤍'}</button>
+    </div>`;
+  }).join('');
+}
+function renderDiscMarkers(){
+  if(!discMap)return;
+  dMarkers.forEach(m=>discMap.removeLayer(m));dMarkers=[];
+  shown.forEach(s=>{
+    if(!s.lat||!s.lng)return;
+    const isOpen=checkOpen(s);
+    const col=isOpen?'var(--grn)':'var(--rose)';
+    const m=L.circleMarker([s.lat,s.lng],{
+      radius:10,fillColor:isOpen?'#22D47A':'#FF4C6A',fillOpacity:1,color:'#fff',weight:2.5,zIndexOffset:100
+    }).addTo(discMap);
+    const dist=uLat?km(uLat,uLng,s.lat,s.lng):null;
+    m.bindPopup(`<b>${s.name}</b><br>${secName(s.sector)}<br>
+      ${isOpen?'<span class="pop-open">● Open Now</span>':'<span class="pop-closed">● Closed</span>'}
+      ${dist?` · <b style="color:var(--teal)">${fmtDist(dist)}</b>`:''}<br>
+      <button class="pop-btn" onclick="openDetail('${s.id}')">View Details →</button>`);
+    m.on('click',()=>{
+      document.querySelectorAll('.bcard').forEach(c=>c.classList.remove('hi'));
+      const c=document.getElementById('bc-'+s.id);
+      if(c){c.classList.add('hi');c.scrollIntoView({behavior:'smooth',block:'nearest'});}
+    });
+    dMarkers.push(m);
+  });
+}
+function togFav(id,btn){
+  const f=LOCAL.favs;
+  if(f.has(id)){
+    f.delete(id);btn.textContent='🤍';btn.classList.remove('fon');
+    showToast('Removed from favourites');
+    if(apiOnline) apiDelete('/api/favourites',{deviceId:DEVICE_ID,bizId:id});
+  } else {
+    f.add(id);btn.textContent='❤️';btn.classList.add('fon');
+    showToast('❤️ Saved!');
+    if(apiOnline) apiPost('/api/favourites',{deviceId:DEVICE_ID,bizId:id});
+  }
+  LOCAL.saveFavs(f);
+}
+
+// ═══ DETAIL MODAL ═══
+function openDetail(id){
+  const s=DB.shops.find(x=>x.id===id);if(!s)return;
+  viewingBiz=s;
+  const isOpen=checkOpen(s);
+  document.getElementById('dHero').style.fontSize='3.5rem';
+  document.getElementById('dHero').querySelector('.mhov').insertAdjacentHTML('afterend','');
+  document.getElementById('dSrc').textContent='📍 Registered on Deckscrab · '+secName(s.sector);
+  document.getElementById('dName').textContent=s.name;
+  const dist=uLat&&s.lat&&s.lng?km(uLat,uLng,s.lat,s.lng):null;
+  document.getElementById('dQuick').innerHTML=`
+    <div class="mqi"><div class="mqlab">Status</div><div class="mqval" style="color:${isOpen?'var(--grn)':'var(--rose)'}">${isOpen?'● Open Now':'● Closed'}</div></div>
+    ${dist?`<div class="mqi"><div class="mqlab">Distance</div><div class="mqval" style="color:var(--teal)">${fmtDist(dist)}</div></div>`:''}
+    ${s.phone?`<div class="mqi"><div class="mqlab">Phone</div><div class="mqval" style="font-size:.78rem">${s.phone}</div></div>`:''}
+    <div class="mqi"><div class="mqlab">Type</div><div class="mqval">${secName(s.sector)}</div></div>
+    <div class="mqi"><div class="mqlab">Price</div><div class="mqval" style="color:var(--gold)">${'₹'.repeat(parseInt(s.priceLevel)||2)}</div></div>
+    ${s.delivery?`<div class="mqi"><div class="mqlab">Delivery</div><div class="mqval" style="color:var(--grn)">✓ Yes</div></div>`:''}`;
+  document.getElementById('dDesc').textContent=s.description||'A locally registered business.';
+  const prds=s.products||[];
+  if(prds.length){
+    document.getElementById('dProdSec').style.display='block';
+    document.getElementById('dProdBody').innerHTML=prds.map(p=>`<tr><td>${p.name}</td><td style="color:var(--mut);font-size:.78rem">${p.unit||''}</td><td class="price">₹${p.price}</td></tr>`).join('');
+  } else document.getElementById('dProdSec').style.display='none';
+  const cb=document.getElementById('dCallBtn');
+  if(s.phone){cb.textContent='📞 '+s.phone;cb.onclick=()=>window.open('tel:'+s.phone.replace(/\s/g,''));}
+  else{cb.textContent='📞 No phone listed';cb.onclick=null;}
+  document.getElementById('detailModal').classList.add('open');
+  document.body.style.overflow='hidden';
+  // mini map
+  setTimeout(()=>{
+    if(miniMapInst){miniMapInst.remove();miniMapInst=null;}
+    if(s.lat&&s.lng){
+      miniMapInst=L.map('miniMap',{zoomControl:false,attributionControl:false,dragging:true,scrollWheelZoom:false}).setView([s.lat,s.lng],16);
+      L.tileLayer(TILE,{maxZoom:20,subdomains:'abcd'}).addTo(miniMapInst);
+      L.circleMarker([s.lat,s.lng],{radius:11,fillColor:isOpen?'#22D47A':'#8B5CF6',fillOpacity:1,color:'#fff',weight:3}).addTo(miniMapInst).bindPopup('<b>'+s.name+'</b>').openPopup();
+      if(uLat){
+        L.circleMarker([uLat,uLng],{radius:7,fillColor:'#4C8BFF',fillOpacity:1,color:'#fff',weight:2}).addTo(miniMapInst);
+        L.polyline([[uLat,uLng],[s.lat,s.lng]],{color:'#00D4B4',weight:2,dashArray:'5 5',opacity:.7}).addTo(miniMapInst);
+        miniMapInst.fitBounds([[uLat,uLng],[s.lat,s.lng]],{padding:[18,18]});
+      }
+    } else {
+      document.getElementById('miniMap').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--mut);font-size:.82rem">No location set</div>';
+    }
+  },160);
+}
+function closeDetail(){
+  document.getElementById('detailModal').classList.remove('open');
+  document.body.style.overflow='';
+  if(miniMapInst){miniMapInst.remove();miniMapInst=null;}
+}
+function detailMaps(){
+  const s=viewingBiz;if(!s||!s.lat)return;
+  window.open('https://www.openstreetmap.org/?mlat='+s.lat+'&mlon='+s.lng+'#map=17/'+s.lat+'/'+s.lng,'_blank');
+}
+function detailShare(){
+  const s=viewingBiz;if(!s)return;
+  const msg=encodeURIComponent('🏪 '+s.name+'\n📍 '+s.address+', '+s.city+'\n📞 '+s.phone+'\nFound on Deckscrab!');
+  window.open('https://wa.me/?text='+msg,'_blank');
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDetail();closeLocModal();}});
+
+// ═══ REGISTER FLOW ═══
+function buildSecGrid(filter=''){
+  const q=filter.toLowerCase();
+  const filtered=!q?SECTORS:SECTORS.filter(s=>s.n.toLowerCase().includes(q)||s.d.toLowerCase().includes(q)||s.id.includes(q)||s.g.includes(q));
+  const grid=document.getElementById('secGrid');
+  if(!filtered.length){grid.innerHTML='<div class="no-res">No sector found. Try different keywords.</div>';return;}
+  // group by category
+  const grouped={};
+  filtered.forEach(s=>{if(!grouped[s.g])grouped[s.g]=[];grouped[s.g].push(s);});
+  const catOrder=['retail','food','health','service','beauty','education','finance','religious','construction','agri'];
+  let html='';
+  const cats=q?Object.keys(grouped):catOrder.filter(c=>grouped[c]);
+  cats.forEach(cat=>{
+    if(!grouped[cat])return;
+    html+=`<div style="grid-column:1/-1;margin:${html?'13px':'0'} 0 5px">
+      <span style="font-size:.67rem;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.08em">${CAT_GROUPS[cat]||cat}</span></div>`;
+    grouped[cat].forEach(s=>{
+      html+=`<div class="scard${selSector===s.id?' sel':''}" onclick="selSec(this,'${s.id}')">
+        <div class="sck">✓</div>
+        <div class="sci">${s.e}</div>
+        <div class="scn">${s.n}</div>
+        <div class="scd">${s.d}</div>
+      </div>`;
+    });
+  });
+  grid.innerHTML=html;
+}
+function filterSecs(q){buildSecGrid(q);}
+function selSec(el,id){
+  selSector=id;
+  document.querySelectorAll('.scard').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  const sec=SECTORS.find(s=>s.id===id);
+  if(sec){
+    const m={food:['Menu & Prices','Add your menu items with prices'],
+      health:['Services & Fees','List your services and consultation fees'],
+      service:['Services & Rates','List your services with typical rates']};
+    const[t,st]=m[sec.g]||['Products & Prices','Add items with prices for customer comparison'];
+    document.getElementById('s3t').textContent=t;
+    document.getElementById('s3s').textContent=st;
+  }
+}
+
+function rNext(from){
+  if(!validStep(from))return;
+  markRDone(from);
+  curStep=from+1;showRStep(curStep);
+  if(curStep===2)setTimeout(()=>{if(!pickMap)initPickMap();else pickMap.invalidateSize();},350);
+}
+function rPrev(from){curStep=from-1;showRStep(curStep);}
+function showRStep(n){
+  document.querySelectorAll('.rsp').forEach(p=>p.classList.remove('on'));
+  document.getElementById('rs'+n).classList.add('on');
+  window.scrollTo({top:0,behavior:'smooth'});
+  updateRProg(n);
+}
+function markRDone(n){
+  const ps=document.getElementById('rps'+n);ps.classList.remove('a');ps.classList.add('d');ps.querySelector('.psc').textContent='✓';
+  const pc=document.getElementById('rpc'+n);if(pc)pc.classList.add('d');
+  const pn=document.getElementById('rps'+(n+1));if(pn)pn.classList.add('a');
+}
+function updateRProg(n){
+  for(let i=0;i<=6;i++){
+    const ps=document.getElementById('rps'+i);if(!ps)continue;
+    ps.classList.remove('a','d');
+    if(i<n){ps.classList.add('d');ps.querySelector('.psc').textContent='✓';}
+    if(i===n)ps.classList.add('a');
+  }
+  for(let i=0;i<=5;i++){
+    const pc=document.getElementById('rpc'+i);if(!pc)continue;
+    if(i<n)pc.classList.add('d');else pc.classList.remove('d');
+  }
+}
+function setFE(wid,fid,show){
+  const w=document.getElementById(wid),el=document.getElementById(fid);
+  if(w){if(show)w.classList.add('err');else w.classList.remove('err');}
+  if(el){if(show)el.classList.add('err');else el.classList.remove('err');}
+}
+function fv(id,min=1){const e=document.getElementById(id);return e&&e.value.trim().length>=min;}
+function validStep(n){
+  let bad=false;
+  if(n===0){if(!selSector){showToast('⚠️ Please select your business sector');return false;}}
+  if(n===1){
+    if(!fv('f-nm',2)){setFE('fw-nm','f-nm',true);bad=true;}else setFE('fw-nm','f-nm',false);
+    if(!fv('f-ow',2)){setFE('fw-ow','f-ow',true);bad=true;}else setFE('fw-ow','f-ow',false);
+    if(!fv('f-ds',20)){setFE('fw-ds','f-ds',true);bad=true;}else setFE('fw-ds','f-ds',false);
+  }
+  if(n===2){
+    if(!fv('f-ad',3)){setFE('fw-ad','f-ad',true);bad=true;}else setFE('fw-ad','f-ad',false);
+    if(!fv('f-ct',2)){setFE('fw-ct','f-ct',true);bad=true;}else setFE('fw-ct','f-ct',false);
+    if(!fv('f-pc',4)){setFE('fw-pc','f-pc',true);bad=true;}else setFE('fw-pc','f-pc',false);
+    if(!pinnedLat||!pinnedLng){
+      const la=parseFloat(g('f-la')),lo=parseFloat(g('f-lo'));
+      if(!isNaN(la)&&!isNaN(lo)){pinnedLat=la;pinnedLng=lo;}
+      else{showToast('📍 Click the map or use GPS to pin your location');bad=true;}
+    }
+  }
+  if(n===6){
+    if(!fv('f-ph',7)){setFE('fw-ph','f-ph',true);bad=true;}else setFE('fw-ph','f-ph',false);
+  }
+  if(bad){showToast('⚠️ Please fill all required fields');
+    document.querySelector('.field.err')?.scrollIntoView({behavior:'smooth',block:'center'});}
+  return !bad;
+}
+
+// ── PICK MAP ── uses geocoding to find by address
+function initPickMap(){
+  if(pickMap){pickMap.invalidateSize();return;}
+  const center=uLat?[uLat,uLng]:[13.0772,79.6712];
+  pickMap=L.map('pickMap',{zoomControl:true,scrollWheelZoom:true}).setView(center,uLat?15:12);
+  L.tileLayer(TILE,{attribution:TATT,maxZoom:20,subdomains:'abcd'}).addTo(pickMap);
+  pickMap.on('click',e=>dropPin(e.latlng.lat,e.latlng.lng,'click'));
+  setTimeout(()=>pickMap.invalidateSize(),400);
+  // If address fields already filled, try to geocode
+  const city=g('f-ct'),addr=g('f-ad');
+  if(city)geocodeAddr(addr+' '+city);
+}
+function dropPin(lat,lng,src){
+  pinnedLat=lat;pinnedLng=lng;
+  document.getElementById('f-la').value=lat.toFixed(6);
+  document.getElementById('f-lo').value=lng.toFixed(6);
+  document.getElementById('mpw').classList.add('pinned');
+  document.getElementById('mhint').classList.add('hi');
+  document.getElementById('pintx').textContent='Pinned: '+lat.toFixed(5)+', '+lng.toFixed(5);
+  document.getElementById('pinf').classList.add('show');
+  if(pickMarker)pickMap.removeLayer(pickMarker);
+  pickMarker=L.circleMarker([lat,lng],{radius:13,fillColor:'#8B5CF6',fillOpacity:1,color:'#fff',weight:3}).addTo(pickMap);
+  if(src==='click'){
+    // reverse geocode to fill address
+    fetch('https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lng+'&format=json&zoom=18&accept-language=en')
+      .then(r=>r.json()).then(d=>{
+        if(!d||!d.address)return;
+        const a=d.address;
+        const adEl=document.getElementById('f-ad'),ctEl=document.getElementById('f-ct'),
+              pcEl=document.getElementById('f-pc'),diEl=document.getElementById('f-di');
+        if(!adEl.value)adEl.value=[a.road||a.pedestrian,a.suburb||a.neighbourhood||a.hamlet].filter(Boolean).join(', ')||d.display_name.split(',').slice(0,2).join(',').trim();
+        if(!ctEl.value)ctEl.value=a.city||a.town||a.village||a.county||'';
+        if(!pcEl.value&&a.postcode)pcEl.value=a.postcode;
+        if(!diEl.value)diEl.value=a.county||a.state_district||'';
+        showToast('📍 Pinned! Address auto-filled from map.');
+      }).catch(()=>showToast('📍 Location pinned!'));
+  }else showToast('📍 Location pinned!');
+}
+function manPin(){
+  const la=parseFloat(document.getElementById('f-la').value),lo=parseFloat(document.getElementById('f-lo').value);
+  if(isNaN(la)||isNaN(lo))return;
+  pinnedLat=la;pinnedLng=lo;
+  if(!pickMap)return;
+  pickMap.setView([la,lo],16);
+  if(pickMarker)pickMap.removeLayer(pickMarker);
+  pickMarker=L.circleMarker([la,lo],{radius:13,fillColor:'#8B5CF6',fillOpacity:1,color:'#fff',weight:3}).addTo(pickMap);
+  document.getElementById('pintx').textContent='Pinned: '+la.toFixed(5)+', '+lo.toFixed(5);
+  document.getElementById('pinf').classList.add('show');
+  document.getElementById('mpw').classList.add('pinned');
+}
+// forward geocode address → pin on map
+function geocodeAddr(addr){
+  if(!addr.trim())return;
+  fetch('https://photon.komoot.io/api/?q='+encodeURIComponent(addr)+'&limit=1&lang=en')
+    .then(r=>r.json()).then(d=>{
+      const f=d.features&&d.features[0];
+      if(!f)return;
+      const lat=f.geometry.coordinates[1],lng=f.geometry.coordinates[0];
+      if(pickMap){pickMap.setView([lat,lng],16);dropPin(lat,lng,'geo');}
+    }).catch(()=>{});
+}
+// Auto-geocode when city field changes
+document.addEventListener('change',e=>{
+  if(e.target.id==='f-ct'||e.target.id==='f-ad'){
+    const addr=g('f-ad')+' '+g('f-ct')+' '+g('f-di');
+    if(g('f-ct').length>2&&!pinnedLat)geocodeAddr(addr);
+  }
+});
+function regGPS(){
+  const btn=document.getElementById('regGpsBtn');
+  document.getElementById('regGpsIco').textContent='⏳';btn.disabled=true;
+  if(!navigator.geolocation){showToast('GPS not available');btn.disabled=false;return;}
+  navigator.geolocation.getCurrentPosition(pos=>{
+    document.getElementById('regGpsIco').textContent='📡';btn.disabled=false;
+    const{latitude:lat,longitude:lng}=pos.coords;
+    if(pickMap)pickMap.setView([lat,lng],17);
+    dropPin(lat,lng,'gps');
+    showToast('📡 GPS location used for shop!');
+  },()=>{
+    document.getElementById('regGpsIco').textContent='📡';btn.disabled=false;
+    showToast('GPS failed — click map to pin');
+  },{enableHighAccuracy:true,timeout:12000,maximumAge:0});
+}
+
+// products
+function addPR(){
+  prc++;const id='pr'+prc;
+  const row=document.createElement('div');row.className='prrow';row.id=id;
+  row.innerHTML=`<input type="text" placeholder="Product / Service name" class="prn"/>
+    <input type="number" placeholder="₹ Price" class="prp" min="0" step="0.5"/>
+    <select class="pru">
+      <option>per item</option><option>per kg</option><option>per litre</option>
+      <option>per 500g</option><option>per pack</option><option>per plate</option>
+      <option>per visit</option><option>per hour</option><option>fixed rate</option>
+    </select>
+    <div class="del-r" onclick="document.getElementById('${id}').remove()">✕</div>`;
+  document.getElementById('prList').appendChild(row);
+}
+function getPRs(){
+  return[...document.querySelectorAll('.prrow')].map(r=>({
+    name:r.querySelector('.prn')?.value.trim(),
+    price:parseFloat(r.querySelector('.prp')?.value),
+    unit:r.querySelector('.pru')?.value
+  })).filter(p=>p.name&&!isNaN(p.price)&&p.price>0);
+}
+// hours
+function buildHGrid(){
+  document.getElementById('hgrid').innerHTML=DAYS.map(d=>`
+    <div class="hrow" id="hr-${d}">
+      <span class="dl">${d.substring(0,3)}</span>
+      <input type="time" id="op-${d}" value="09:00" onchange="hrsData['${d}'].open=this.value"/>
+      <input type="time" id="cl-${d}" value="21:00" onchange="hrsData['${d}'].close=this.value"/>
+      <label class="cltog" id="ct-${d}"><input type="checkbox" onchange="togCl('${d}',this.checked)"/> Closed</label>
+    </div>`).join('');
+}
+function togCl(d,v){
+  hrsData[d].closed=v;
+  document.getElementById('hr-'+d).querySelectorAll('input[type=time]').forEach(i=>{i.disabled=v;i.style.opacity=v?'.3':'1';});
+  document.getElementById('ct-'+d).classList.toggle('cl',v);
+}
+function upZ(inp,id){
+  if(!inp.files.length)return;
+  const z=document.getElementById(id);z.classList.add('done');
+  z.querySelector('.uzi').textContent='✅';
+  z.querySelector('.uzl').textContent=inp.files.length>1?inp.files.length+' files':inp.files[0].name.substring(0,14)+(inp.files[0].name.length>14?'…':'');
+}
+function submitReg(){
+  if(!validStep(6))return;
+  const btn=document.querySelector('.btn-sub');btn.innerHTML='⏳ Going Live…';btn.disabled=true;
+  const sec=SECTORS.find(s=>s.id===selSector)||{e:'🏪',n:'Business',g:'other'};
+  const bizId='DS-'+Date.now().toString().slice(-6);
+  const now=new Date();
+  const shop={
+    id:bizId+'-'+Date.now(),bizId,sector:selSector,sectorName:sec.n,sectorEmoji:sec.e,
+    name:g('f-nm'),ownerName:g('f-ow'),year:g('f-yr'),description:g('f-ds'),
+    priceLevel:g('f-pr'),keywords:g('f-kw'),
+    address:g('f-ad'),city:g('f-ct'),pincode:g('f-pc'),district:g('f-di'),state:g('f-st'),
+    lat:pinnedLat,lng:pinnedLng,
+    products:getPRs(),hours:JSON.parse(JSON.stringify(hrsData)),hoursNote:g('f-hn'),
+    phone:g('f-ph'),phone2:g('f-p2'),email:g('f-em'),website:g('f-wb'),
+    whatsapp:g('f-wa'),upi:g('f-up'),
+    instagram:g('f-ig'),facebook:g('f-fb'),youtube:g('f-yt'),
+    delivery:document.getElementById('tg-d').checked,
+    orders:document.getElementById('tg-o').checked,
+    showPhone:document.getElementById('tg-sp').checked,
+    registeredAt:now.getTime(),
+    registeredAtStr:now.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})
+  };
+  // Save to API (if online) and local fallback
+  (async () => {
+    let savedShop = shop;
+    if (apiOnline) {
+      const result = await apiPost('/api/businesses', shop);
+      if (result && result.ok) {
+        shop.bizId = result.bizId;
+        shop.id = result.id || shop.id;
+        savedShop = shop;
+        showToast('Saved to server — visible on all devices!');
+      } else {
+        showToast('Server error — saved locally only');
+      }
+    } else {
+      showToast('Offline — saved locally. Will sync when online.');
+    }
+    LOCAL.add(savedShop);
+    regData = savedShop;
+    btn.innerHTML='🎉 Register & Go Live <span class="arr">→</span>';btn.disabled=false;
+    buildProfile(savedShop);
+    goTo('profile');
+    updateHomeStats();renderRecentGrid();buildCatGrid();
+  })();
+}
+
+// ═══ PROFILE PAGE ═══
+function buildProfile(s){
+  const sec=SECTORS.find(x=>x.id===s.sector)||{e:'🏪',n:'Business',g:'other'};
+  const isOpen=checkOpen(s);
+  document.getElementById('profEmoji').textContent=sec.e;
+  document.getElementById('profSector').textContent=CAT_GROUPS[sec.g]||sec.g+' · '+sec.n;
+  document.getElementById('profNameTxt').textContent=s.name;
+  document.getElementById('profBizId').textContent=s.bizId;
+  const dist=uLat&&s.lat&&s.lng?km(uLat,uLng,s.lat,s.lng):null;
+  document.getElementById('profQuick').innerHTML=`
+    <div class="pq"><span class="op-pill ${isOpen?'open':'closed'}">${isOpen?'● Open Now':'● Closed Now'}</span></div>
+    <div class="pq"><span class="pqm">📍</span><span class="pqv">${s.address}, ${s.city}</span></div>
+    ${dist?`<div class="pq"><span class="pqm">📏</span><span class="pqv" style="color:var(--teal)">${fmtDist(dist)} away</span></div>`:''}
+    ${s.phone&&s.showPhone?`<div class="pq"><span class="pqm">📞</span><span class="pqv">${s.phone}</span></div>`:''}
+    <div class="pq"><span class="pqm">💰</span><span class="pqm">${['','₹ Budget','₹₹ Mid-range','₹₹₹ Premium'][parseInt(s.priceLevel)||2]}</span></div>
+    ${s.delivery?`<div class="pq"><span class="pqm">🚚</span><span class="pqm">Delivery available</span></div>`:''}
+    ${s.year?`<div class="pq"><span class="pqm">📅</span><span class="pqm">Est. ${s.year}</span></div>`:''}`;
+  document.getElementById('profDesc').textContent=s.description||'';
+  if(s.products&&s.products.length){
+    document.getElementById('prodSec').style.display='block';
+    document.getElementById('prodSecTit').textContent=
+      s.sector&&['food','restaurant','tiffin','biryani','fastfood','cafe','juice','sweets','icecream','catering','cakeshop'].includes(sec.g)?'Menu & Prices':
+      ['health','doctor','dentist','ent','eye','hospital','lab','physio','ayur','homeo','vet','nursing'].includes(sec.g)?'Services & Fees':
+      ['service','welder','plumber','electrician','mechanic','carpenter','painter','tailor','acrepair','mobilerepair','cleaning','taxi','courier'].includes(sec.g)?'Services & Rates':
+      'Products & Prices';
+    document.getElementById('prodBody').innerHTML=s.products.map(p=>
+      `<tr><td>${p.name}</td><td style="color:var(--mut);font-size:.78rem">${p.unit||''}</td><td class="price">₹${p.price}</td></tr>`
+    ).join('');
+  } else document.getElementById('prodSec').style.display='none';
+  // hours
+  document.getElementById('hoursTbl').innerHTML=DAYS.map(d=>{
+    const h=s.hours&&s.hours[d]||{open:'09:00',close:'21:00',closed:false};
+    return`<tr class="${h.closed?'cl':''}"><td>${d}</td><td>${h.closed?'Closed':h.open+' – '+h.close}</td></tr>`;
+  }).join('')+(s.hoursNote?`<tr><td colspan="2" style="font-size:.74rem;color:var(--mut);padding-top:7px">ℹ️ ${s.hoursNote}</td></tr>`:'');
+  // contact
+  document.getElementById('waBtn').style.display=s.whatsapp||s.phone?'flex':'none';
+  document.getElementById('callBtn').style.display=s.phone&&s.showPhone?'flex':'none';
+  document.getElementById('profAddr').textContent=s.address+(s.city?', '+s.city:'')+(s.pincode?' – '+s.pincode:'');
+  if(s.upi){document.getElementById('upiRow').style.display='flex';document.getElementById('profUPI').textContent=s.upi;}else document.getElementById('upiRow').style.display='none';
+  if(s.email){document.getElementById('emlRow').style.display='flex';document.getElementById('profEmail').textContent=s.email;}else document.getElementById('emlRow').style.display='none';
+  if(s.website){document.getElementById('webRow').style.display='flex';document.getElementById('profWeb').textContent=s.website;}else document.getElementById('webRow').style.display='none';
+  // social
+  const slnks=[];
+  if(s.instagram)slnks.push(`<button class="sl-btn sl-ig" onclick="window.open('${s.instagram.startsWith('http')?s.instagram:'https://instagram.com/'+s.instagram}','_blank')">📷 Instagram</button>`);
+  if(s.facebook)slnks.push(`<button class="sl-btn sl-fb" onclick="window.open('${s.facebook.startsWith('http')?s.facebook:'https://facebook.com/'+s.facebook}','_blank')">📘 Facebook</button>`);
+  if(s.youtube)slnks.push(`<button class="sl-btn sl-yt" onclick="window.open('${s.youtube}','_blank')">▶️ YouTube</button>`);
+  if(slnks.length){document.getElementById('socSec').style.display='block';document.getElementById('socLinks').innerHTML=slnks.join('');}
+  else document.getElementById('socSec').style.display='none';
+  // profile mini map
+  setTimeout(()=>{
+    if(profMap){profMap.remove();profMap=null;}
+    if(s.lat&&s.lng){
+      profMap=L.map('profMapEl',{zoomControl:false,attributionControl:false,dragging:true,scrollWheelZoom:false}).setView([s.lat,s.lng],16);
+      L.tileLayer(TILE,{maxZoom:20,subdomains:'abcd'}).addTo(profMap);
+      L.circleMarker([s.lat,s.lng],{radius:13,fillColor:isOpen?'#22D47A':'#8B5CF6',fillOpacity:1,color:'#fff',weight:3})
+        .addTo(profMap).bindPopup('<b>'+s.name+'</b>').openPopup();
+    } else {
+      document.getElementById('profMapEl').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--mut);font-size:.82rem;background:var(--sur)">No location pinned</div>';
+    }
+  },200);
+}
+// profile actions
+function profWA(){
+  const s=regData||viewingBiz;if(!s)return;
+  const num=(s.whatsapp||s.phone||'').replace(/\D/g,'');
+  const msg=encodeURIComponent('Hi! I found your shop '+s.name+' on Deckscrab.\nLocation: '+s.city);
+  if(num)window.open('https://wa.me/91'+num+'?text='+msg,'_blank');
+}
+function profCall(){const s=regData||viewingBiz;if(!s||!s.phone)return;window.open('tel:'+s.phone.replace(/\s/g,''));}
+function profMaps(){const s=regData||viewingBiz;if(!s||!s.lat)return;window.open('https://www.openstreetmap.org/?mlat='+s.lat+'&mlon='+s.lng+'#map=17/'+s.lat+'/'+s.lng,'_blank');}
+function waShare(){
+  const s=regData||viewingBiz;if(!s)return;
+  const msg=encodeURIComponent('🏪 *'+s.name+'*\n📍 '+s.address+', '+s.city+(s.phone?'\n📞 '+s.phone:'')+'\n\nFound on Deckscrab! Business ID: '+s.bizId);
+  window.open('https://wa.me/?text='+msg,'_blank');
+}
+
+// ═══ MY SHOPS ═══
+function renderMyShops(){
+  const shops=LOCAL.shops;
+  const el=document.getElementById('myShopsContent');
+  if(!shops.length){
+    el.innerHTML='<div class="noshops"><div class="ni">🏪</div><h2>No businesses listed yet</h2><p>Register your first business — free, instant, permanent. It will appear on the map for everyone nearby.</p><button class="nav-add" style="border-radius:var(--rs);padding:9px 20px;font-size:.83rem" onclick="goTo(\'register\')">+ Register Your Business</button></div>';
+    return;
+  }
+  el.innerHTML='<div class="shgrid">'+[...shops].reverse().map(s=>{
+    const sec=SECTORS.find(x=>x.id===s.sector)||{e:'🏪',n:'Business'};
+    const isOpen=checkOpen(s);
+    const dist=uLat&&s.lat&&s.lng?km(uLat,uLng,s.lat,s.lng):null;
+    return`<div class="shcard">
+      <div class="shbanner">${sec.e}</div>
+      <div class="shbody">
+        <div class="shname">${s.name}</div>
+        <div class="shcat">${sec.n} · <span style="color:${isOpen?'var(--grn)':'var(--rose)'}">${isOpen?'Open':'Closed'}</span></div>
+        <div class="shaddr">📍 ${s.address||''}, ${s.city||''}</div>
+        ${s.lat&&s.lng?`<div class="shcoord">🌐 ${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}</div>`:'<div class="shcoord" style="color:var(--rose)">⚠️ No location pin set</div>'}
+        <div class="shmeta">🕐 ${s.hours?.Monday?.open||'09:00'} – ${s.hours?.Monday?.close||'21:00'} · ${s.delivery?'🚚 Delivery':'🚶 Pickup'}</div>
+        ${dist?`<div class="shmeta" style="color:var(--teal)">📏 ${fmtDist(dist)} from you</div>`:''}
+        <div class="shmeta">📅 Registered: ${s.registeredAtStr||'—'} · ID: ${s.bizId}</div>
+        <div class="shacts">
+          <button class="msb view" onclick="viewShop('${s.id}')">View Profile</button>
+          ${s.lat&&s.lng?`<button class="msb maps" onclick="window.open('https://www.openstreetmap.org/?mlat=${s.lat}&mlon=${s.lng}#map=17/${s.lat}/${s.lng}','_blank')">🗺️ Map</button>`:''}
+          <button class="msb del" onclick="delShop('${s.id}')">Delete</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('')+'</div>';
+}
+function viewShop(id){
+  const s=DB.shops.find(x=>x.id===id);if(!s)return;
+  regData=s;buildProfile(s);goTo('profile');
+}
+function delShop(id){
+  if(!confirm('Delete this listing? This cannot be undone.'))return;
+  const shop = LOCAL.shops.find(s=>s.id===id);
+  LOCAL.del(id);
+  if(apiOnline && shop && shop.bizId) {
+    apiDelete('/api/businesses/'+shop.bizId).then(()=>showToast('🗑️ Deleted from server'));
+  }
+  renderMyShops();updateHomeStats();renderRecentGrid();buildCatGrid();
+  showToast('🗑️ Listing deleted');
+}
+
+// ═══ DB — unified data access (local + server) ═══
+const DB = {
+  get shops() { return LOCAL.shops; },
+  get favs()  { return LOCAL.favs; }
+};
+
+// ═══ HOME PAGE FUNCTIONS ═══
+function updateHomeStats() {
+  const shops = DB.shops;
+  const el = document.getElementById('statBiz');
+  if (el) el.textContent = shops.length;
+  const citiesEl = document.getElementById('statCities');
+  if (citiesEl) {
+    const cities = new Set(shops.map(s => s.city).filter(Boolean));
+    citiesEl.textContent = cities.size || '—';
+  }
+}
+
+function renderRecentGrid() {
+  const el = document.getElementById('recentGrid');
+  if (!el) return;
+  const shops = [...DB.shops].slice(0, 8);
+  if (!shops.length) {
+    el.innerHTML = '<div class="empty-grid"><div class="ei">🏪</div><div class="et">No businesses yet</div><div>Be the first to register!</div></div>';
+    return;
+  }
+  el.innerHTML = shops.map(s => {
+    const sec = SECTORS.find(x => x.id === s.sector) || {e:'🏪', n:'Business'};
+    const isOpen = checkOpen(s);
+    const dist = uLat && s.lat && s.lng ? km(uLat, uLng, s.lat, s.lng) : null;
+    return `<div class="lcard usr" onclick="openDetail('${s.id}')">
+      <div class="lc-top">
+        <span>${sec.e}</span>
+        <span class="lc-ob ${isOpen?'open':'closed'}">${isOpen?'Open':'Closed'}</span>
+      </div>
+      <div class="lc-body">
+        <div class="lc-cat">${sec.n}</div>
+        <div class="lc-name">${s.name}</div>
+        <div class="lc-addr">${s.address || ''}, ${s.city || ''}</div>
+        <div class="lc-foot">
+          <span class="lc-dist">${dist ? fmtDist(dist) : s.city || ''}</span>
+          <span class="lc-price">${'&#8377;'.repeat(parseInt(s.priceLevel)||2)}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function buildCatGrid() {
+  const el = document.getElementById('catGrid');
+  if (!el) return;
+  const shops = DB.shops;
+  const counts = {};
+  shops.forEach(s => { counts[s.sector] = (counts[s.sector] || 0) + 1; });
+  el.innerHTML = Object.entries(CAT_GROUPS).slice(0, 10).map(([gid, gname]) => {
+    const secs = SECTORS.filter(s => s.g === gid);
+    const count = secs.reduce((n, s) => n + (counts[s.id] || 0), 0);
+    const emoji = secs[0]?.e || '🏪';
+    return `<div class="cat-tile" onclick="catFilter='${gid}';goTo('discover')">
+      <div class="ct-ico">${emoji}</div>
+      <div class="ct-nm">${gname.split(' ')[0]}</div>
+      <div class="ct-cnt">${count} listed</div>
+    </div>`;
+  }).join('');
+}
+
+function doHomeSearch() {
+  const loc = document.getElementById('hLocIn')?.value.trim();
+  const q   = document.getElementById('hSearchIn')?.value.trim();
+  if (loc) {
+    const found = cityLookup(loc);
+    if (found) setLoc(found[0], found[1], found[2], 'typed');
+  }
+  goTo('discover');
+  setTimeout(() => {
+    const si = document.getElementById('discSearchIn');
+    if (si && q) { si.value = q; renderDisc(); }
+  }, 200);
+}
+
+// ═══ DISCOVER MAP HELPERS ═══
+function initDiscMap() {
+  if (discMap) return;
+  if (typeof L === 'undefined') return;
+  const center = uLat ? [uLat, uLng] : [13.0772, 79.6712];
+  discMap = L.map('discMap', {zoomControl: true, scrollWheelZoom: true}).setView(center, uLat ? 14 : 11);
+  L.tileLayer(TILE, {attribution: TATT, maxZoom: 20, subdomains: 'abcd'}).addTo(discMap);
+  placeUMarker();
+}
+
+function placeUMarker() {
+  if (!discMap || !uLat) return;
+  if (uMarker) discMap.removeLayer(uMarker);
+  uMarker = L.circleMarker([uLat, uLng], {
+    radius: 9, fillColor: '#4C8BFF', fillOpacity: 1, color: '#fff', weight: 2.5, zIndexOffset: 200
+  }).addTo(discMap).bindPopup('You are here');
+}
+
+function discSearch() { renderDisc(); }
+
+function fCat(el, gid) {
+  catFilter = gid;
+  document.querySelectorAll('.dcat').forEach(b => b.classList.remove('on'));
+  if (el) el.classList.add('on');
+  renderDisc();
+}
+
+function sortBy(el, mode) {
+  sortMode = mode;
+  document.querySelectorAll('.srt').forEach(b => b.classList.remove('on'));
+  if (el) el.classList.add('on');
+  renderDisc();
+}
+
+function quickSearch(q) {
+  document.getElementById('hSearchIn').value = q;
+  goTo('discover');
+  setTimeout(() => {
+    const si = document.getElementById('discSearchIn');
+    if (si) { si.value = q; renderDisc(); }
+  }, 200);
+}
+
+// ═══ UTILITIES ═══
+function checkOpen(s){
+  if(!s.hours)return false;
+  try{
+    const now=new Date(),day=DAYS[now.getDay()===0?6:now.getDay()-1],cur=now.getHours()*60+now.getMinutes();
+    const h=s.hours[day];if(!h||h.closed)return false;
+    const[oh,om]=h.open.split(':').map(Number),[ch,cm]=h.close.split(':').map(Number);
+    return cur>=(oh*60+om)&&cur<=(ch*60+cm);
+  }catch(e){return false;}
+}
+function km(a,b,c,d){
+  const R=6371,dL=(c-a)*Math.PI/180,dG=(d-b)*Math.PI/180,
+    x=Math.sin(dL/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dG/2)**2;
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+function fmtDist(d){return d<1?Math.round(d*1000)+'m':d.toFixed(1)+' km';}
+const g=id=>{const e=document.getElementById(id);return e?e.value.trim():'';};
+let tT;
+function showToast(msg){const el=document.getElementById('toastEl');el.textContent=msg;el.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>el.classList.remove('show'),3200);}
+document.addEventListener('input',ev=>{
+  const el=ev.target;if(!['INPUT','SELECT','TEXTAREA'].includes(el.tagName))return;
+  el.classList.remove('err');const fw=el.closest('.field');if(fw)fw.classList.remove('err');
+});
+// reset register form when navigating back
+window.addEventListener('DOMContentLoaded',()=>{
+  buildSecGrid();buildHGrid();addPR();addPR();addPR();
+  updateHomeStats();renderRecentGrid();buildCatGrid();
+  // Check API connection on load
+  checkAPI().then(()=>{
+    updateHomeStats();renderRecentGrid();
+  });
+});
+
+// ── API URL SETTINGS (let user change the server URL) ──
+function setApiUrl(){
+  const url=prompt('Enter your Deckscrab server URL:\n(e.g. https://your-app.railway.app)',
+    localStorage.getItem('nb_api_url')||'http://localhost:3000');
+  if(url!==null){
+    localStorage.setItem('nb_api_url',url.trim().replace(/\/+$/,''));
+    location.reload();
+  }
+}
+</script>
+</body>
+</html>
