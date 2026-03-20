@@ -1456,7 +1456,7 @@ function renderShopSite(shop){
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px">
               ${['Your ordering website','yourshop.deckscrab.in','Full menu with prices','UPI · Card · Cash payment','Auto GST bill generation','OTP verification (anti-fraud)','WhatsApp bot with site link','Shopkeeper confirm panel','WhatsApp order alerts','Free listing on Deckscrab map'].map(f=>`<div style="display:flex;align-items:center;gap:6px;font-size:.76rem;color:var(--txt)"><span style="color:var(--grn);font-weight:800;flex-shrink:0">✓</span>${f}</div>`).join('')}
             </div>
-            <button onclick="showToast('🚀 Website Plan — Coming Soon! Contact us: wa.me/919384707706')" style="width:100%;padding:13px;background:var(--gold);color:var(--bg);border:none;border-radius:var(--rs);font-size:.9rem;font-weight:800;cursor:pointer;font-family:'Syne',sans-serif">🌐 Build My Website — ₹399/month</button>
+            <button onclick="openGrowBuilder('website',399)" style="width:100%;padding:13px;background:var(--gold);color:var(--bg);border:none;border-radius:var(--rs);font-size:.9rem;font-weight:800;cursor:pointer;font-family:'Syne',sans-serif">🌐 Build My Website — Free Now</button>
           </div>
         </div>
 
@@ -1476,7 +1476,7 @@ function renderShopSite(shop){
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px">
             ${['🏆 Top of search results','📍 Priority map placement','🏠 Featured on home page','📣 Push notifications to nearby users','📊 Weekly performance report','🎯 Target by location & category','💬 Promoted WhatsApp messages','✅ Verified badge on your listing'].map(f=>`<div style="display:flex;align-items:center;gap:6px;font-size:.76rem;color:var(--txt)"><span style="color:var(--vio);font-weight:800;flex-shrink:0">✓</span>${f}</div>`).join('')}
           </div>
-          <button onclick="showToast('📣 Ads Plan — Coming Soon! Contact us: wa.me/919384707706')" style="width:100%;padding:13px;background:var(--vio);color:#fff;border:none;border-radius:var(--rs);font-size:.9rem;font-weight:800;cursor:pointer;font-family:'Syne',sans-serif">📣 Run Ads — ₹999/month</button>
+          <button onclick="openGrowBuilder('ads',999)" style="width:100%;padding:13px;background:var(--vio);color:#fff;border:none;border-radius:var(--rs);font-size:.9rem;font-weight:800;cursor:pointer;font-family:'Syne',sans-serif">📣 Run Ads — ₹999/month</button>
         </div>
 
       </div>
@@ -1646,36 +1646,27 @@ function renderShopSite(shop){
       <div id="gbs4" class="gbstep" style="display:none">
         <div style="background:var(--sur);border:1.5px solid var(--bor);border-radius:var(--r);overflow:hidden;margin-bottom:14px">
           <div style="padding:14px 16px 10px;border-bottom:1px solid var(--bor)">
-            <div style="font-family:'Syne',sans-serif;font-size:.98rem;font-weight:700;color:var(--wht);margin-bottom:2px">Step 5 — Pay & Go Live</div>
-            <div style="font-size:.74rem;color:var(--mut)">Your website goes live the moment payment is confirmed</div>
+            <div style="font-family:'Syne',sans-serif;font-size:.98rem;font-weight:700;color:var(--wht);margin-bottom:2px">Step 5 — Go Live!</div>
+            <div style="font-size:.74rem;color:var(--mut)">Your website goes live instantly — free during launch period</div>
           </div>
           <div style="padding:14px 16px">
             <!-- Order summary -->
             <div id="gbPaySummary" style="background:#0a0f1a;border:1px solid rgba(245,197,24,.15);border-radius:var(--rs);padding:14px;margin-bottom:14px"></div>
 
-            <!-- Payment method -->
-            <div style="font-size:.75rem;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.07em;margin-bottom:9px">Payment Method</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-              <div onclick="selGbPay(this,'upi')" class="gb-pm gb-pm-sel" style="background:#0a0f1a;border:2px solid var(--gold);border-radius:var(--rs);padding:12px;text-align:center;cursor:pointer"><div style="font-size:1.4rem;margin-bottom:4px">📱</div><div style="font-size:.77rem;font-weight:700;color:var(--wht)">UPI</div><div style="font-size:.64rem;color:var(--mut)">GPay · PhonePe · Paytm</div></div>
-              <div onclick="selGbPay(this,'card')" class="gb-pm" style="background:#0a0f1a;border:2px solid var(--bor);border-radius:var(--rs);padding:12px;text-align:center;cursor:pointer"><div style="font-size:1.4rem;margin-bottom:4px">💳</div><div style="font-size:.77rem;font-weight:700;color:var(--wht)">Card</div><div style="font-size:.64rem;color:var(--mut)">Debit / Credit</div></div>
-            </div>
-            <div id="gbUpiArea">
-              <div class="field"><label>Your UPI ID or phone number</label><input class="fi" id="gbUpiId" placeholder="e.g. 9876543210@gpay or name@upi"/></div>
-            </div>
-            <div id="gbCardArea" style="display:none">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
-                <div class="field"><label>Card Number</label><input class="fi" id="gbCardNum" placeholder="1234 5678 9012 3456"/></div>
-                <div class="field"><label>Expiry</label><input class="fi" id="gbCardExp" placeholder="MM/YY"/></div>
-              </div>
-              <div class="field"><label>CVV</label><input class="fi" id="gbCardCvv" placeholder="123" type="password"/></div>
-            </div>
+            <!-- Payment method — hidden until payment activated -->
+            <div id="gbUpiArea" style="display:none"><input class="fi" id="gbUpiId" placeholder="UPI ID"/></div>
+            <div id="gbCardArea" style="display:none"></div>
 
-            <!-- Pay button -->
+            <!-- FREE NOW — Pay later -->
             <div id="gbPayBtnArea">
-              <button onclick="processGbPayment()" id="gbPayBtn" style="width:100%;padding:14px;background:linear-gradient(135deg,var(--gold),var(--ora));color:var(--bg);border:none;border-radius:var(--rs);font-size:.92rem;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;font-family:'Syne',sans-serif;box-shadow:0 6px 20px rgba(245,197,24,.3)">
-                🚀 Pay ₹<span id="gbPayAmt">399</span> & Go Live Now
+              <div style="background:rgba(31,217,122,.07);border:1.5px solid rgba(31,217,122,.22);border-radius:var(--rs);padding:14px;margin-bottom:12px;font-size:.82rem;color:rgba(31,217,122,.85);line-height:1.7">
+                🎉 <strong style="color:#fff">Free during launch!</strong><br/>
+                Your website goes live instantly. We'll add payment later when you're ready.
+              </div>
+              <button onclick="processGbPayment()" id="gbPayBtn" style="width:100%;padding:14px;background:linear-gradient(135deg,var(--grn),var(--teal));color:#fff;border:none;border-radius:var(--rs);font-size:.92rem;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;font-family:'Syne',sans-serif;box-shadow:0 6px 20px rgba(31,217,122,.3)">
+                🚀 Go Live Now — Free!
               </button>
-              <div style="text-align:center;font-size:.69rem;color:var(--mut)">🔒 Secure · Cancel anytime · No hidden charges</div>
+              <div style="text-align:center;font-size:.69rem;color:var(--mut)">Your website link is created instantly · Share anywhere</div>
             </div>
 
             <!-- SUCCESS -->
@@ -3276,10 +3267,8 @@ function selGbPay(el,m){
   document.getElementById('gbCardArea').style.display=m==='card'?'block':'none';
 }
 async function processGbPayment(){
-  const upiVal=document.getElementById('gbUpiId')?.value.trim();
-  if(gbPayMethod==='upi'&&!upiVal){showToast('⚠️ Enter your UPI ID or phone number');return;}
   const btn=document.getElementById('gbPayBtn');
-  if(btn){btn.textContent='⏳ Verifying…';btn.disabled=true;}
+  if(btn){btn.textContent='⏳ Creating your website…';btn.disabled=true;}
 
   const name=document.getElementById('gb-name').value.trim();
   const phone=document.getElementById('gb-phone').value.trim();
@@ -3287,96 +3276,50 @@ async function processGbPayment(){
   const addr=document.getElementById('gb-addr').value.trim();
   const slug=name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
   const websiteUrl=`https://waseem-2007.github.io/deckscrab/?shop=${slug}`;
-  const botMsg=encodeURIComponent(`Hi! Order from ${name}: ${websiteUrl}`);
+  const botMsg=encodeURIComponent(`Hi! I want to order from ${name}. View our menu: ${websiteUrl}`);
   const botLink=`https://wa.me/91${phone}?text=${botMsg}`;
   const prods=getGbProds();
   const bizId='DS-'+Date.now().toString().slice(-6);
 
-  // Build shop data
   const shopData={
-    id:'ws_'+Date.now(),
-    name,e:document.getElementById('gb-cat').value||'🏪',
+    id:'ws_'+Date.now(),name,
+    e:document.getElementById('gb-cat').value||'🏪',
     desc:document.getElementById('gb-tagline').value,
     phone,wa:phone,city,addr,
-    oh:document.getElementById('gb-open').value||'9:00 AM',
-    oc:document.getElementById('gb-close').value||'9:00 PM',
-    prods,theme:gbSelTheme,
-    websiteEnabled:true,websiteUrl,botLink,
-    plan:gbPlan,planAmt:gbAmt,
-    bizId,reg:Date.now(),delivery:true,
+    oh:document.getElementById('gb-open')?.value||'9:00 AM',
+    oc:document.getElementById('gb-close')?.value||'9:00 PM',
+    prods,theme:gbSelTheme,websiteEnabled:true,websiteUrl,botLink,
+    plan:gbPlan,bizId,reg:Date.now(),delivery:true,
     sector:'Business',priceLevel:'2',verified:false,
   };
 
-  // ── STEP 1: Save to Railway so website works on ALL devices ──
   if(btn)btn.textContent='⏳ Saving to server…';
-  const saved=await apiPost('/api/businesses',{
-    ...shopData,
-    name,ownerName:name,description:shopData.desc,
-    address:addr,pincode:'',phone,whatsapp:phone,
-    products:prods.map(p=>({name:p.n,price:p.p})),
-    sectorName:'Business',sectorEmoji:shopData.e,
-  });
-  // Also save locally as fallback
+  try{
+    await apiPost('/api/businesses',{
+      ...shopData,ownerName:name,description:shopData.desc,
+      address:addr,pincode:'',products:prods.map(p=>({name:p.n,price:p.p})),
+      sectorName:'Business',sectorEmoji:shopData.e,
+    });
+  }catch(e){}
+
   const idx=myShops.findIndex(s=>s.phone===phone||s.name===name);
-  if(idx>=0)myShops[idx]={...myShops[idx],...shopData};
-  else myShops.unshift(shopData);
+  if(idx>=0)myShops[idx]={...myShops[idx],...shopData};else myShops.unshift(shopData);
   localStorage.setItem('ds_myshops',JSON.stringify(myShops));
   gbBuiltShop={name,phone,slug,websiteUrl,botLink};
 
-  // ── STEP 2: Send payment request to YOUR WhatsApp ──
-  if(btn)btn.textContent='⏳ Processing payment…';
-  const paymentMsg=
-`💳 *PAYMENT RECEIVED — Deckscrab Grow*
-━━━━━━━━━━━━━━━━━━━━
-🏪 *Business:* ${name}
-📍 *City:* ${city}
-📞 *Phone:* ${phone}
-🌐 *Plan:* ${gbPlan==='website'?'Website + WhatsApp Bot':'Ads Plan'}
-💰 *Amount:* ₹${gbAmt}/month
-${gbPayMethod==='upi'?`📱 *UPI ID:* ${upiVal}`:'💳 Card payment'}
-🔑 *Biz ID:* ${bizId}
-🌐 *Website:* ${websiteUrl}
-━━━━━━━━━━━━━━━━━━━━
-Please verify payment and confirm activation.
-Send: ✅ ACTIVATED to complete.`;
+  const yourNotif=`🆕 *New Website — Deckscrab*\n🏪 ${name}\n📍 ${city}\n📞 ${phone}\n🌐 ${websiteUrl}\n📦 ${prods.length} products\n🆔 ${bizId}`;
+  setTimeout(()=>window.open(`https://wa.me/919384707706?text=${encodeURIComponent(yourNotif)}`,'_blank'),500);
 
-  // Send to YOUR WhatsApp (9384707706)
-  setTimeout(()=>{
-    window.open(`https://wa.me/919384707706?text=${encodeURIComponent(paymentMsg)}`,'_blank');
-  },400);
+  const ownerMsg=`🎉 *Your Website is LIVE on Deckscrab!*\n\n🏪 *${name}*\n\n🌐 *Your Website Link:*\n${websiteUrl}\n\nShare this link with your customers!\nThey browse → order → pay → bill comes to YOU on WhatsApp automatically.\n\n💬 *WhatsApp Order Link:*\n${botLink}\n\n_Powered by Deckscrab · Support: wa.me/919384707706_`;
+  setTimeout(()=>window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(ownerMsg)}`,'_blank'),1500);
 
-  // ── STEP 3: Send confirmation to business owner ──
-  const ownerMsg=
-`🎉 *Your Deckscrab Website is Ready!*
-━━━━━━━━━━━━━━━━━━━━
-🏪 *Shop:* ${name}
-🌐 *Website:* ${websiteUrl}
-💬 *Bot Link:* wa.me/91${phone}
-
-*How customers order:*
-1️⃣ They open your website link
-2️⃣ Select items → add to cart
-3️⃣ Fill address → pay
-4️⃣ OTP verified → bill sent to YOU
-5️⃣ You prepare & deliver
-
-📌 Share your link on WhatsApp & Instagram!
-
-_Payment confirmation pending. You will be activated within 24 hours._
-_Deckscrab Support: wa.me/919384707706_`;
-
-  setTimeout(()=>{
-    window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(ownerMsg)}`,'_blank');
-  },1400);
-
-  // ── STEP 4: Show success ──
   setTimeout(()=>{
     setTxt('gbLiveWebUrl',websiteUrl);
-    setTxt('gbLiveBotUrl',`wa.me/91${phone} (website link included)`);
+    setTxt('gbLiveBotUrl',`wa.me/91${phone} (with website link)`);
     const pba=document.getElementById('gbPayBtnArea');if(pba)pba.style.display='none';
     const gbr=document.getElementById('gbBackRow');if(gbr)gbr.style.display='none';
     const suc=document.getElementById('gbSuccess');if(suc)suc.style.display='block';
-    showToast('🎉 Payment sent! Activation within 24 hours.');
+    showToast('🎉 Your website is live!');
   },2000);
 }
 function copyGbLink(elId){
