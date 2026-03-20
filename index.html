@@ -3132,31 +3132,33 @@ let gbProdCount=0,gbBuiltShop=null;
 
 function openGrowBuilder(plan,amt){
   gbPlan=plan;gbAmt=amt;gbStep=0;gbProdCount=0;gbBuiltShop=null;
-  document.getElementById('gbPayAmt').textContent=amt;
-  document.getElementById('gbSuccess').style.display='none';
-  document.getElementById('gbPayBtnArea').style.display='block';
-  document.getElementById('gbBackRow').style.display='flex';
-  document.getElementById('gbPayBtn').textContent='🚀 Pay ₹'+amt+' & Go Live Now';
-  document.getElementById('gbPayBtn').disabled=false;
+  // Reset success/button states safely
+  const suc=document.getElementById('gbSuccess');if(suc)suc.style.display='none';
+  const pba=document.getElementById('gbPayBtnArea');if(pba)pba.style.display='block';
+  const gbr=document.getElementById('gbBackRow');if(gbr)gbr.style.display='flex';
+  const btn=document.getElementById('gbPayBtn');
+  if(btn){btn.textContent='🚀 Go Live Now — Free!';btn.disabled=false;}
+  // Set titles
   const titles={website:'🌐 Build Your Website',ads:'📣 Run Ads on Deckscrab'};
-  const subs={website:'Your shop goes live in 5 minutes',ads:'Boost your shop to top results'};
-  document.getElementById('gBuilderTitle').textContent=titles[plan]||titles.website;
-  document.getElementById('gBuilderSub').textContent=subs[plan]||subs.website;
-  // Pre-fill from existing shop
+  const subs={website:'Your shop goes live in 5 minutes — free!',ads:'Boost your shop to top results'};
+  setTxt('gBuilderTitle',titles[plan]||titles.website);
+  setTxt('gBuilderSub',subs[plan]||subs.website);
+  // Pre-fill from existing shop if available
   if(myShops.length){
     const s=myShops[0];
-    document.getElementById('gb-name').value=s.name||'';
-    document.getElementById('gb-tagline').value=s.desc||'';
-    document.getElementById('gb-phone').value=s.phone||'';
-    document.getElementById('gb-city').value=s.city||'';
-    document.getElementById('gb-addr').value=s.addr||s.address||'';
-    document.getElementById('gbProdList').innerHTML='';
+    const f=(id,val)=>{const e=document.getElementById(id);if(e&&!e.value)e.value=val||'';};
+    f('gb-name',s.name);f('gb-tagline',s.desc);
+    f('gb-phone',s.phone);f('gb-city',s.city);
+    f('gb-addr',s.addr||s.address);
+    const pl=document.getElementById('gbProdList');
+    if(pl)pl.innerHTML='';
     if(s.prods&&s.prods.length)s.prods.forEach(p=>addGbProd(p.n||p.name||'',p.p||p.price||'','🍽️'));
   }
-  if(!document.getElementById('gbProdList').children.length){addGbProd();addGbProd();addGbProd();}
+  const pl=document.getElementById('gbProdList');
+  if(pl&&!pl.children.length){addGbProd();addGbProd();addGbProd();}
   gotoGbStep(0);
-  document.getElementById('growPlans').style.display='none';
-  document.getElementById('growBuilder').style.display='block';
+  const gp=document.getElementById('growPlans');if(gp)gp.style.display='none';
+  const gb=document.getElementById('growBuilder');if(gb)gb.style.display='block';
   window.scrollTo(0,0);
 }
 function closeGrowBuilder(){
@@ -3245,19 +3247,19 @@ function buildGbPreview(){
     </div>`;
 }
 function buildGbPaySummary(){
-  const name=document.getElementById('gb-name').value||'Your Shop';
+  const name=(document.getElementById('gb-name')?.value)||'Your Shop';
   const slug=name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
   const labels={website:'Website + WhatsApp Bot',ads:'Ads & Boost Plan'};
-  document.getElementById('gbPaySummary').innerHTML=`
-    <div style="font-size:.72rem;color:var(--mut);text-transform:uppercase;letter-spacing:.07em;font-weight:700;margin-bottom:9px">Order Summary</div>
-    <div style="display:flex;justify-content:space-between;font-size:.83rem;padding:6px 0;border-bottom:1px solid var(--bor)"><span>${labels[gbPlan]||'Plan'}</span><span style="color:var(--gold);font-weight:700">₹${gbAmt}/month</span></div>
+  const websiteUrl=`https://waseem-2007.github.io/deckscrab/?shop=${slug}`;
+  setHtml('gbPaySummary',`
+    <div style="font-size:.72rem;color:var(--mut);text-transform:uppercase;letter-spacing:.07em;font-weight:700;margin-bottom:9px">Your Website Summary</div>
+    <div style="display:flex;justify-content:space-between;font-size:.83rem;padding:6px 0;border-bottom:1px solid var(--bor)"><span>${labels[gbPlan]||'Website Plan'}</span><span style="color:var(--grn);font-weight:700">FREE 🎉</span></div>
     <div style="display:flex;justify-content:space-between;font-size:.83rem;padding:6px 0;border-bottom:1px solid var(--bor)"><span style="color:var(--mut)">For</span><span style="font-weight:700">${name}</span></div>
-    ${gbPlan==='website'?`<div style="display:flex;justify-content:space-between;font-size:.8rem;padding:6px 0;border-bottom:1px solid var(--bor)"><span style="color:var(--mut)">Website</span><span style="color:var(--teal)">${slug}.deckscrab.in</span></div>`:''}
+    <div style="display:flex;justify-content:space-between;font-size:.8rem;padding:6px 0;border-bottom:1px solid var(--bor)"><span style="color:var(--mut)">Your Website</span><span style="color:var(--teal);font-size:.72rem;word-break:break-all">${websiteUrl}</span></div>
     <div style="display:flex;justify-content:space-between;font-size:.8rem;padding:6px 0;border-bottom:1px solid var(--bor)"><span style="color:var(--mut)">WhatsApp Bot</span><span style="color:var(--grn)">✓ Included</span></div>
     <div style="display:flex;justify-content:space-between;font-size:.8rem;padding:6px 0;border-bottom:1px solid var(--bor)"><span style="color:var(--mut)">OTP Verification</span><span style="color:var(--grn)">✓ Included</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:.8rem;padding:6px 0;border-bottom:1px solid var(--bor)"><span style="color:var(--mut)">Setup Fee</span><span style="color:var(--grn)">FREE</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:1rem;font-weight:800;padding:12px 0 0;margin-top:7px;border-top:1.5px solid rgba(245,197,24,.2)"><span>Total</span><span style="color:var(--gold)">₹${gbAmt}/month</span></div>
-    <div style="font-size:.69rem;color:var(--mut);margin-top:6px">Cancel anytime · No hidden fees · Instant activation</div>`;
+    <div style="display:flex;justify-content:space-between;font-size:.8rem;padding:6px 0;border-bottom:1px solid var(--bor)"><span style="color:var(--mut)">Bill to Shopkeeper</span><span style="color:var(--grn)">✓ Auto</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:1rem;font-weight:800;padding:12px 0 0;margin-top:7px;border-top:1.5px solid rgba(31,217,122,.25)"><span>Cost</span><span style="color:var(--grn)">FREE during launch</span></div>`);
 }
 function selGbPay(el,m){
   gbPayMethod=m;
