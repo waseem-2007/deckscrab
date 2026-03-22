@@ -2220,14 +2220,18 @@ function renderShopSite(shop){
         <div class="step-card-hdr"><h2>3. Business Location</h2><p>Pin your exact location on map</p></div>
         <div class="step-card-body">
           <button class="gps-btn" onclick="regGPS()"><span id="regGpsIco">📡</span><span id="regGpsTxt">Use GPS — Find My Location</span></button>
-          <div class="field"><label>Street Address <span class="req">*</span></label><input class="fi" id="f-ad" placeholder="Shop No., Street, Area"/></div>
+          <div class="field"><label>Street Address <span class="req">*</span></label><input class="fi" id="f-ad" placeholder="Shop No., Street, Area" oninput="regSearchAddr()"/></div>
           <div class="frow">
             <div class="field"><label>City <span class="req">*</span></label><input class="fi" id="f-ct" placeholder="e.g. Arakkonam"/></div>
             <div class="field"><label>Pincode <span class="req">*</span></label><input class="fi" id="f-pc" placeholder="631101" type="number"/></div>
           </div>
-          <div class="map-ph" id="mapPh" onclick="demoPin()">
-            <div class="map-ph-ico">🗺️</div>
-            <div class="map-ph-txt">Tap to pin your location on map</div>
+          <!-- Real Leaflet Map -->
+          <div id="regMapWrap" style="border-radius:var(--rs);overflow:hidden;border:1.5px solid var(--bor);margin-top:4px">
+            <div id="regMap" style="height:200px;width:100%;background:#1a1a2e"></div>
+            <div style="background:var(--sur);padding:8px 12px;font-size:.72rem;color:var(--mut);display:flex;align-items:center;gap:6px">
+              <span>📍</span>
+              <span id="regMapCoords">Tap GPS button or tap map to pin your shop location</span>
+            </div>
           </div>
           <div class="pin-confirm" id="pinConfirm"><span>✅</span><span id="pinCoordsTxt">Location pinned</span></div>
         </div>
@@ -3942,38 +3946,139 @@ function nextStep(from){
   if(from===3)buildReviewSummary();
   document.getElementById('sp'+from).classList.remove('on');
   curStep=from+1;document.getElementById('sp'+curStep).classList.add('on');
-  updateStepBar(curStep);window.scrollTo(0,0);
+  updateStepBar(curStep);
+  // Init registration map when reaching location step
+  if(curStep===2)setTimeout(()=>initRegMap(uLat||13.0772,uLng||79.6712),300);
+  window.scrollTo(0,0);
 }
 function prevStep(from){
   document.getElementById('sp'+from).classList.remove('on');
   curStep=from-1;document.getElementById('sp'+curStep).classList.add('on');
   updateStepBar(curStep);window.scrollTo(0,0);
 }
+let regMapInst=null,regMarker=null;
+
+function initRegMap(lat,lng){
+  if(regMapInst){
+    regMapInst.setView([lat,lng],16);
+    if(regMarker)regMarker.setLatLng([lat,lng]);
+    else regMarker=L.marker([lat,lng],{draggable:true}).addTo(regMapInst).on('dragend',function(e){
+      const p=e.target.getLatLng();
+      uLat=p.lat;uLng=p.lng;pinned=true;
+      document.getElementById('regMapCoords').textContent=`📍 ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+      document.getElementById('pinConfirm').classList.add('show');
+      document.getElementById('pinCoordsTxt').textContent=`${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+    });
+    return;
+  }
+  // Init map
+  setTimeout(()=>{
+    const mapEl=document.getElementById('regMap');
+    if(!mapEl||!window.L)return;
+    regMapInst=L.map('regMap',{zoomControl:true}).setView([lat,lng],16);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OSM © CARTO',maxZoom:20,subdomains:'abcd'}).addTo(regMapInst);
+    // Draggable marker
+    regMarker=L.marker([lat,lng],{draggable:true}).addTo(regMapInst);
+    regMarker.on('dragend',function(e){
+      const p=e.target.getLatLng();
+      uLat=p.lat;uLng=p.lng;pinned=true;
+      document.getElementById('regMapCoords').textContent=`📍 ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+      document.getElementById('pinConfirm').classList.add('show');
+      document.getElementById('pinCoordsTxt').textContent=`${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+    });
+    // Tap to move marker
+    regMapInst.on('click',function(e){
+      uLat=e.latlng.lat;uLng=e.latlng.lng;pinned=true;
+      regMarker.setLatLng(e.latlng);
+      document.getElementById('regMapCoords').textContent=`📍 ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
+      document.getElementById('pinConfirm').classList.add('show');
+      document.getElementById('pinCoordsTxt').textContent=`${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
+      showToast('📍 Location pinned!');
+    });
+    regMapInst.invalidateSize();
+  },200);
+}
+
 function regGPS(){
   const ico=document.getElementById('regGpsIco'),txt=document.getElementById('regGpsTxt');
-  if(!navigator.geolocation){showToast('GPS not available');return;}
+  if(!navigator.geolocation){showToast('GPS not supported');return;}
   ico.textContent='⏳';txt.textContent='Getting location…';
   navigator.geolocation.getCurrentPosition(pos=>{
+    const lat=pos.coords.latitude,lng=pos.coords.longitude;
+    uLat=lat;uLng=lng;pinned=true;
     ico.textContent='✅';txt.textContent='GPS location pinned!';
-    pinned=true;
-    document.getElementById('mapPh').classList.add('pinned');
-    document.getElementById('mapPh').querySelector('.map-ph-ico').textContent='✅';
-    document.getElementById('mapPh').querySelector('.map-ph-txt').textContent='Location pinned via GPS';
+    // Reverse geocode for city name
+    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+      .then(r=>r.json()).then(d=>{
+        const city=d.address?.city||d.address?.town||d.address?.village||d.address?.suburb||'';
+        const pin=d.address?.postcode||'';
+        if(city&&!document.getElementById('f-ct').value)document.getElementById('f-ct').value=city;
+        if(pin&&!document.getElementById('f-pc').value)document.getElementById('f-pc').value=pin;
+        document.getElementById('regMapCoords').textContent=`📍 ${city||'Location pinned'}`;
+      }).catch(()=>{});
     document.getElementById('pinConfirm').classList.add('show');
-    document.getElementById('pinCoordsTxt').textContent=`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
-    if(!document.getElementById('f-ct').value)document.getElementById('f-ct').value=uLocName||'Arakkonam';
-    if(!document.getElementById('f-pc').value)document.getElementById('f-pc').value='631101';
+    document.getElementById('pinCoordsTxt').textContent=`${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    document.getElementById('regMapCoords').textContent=`📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    initRegMap(lat,lng);
     showToast('📡 GPS location pinned!');
-  },()=>{ico.textContent='📡';txt.textContent='GPS failed — tap map to pin';showToast('GPS failed — tap map below');},{enableHighAccuracy:true,timeout:12000,maximumAge:0});
+  },err=>{
+    ico.textContent='📡';txt.textContent='GPS failed — tap map to pin';
+    showToast('GPS failed — enter address manually');
+    // Init map at default location
+    initRegMap(uLat||13.0772,uLng||79.6712);
+  },{enableHighAccuracy:true,timeout:15000,maximumAge:0});
 }
+
 function demoPin(){
-  pinned=true;
-  document.getElementById('mapPh').classList.add('pinned');
-  document.getElementById('mapPh').querySelector('.map-ph-ico').textContent='✅';
-  document.getElementById('mapPh').querySelector('.map-ph-txt').textContent='Location pinned on map';
+  // Fallback — kept for compatibility
+  const lat=uLat||13.0772,lng=uLng||79.6712;
+  uLat=lat;uLng=lng;pinned=true;
+  initRegMap(lat,lng);
   document.getElementById('pinConfirm').classList.add('show');
-  document.getElementById('pinCoordsTxt').textContent=uLat?`${uLat.toFixed(5)}, ${uLng.toFixed(5)}`:'13.07720, 79.67120 (Arakkonam)';
-  showToast('📍 Location pinned!');
+  document.getElementById('pinCoordsTxt').textContent=`${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  showToast('📍 Location pinned! Drag the marker to adjust.');
+}
+
+function regSearchAddr(){
+  // Auto-search when address is typed
+  clearTimeout(regSearchAddr._t);
+  regSearchAddr._t=setTimeout(()=>{
+    const addr=document.getElementById('f-ad')?.value.trim();
+    const city=document.getElementById('f-ct')?.value.trim();
+    if(!addr||addr.length<5)return;
+    const q=`${addr} ${city} Tamil Nadu India`;
+    fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`)
+      .then(r=>r.json()).then(d=>{
+        if(d&&d[0]){
+          const lat=parseFloat(d[0].lat),lng=parseFloat(d[0].lon);
+          uLat=lat;uLng=lng;pinned=true;
+          initRegMap(lat,lng);
+          document.getElementById('pinConfirm').classList.add('show');
+          document.getElementById('pinCoordsTxt').textContent=`${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+          document.getElementById('regMapCoords').textContent=`📍 Found: ${d[0].display_name.split(',').slice(0,2).join(',')}`;
+        }
+      }).catch(()=>{});
+  },1000);
+}
+
+// Sync local shops to Railway server
+async function syncShopsToServer(){
+  if(!myShops.length){showToast('No shops to sync');return;}
+  showToast('🔄 Syncing to server…');
+  let synced=0;
+  for(const shop of myShops){
+    try{
+      const result=await apiPost('/api/businesses',shop);
+      if(result&&result.ok)synced++;
+    }catch(e){}
+  }
+  if(synced>0){
+    apiOnline=true;setDot('online');
+    showToast(`✅ ${synced} shop${synced>1?'s':''} synced — visible on all devices!`);
+    renderProfile();
+  }else{
+    showToast('❌ Sync failed — check connection');
+  }
 }
 let pCnt=0;
 function addProd(){
@@ -4078,24 +4183,45 @@ async function submitShop(){
     lat:uLat||13.0772,lng:uLng||79.6712,
     products:getProds().map(p=>({name:p.n,price:p.p,unit:'per item',img:p.img||'',emoji:p.emoji||'🍽️',category:p.cat||'Menu',description:p.desc||''})),
     registeredAt:Date.now(),bizId,
-    // local-only fields
     oh:'09:00',oc:'21:00',rating:0,rc:0,views:1,verified:false,
     prods:getProds(),revs:[],reg:Date.now(),
-    // shop photos — up to 4
     photos:shopPhotos.filter(Boolean),
   };
-  // Save to Railway if online
-  if(apiOnline){
+
+  // Save locally FIRST (instant)
+  myShops.unshift(shop);
+  localStorage.setItem('ds_myshops',JSON.stringify(myShops));
+  LOCAL.add(shop);
+
+  // ALWAYS try Railway — wake it if needed
+  let savedToServer=false;
+  try{
+    // Try direct post first
     const result=await apiPost('/api/businesses',shop);
     if(result&&result.ok){
       shop.bizId=result.bizId||bizId;
       shop.id=result.id||shop.id;
-      showToast('✅ Saved to server — visible on all devices!');
-    }else showToast('Server error — saved locally only');
-  }else showToast('📱 Offline — saved locally. Will sync when online.');
-  // Always save locally too
-  myShops.unshift(shop);localStorage.setItem('ds_myshops',JSON.stringify(myShops));
-  LOCAL.add(shop);
+      // Update local with server IDs
+      myShops[0]=shop;
+      localStorage.setItem('ds_myshops',JSON.stringify(myShops));
+      savedToServer=true;
+      apiOnline=true;
+      setDot('online');
+    }else{
+      // Try waking server then retry
+      const woke=await wakeServer();
+      if(woke){
+        const retry=await apiPost('/api/businesses',shop);
+        if(retry&&retry.ok){
+          shop.bizId=retry.bizId||bizId;
+          myShops[0]=shop;
+          localStorage.setItem('ds_myshops',JSON.stringify(myShops));
+          savedToServer=true;
+        }
+      }
+    }
+  }catch(e){}
+
   if(btn){btn.textContent='🎉 Register & Go Live →';btn.disabled=false;}
   document.getElementById('reviewForm').style.display='none';
   document.getElementById('successScreen').classList.add('show');
@@ -4104,7 +4230,7 @@ async function submitShop(){
     <div class="success-row"><span class="success-row-lbl">Category</span><span class="success-row-val">${shop.e} ${shop.sector}</span></div>
     <div class="success-row"><span class="success-row-lbl">Location</span><span class="success-row-val">${shop.city}</span></div>
     <div class="success-row"><span class="success-row-lbl">ID</span><span class="success-row-val" style="color:var(--teal);font-family:monospace">${shop.bizId}</span></div>
-    <div class="success-row"><span class="success-row-lbl">Server</span><span class="success-row-val" style="color:${apiOnline?'var(--grn)':'var(--gold)'}">${apiOnline?'✅ Saved to Railway':'📱 Saved locally'}</span></div>
+    <div class="success-row"><span class="success-row-lbl">Server</span><span class="success-row-val" style="color:${savedToServer?'var(--grn)':'var(--gold)'}">${savedToServer?'✅ Saved — visible everywhere!':'📱 Saved locally — tap Sync in Profile'}</span></div>
     <div class="success-row"><span class="success-row-lbl">Status</span><span class="success-row-val" style="color:var(--grn)">✅ Live on Deckscrab</span></div>`;
 }
 // ═══ SHOP PHOTO UPLOAD ═══
@@ -4177,6 +4303,8 @@ function resetAddShop(){
   document.getElementById('mapPh').querySelector('.map-ph-txt').textContent='Tap to pin your location on map';
   document.getElementById('pinConfirm').classList.remove('show');
   resetPhotoSlots();
+  // Reset registration map
+  if(regMapInst){try{regMapInst.remove();}catch(e){}regMapInst=null;regMarker=null;}
   addProd();addProd();
 }
 
@@ -4217,6 +4345,7 @@ function renderProfile(){
       ${[
         {i:'📦',l:'Orders Received',f:`renderOrdersView()`,badge:pendingOrderCount()},
         {i:'📋',l:'My Listed Shops',f:`renderMyShopsView()`},
+        {i:'☁️',l:'Sync to Server',f:`syncShopsToServer()`},
         {i:'➕',l:'Add New Business',f:`goTo('addshop')`},
         {i:'📍',l:'Set My Location',f:`openLocModal()`},
         {i:'⚙️',l:'Settings',f:`showToast('Coming soon!')`}
