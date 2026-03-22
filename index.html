@@ -404,6 +404,17 @@ select.fi{appearance:none;cursor:pointer}
 .pin-confirm.show{display:flex;align-items:center;gap:6px}
 .prod-row{display:grid;grid-template-columns:1fr 88px 24px;gap:6px;align-items:center;margin-bottom:7px}
 .add-prod-btn{width:100%;padding:9px;background:rgba(255,255,255,.03);
+.photo-slot{aspect-ratio:1;background:var(--sur);border:2px dashed var(--bor);border-radius:var(--rs);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:.18s;overflow:hidden;position:relative}
+.photo-slot:hover{border-color:var(--gold);background:rgba(245,197,24,.04)}
+.photo-slot.has-img{border-style:solid;border-color:rgba(255,255,255,.2)}
+.photo-slot-ico{font-size:1.4rem;margin-bottom:4px;pointer-events:none}
+.photo-slot-lbl{font-size:.62rem;font-weight:700;color:var(--mut);pointer-events:none}
+.photo-slot img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:calc(var(--rs) - 2px)}
+.photo-slot-del{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:.65rem;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2;border:none;font-family:'DM Sans',sans-serif}
+/* Also show photos in shop detail modal */
+.modal-photos{display:flex;gap:8px;overflow-x:auto;padding:0 0 4px;scrollbar-width:none;margin-bottom:12px}
+.modal-photos::-webkit-scrollbar{display:none}
+.modal-photo{width:110px;height:110px;border-radius:var(--rs);object-fit:cover;flex-shrink:0;border:1px solid var(--bor)}
   border:1.5px dashed var(--bor);border-radius:var(--rs);font-size:.77rem;color:var(--mut);margin-bottom:10px}
 .add-prod-btn:hover{border-color:rgba(245,197,24,.28);color:var(--gold)}
 .toggle-row{display:flex;align-items:center;justify-content:space-between;
@@ -915,52 +926,81 @@ textarea.sw-fi{resize:vertical;min-height:68px}
       <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
     </div>`;
 
-    function slugify(name){return(name||'').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');}
+    function slugify(name){
+      return(name||'').toLowerCase()
+        .replace(/copy$/i,'')         // remove "Copy" added by clipboard
+        .replace(/\s+/g,'-')
+        .replace(/[^a-z0-9-]/g,'')
+        .replace(/-+/g,'-')           // collapse multiple dashes
+        .replace(/^-|-$/g,'');        // trim dashes
+    }
+
+    // Also try loose matching (ignore dashes/spaces differences)
+    function loosify(name){
+      return(name||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+    }
 
     // 1. Try localStorage first (fastest)
     let shop=null;
     try{
       const local=JSON.parse(localStorage.getItem('ds_myshops')||'[]');
+      // Exact slug match first
       shop=local.find(s=>slugify(s.name)===shopSlug);
+      // Fuzzy match if not found
+      if(!shop)shop=local.find(s=>loosify(s.name)===loosify(shopSlug));
+      // Stored slug match
+      if(!shop)shop=local.find(s=>s.websiteSlug===shopSlug||slugify(s.websiteSlug||'')===shopSlug);
     }catch(e){}
 
     // 2. Try Railway server (works on ALL devices)
     if(!shop){
       try{
-        const r=await fetch('https://deckscrab-backend-production.up.railway.app/api/businesses?limit=200');
+        const r=await fetch('https://deckscrab-backend-production.up.railway.app/api/businesses?limit=500');
         const d=await r.json();
         if(d&&d.businesses){
-          const found=d.businesses.find(b=>slugify(b.name)===shopSlug);
+          let found=d.businesses.find(b=>slugify(b.name)===shopSlug);
+          if(!found)found=d.businesses.find(b=>loosify(b.name)===loosify(shopSlug));
           if(found){
             shop={
               name:found.name,
-              e:found.sectorEmoji||'🏪',
-              desc:found.description||'',
+              e:found.sectorEmoji||found.emoji||'🏪',
+              desc:found.description||found.desc||'',
               phone:found.phone||'',
-              wa:found.whatsapp||found.phone||'',
-              addr:found.address||'',
+              wa:found.whatsapp||found.wa||found.phone||'',
+              addr:found.address||found.addr||'',
               city:found.city||'',
-              oh:found.hours?.Monday?.open||'9:00 AM',
-              oc:found.hours?.Monday?.close||'9:00 PM',
-              delivery:!!found.delivery,
+              oh:found.hours?.Monday?.open||found.oh||'9:00 AM',
+              oc:found.hours?.Monday?.close||found.oc||'9:00 PM',
+              delivery:found.delivery!==false,
               theme:found.theme||'dark',
-              prods:(found.products||[]).map(p=>({n:p.name||p.n,p:parseFloat(p.price||p.p)||0,emoji:'🍽️',cat:'Menu'})),
+              sector:found.sectorName||found.sector||'',
+              prods:(found.products||found.prods||[]).map(p=>({
+                n:p.name||p.n||'Item',
+                p:parseFloat(p.price||p.p)||0,
+                emoji:p.emoji||'🍽️',
+                cat:p.cat||p.category||'Menu',
+                desc:p.description||p.desc||'',
+              })),
             };
           }
         }
       }catch(e){}
     }
 
-    // 3. Not found anywhere
+    // 3. Not found
     document.body.innerHTML='';
     document.body.className='sw-body';
     if(!shop){
       document.body.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:24px;font-family:'DM Sans',sans-serif;background:#111827;color:#fff">
         <div style="font-size:3rem;margin-bottom:14px">🏪</div>
         <div style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:700;margin-bottom:8px">Shop Not Found</div>
-        <div style="font-size:.84rem;color:rgba(255,255,255,.4);margin-bottom:6px">The shop <strong style="color:#fff">"${shopSlug}"</strong> hasn't set up their website yet.</div>
-        <div style="font-size:.78rem;color:rgba(255,255,255,.3);margin-bottom:20px">They need to register on Deckscrab and activate the Website Plan.</div>
-        <a href="${window.location.pathname}" style="background:#F5C518;color:#07090F;border-radius:999px;padding:11px 24px;font-size:.86rem;font-weight:700;text-decoration:none">← Browse All Shops</a>
+        <div style="font-size:.84rem;color:rgba(255,255,255,.5);margin-bottom:6px">We couldn't find <strong style="color:#fff">"${shopSlug}"</strong></div>
+        <div style="font-size:.76rem;color:rgba(255,255,255,.3);margin-bottom:20px;line-height:1.65;max-width:300px">
+          This may be a wrong link or the business hasn't registered yet.<br/>
+          Try searching for this shop in the Deckscrab app.
+        </div>
+        <a href="${window.location.pathname}" style="background:#25D366;color:#fff;border-radius:999px;padding:11px 24px;font-size:.86rem;font-weight:700;text-decoration:none;margin-bottom:10px;display:inline-block">🔍 Browse All Shops</a>
+        <a href="https://wa.me/919384707706?text=${encodeURIComponent('Hi! I am trying to open the shop "'+shopSlug+'" but it says not found. Can you help?')}" target="_blank" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);border-radius:999px;padding:10px 20px;font-size:.8rem;font-weight:600;text-decoration:none;display:inline-block">💬 Contact Support</a>
       </div>`;
       return;
     }
@@ -970,221 +1010,780 @@ textarea.sw-fi{resize:vertical;min-height:68px}
 })();
 
 function renderShopSite(shop){
+  // ── SECTOR DETECTION ──
   var prods=shop.prods||shop.products||[];
-  var theme=shop.theme||'dark';
   var emoji=shop.e||shop.sectorEmoji||'🏪';
-  var T={
-    dark:{bg:'linear-gradient(160deg,#1f2937,#111827)',acc:'#F5C518',at:'#111827',cb:'#F5C518',ct:'#111827'},
-    warm:{bg:'linear-gradient(160deg,#7c2d12,#1a0a00)',acc:'#f97316',at:'#fff',cb:'#f97316',ct:'#fff'},
-    green:{bg:'linear-gradient(160deg,#052e16,#021a0e)',acc:'#22c55e',at:'#111827',cb:'#22c55e',ct:'#111827'},
-    blue:{bg:'linear-gradient(160deg,#0f172a,#030712)',acc:'#3b82f6',at:'#fff',cb:'#3b82f6',ct:'#fff'},
-    pink:{bg:'linear-gradient(160deg,#2d0022,#1a0015)',acc:'#ec4899',at:'#fff',cb:'#ec4899',ct:'#fff'},
-    teal:{bg:'linear-gradient(160deg,#002929,#001a1a)',acc:'#14b8a6',at:'#111827',cb:'#14b8a6',ct:'#111827'},
+  var shopName=shop.name||'Shop';
+  var shopPhone=shop.wa||shop.phone||'';
+  var sectorRaw=(shop.sector||shop.sectorName||shop.n||'').toLowerCase();
+
+  // Detect food vs service vs booking vs enquiry sector
+  var FOOD_SECTORS=['restaurant','mess','hotel','food','biryani','bakery','café','cafe','sweets','dairy','tiffin','juice','fruits','grocery','kirana','supermarket','vegetable','snacks'];
+  var SERVICE_SECTORS=['welder','fabrication','plumber','electrician','carpenter','mechanic','ac repair','mobile repair','courier','taxi','auto','painter','cleaning'];
+  var BOOKING_SECTORS=['salon','saloon','spa','gym','fitness','doctor','dentist','hospital','lab','tuition','school','computer','yoga','physiotherapy'];
+  var ENQUIRY_SECTORS=['real estate','lawyer','ca','accountant','bank','hardware','building','construction','agriculture','temple','church','mosque','jewellery','furniture','clothes','tailor','electronics'];
+
+  var sectorType='food'; // default
+  if(FOOD_SECTORS.some(function(s){return sectorRaw.includes(s)||emoji.includes('🍛')||emoji.includes('🥐')||emoji.includes('☕')||emoji.includes('🛒')||emoji.includes('🍎')||emoji.includes('🍲');}))sectorType='food';
+  if(SERVICE_SECTORS.some(function(s){return sectorRaw.includes(s)||emoji.includes('⚡')||emoji.includes('🔧')||emoji.includes('🚿')||emoji.includes('🪚')||emoji.includes('🔌');}))sectorType='service';
+  if(BOOKING_SECTORS.some(function(s){return sectorRaw.includes(s)||emoji.includes('💇')||emoji.includes('✂️')||emoji.includes('🏋️')||emoji.includes('🧖')||emoji.includes('👨‍⚕️')||emoji.includes('🦷');}))sectorType='booking';
+  if(ENQUIRY_SECTORS.some(function(s){return sectorRaw.includes(s)||emoji.includes('🧱')||emoji.includes('🌾')||emoji.includes('⚖️')||emoji.includes('🏠')||emoji.includes('🧵');}))sectorType='enquiry';
+
+  // Theme accent
+  var ACCENTS={dark:'#f59e0b',warm:'#f97316',green:'#22c55e',blue:'#3b82f6',pink:'#ec4899',teal:'#14b8a6'};
+  var acc=ACCENTS[shop.theme||'dark']||'#22c55e';
+  var heroGrads={
+    dark:'linear-gradient(135deg,#1a1a2e,#374151)',warm:'linear-gradient(135deg,#92400e,#c2410c)',
+    green:'linear-gradient(135deg,#14532d,#15803d)',blue:'linear-gradient(135deg,#1e3a5f,#1d4ed8)',
+    pink:'linear-gradient(135deg,#4a044e,#9333ea)',teal:'linear-gradient(135deg,#134e4a,#0f766e)',
   };
-  var t=T[theme]||T.dark;
-  var cats=['All'].concat([...new Set(prods.map(function(p){return p.cat||'Menu';}))]);
-  var swCart={},swCat='All',swPayMethod='upi',swOtp='',swOrderId='',swGrand=0,swAddr='';
+  var heroGrad=heroGrads[shop.theme||'dark']||heroGrads.dark;
 
-  document.title=shop.name+' — Order Online';
-  document.body.innerHTML=
-    '<div class="sw-hero" style="background:'+t.bg+'"><div class="sw-hero-bg">'+emoji+'</div><div class="sw-hero-ov"></div><div class="sw-wrap sw-hero-cnt">'+
-    '<div class="sw-open-badge"><div class="sw-dot"></div>Live & Accepting Orders</div>'+
-    '<div class="sw-name">'+shop.name+'</div>'+
-    '<div class="sw-tagline">'+(shop.desc||'Quality products · Best prices · Fast delivery')+'</div>'+
-    '<div class="sw-acts"><a href="#swmenu" class="sw-btn-order" style="background:'+t.acc+';color:'+t.at+'">🛒 Order Now</a>'+(shop.phone?'<a href="tel:'+shop.phone+'" class="sw-btn-call">📞 '+shop.phone+'</a>':'')+'</div>'+
-    '</div></div>'+
-    '<div class="sw-wrap">'+
-    '<div class="sw-section" id="swmenu"><div class="sw-sec-title">Menu & Prices</div>'+
-    '<div class="sw-cats" id="swCats">'+cats.map(function(c){return'<button class="sw-cat'+(c==='All'?' on':'')+'" onclick="swCatClick(this,\''+c+'\')">'+c+'</button>';}).join('')+'</div>'+
-    '<div id="swGrid"></div></div>'+
-    '<div class="sw-section"><div class="sw-sec-title">Find Us</div>'+
-    '<div class="sw-info-grid">'+
-    '<div class="sw-info-card"><div class="sw-info-ico">📍</div><div class="sw-info-title">Address</div><div class="sw-info-val">'+(shop.addr||shop.address||'—')+', '+(shop.city||'')+'</div></div>'+
-    '<div class="sw-info-card"><div class="sw-info-ico">⏰</div><div class="sw-info-title">Hours</div><div class="sw-info-val">'+(shop.oh||'9 AM')+' – '+(shop.oc||'9 PM')+'</div></div>'+
-    '<div class="sw-info-card"><div class="sw-info-ico">🚚</div><div class="sw-info-title">Delivery</div><div class="sw-info-val">'+(shop.delivery!==false?'✅ Available':'Pickup only')+'</div></div>'+
-    '<div class="sw-info-card"><div class="sw-info-ico">📞</div><div class="sw-info-title">Phone</div><div class="sw-info-val"><a href="tel:'+(shop.phone||'')+'" style="color:'+t.acc+'">'+(shop.phone||'—')+'</a></div></div>'+
-    '</div>'+
-    '<div class="sw-wa-bar" onclick="window.open(\'https://wa.me/91'+(shop.wa||shop.phone)+'?text='+encodeURIComponent('Hi! I found your shop on Deckscrab. I want to order from '+shop.name+'.')+'\',\'_blank\')">'+
-    '<div><div class="sw-wa-bar-txt">💬 Chat on WhatsApp</div><div class="sw-wa-bar-sub">Quick replies · Track your order</div></div>'+
-    '<button class="sw-wa-bar-btn">Chat →</button></div></div></div>'+
-    '<div class="sw-footer"><div class="sw-footer-txt">Powered by Deckscrab · Secure ordering · OTP verified payments</div></div>'+
-    '<div class="sw-cart" id="swCart" style="background:'+t.cb+'"><div><div class="sw-cart-txt" id="swCartTxt" style="color:'+t.ct+'">🛒 0 items</div><div class="sw-cart-sub" style="color:'+t.ct+'">Tap to checkout</div></div><button class="sw-cart-btn" style="color:'+t.acc+'" onclick="swOpenCheckout()">Checkout →</button></div>'+
-    '<div class="sw-sheet-ov" id="swOv" onclick="if(event.target===this)swClose()"><div class="sw-sheet"><div class="sw-sheet-hdr"><div class="sw-sheet-title" id="swTitle">🛒 Your Order</div><button class="sw-sheet-close" onclick="swClose()">✕</button></div><div class="sw-sheet-body" id="swBody"></div></div></div>';
+  // ── INJECT CSS ──
+  var st=document.createElement('style');
+  st.textContent=`
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    body{font-family:'DM Sans',sans-serif;background:#f5f5f5;color:#1a1a1a;min-height:100vh;overflow-x:hidden}
+    button,input,textarea,select{font-family:'DM Sans',sans-serif;outline:none}
+    /* NAV */
+    .ps-nav{position:sticky;top:0;z-index:200;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.1);padding:10px 14px;display:flex;align-items:center;gap:10px}
+    .ps-nav-back{width:34px;height:34px;border-radius:50%;background:#f5f5f5;border:none;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .ps-nav-info{flex:1;min-width:0}
+    .ps-nav-name{font-size:.95rem;font-weight:800;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ps-nav-sub{font-size:.69rem;color:#888;margin-top:1px}
+    .ps-nav-wa{background:#25D366;color:#fff;border:none;border-radius:999px;padding:7px 13px;font-size:.74rem;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0}
+    /* HERO */
+    .ps-hero{padding:16px 14px;color:#fff;position:relative;overflow:hidden;min-height:130px;display:flex;align-items:flex-end}
+    .ps-hero-bg{position:absolute;right:-8px;top:50%;transform:translateY(-50%);font-size:100px;opacity:.1;pointer-events:none}
+    .ps-hero-cnt{position:relative;z-index:1}
+    .ps-hero-e{font-size:2rem;margin-bottom:5px}
+    .ps-hero-name{font-size:1.2rem;font-weight:900;margin-bottom:3px}
+    .ps-hero-desc{font-size:.76rem;opacity:.7;line-height:1.5;margin-bottom:8px;max-width:240px}
+    .ps-hero-chips{display:flex;gap:6px;flex-wrap:wrap}
+    .ps-chip{background:rgba(255,255,255,.15);border-radius:999px;padding:3px 9px;font-size:.67rem;font-weight:700}
+    .ps-chip-open{background:rgba(37,211,102,.3);color:#4ade80}
+    /* INFO STRIP */
+    .ps-info{background:#fff;padding:9px 14px;display:flex;gap:14px;overflow-x:auto;border-bottom:1px solid #f0f0f0;scrollbar-width:none}
+    .ps-info::-webkit-scrollbar{display:none}
+    .ps-info-it{display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0;font-size:.73rem;color:#666}
+    .ps-info-it strong{color:#1a1a1a}
+    /* MAIN LAYOUT — left sidebar + right content */
+    .ps-layout{display:flex;min-height:calc(100vh - 160px)}
+    /* LEFT SIDEBAR — category list */
+    .ps-sidebar{width:90px;flex-shrink:0;background:#fff;border-right:1px solid #f0f0f0;position:sticky;top:55px;height:calc(100vh - 55px);overflow-y:auto;scrollbar-width:none}
+    .ps-sidebar::-webkit-scrollbar{display:none}
+    .ps-sibtn{width:100%;padding:12px 6px;border:none;background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;border-left:3px solid transparent;transition:.15s}
+    .ps-sibtn.on{background:#f0fdf4;border-left-color:${acc}}
+    .ps-sibtn-ico{font-size:1.4rem}
+    .ps-sibtn-lbl{font-size:.62rem;font-weight:700;color:#888;text-align:center;line-height:1.3}
+    .ps-sibtn.on .ps-sibtn-lbl{color:${acc}}
+    /* RIGHT CONTENT */
+    .ps-content{flex:1;min-width:0;padding-bottom:150px}
+    .ps-search-bar{padding:8px 12px;background:#fff;border-bottom:1px solid #f0f0f0;position:sticky;top:55px;z-index:100}
+    .ps-sinp{width:100%;background:#f5f5f5;border:1.5px solid #e8e8e8;border-radius:999px;padding:8px 12px 8px 34px;font-size:.83rem;color:#1a1a1a;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23aaa' stroke-width='2.5'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='M21 21l-4.35-4.35'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:11px center}
+    .ps-sinp:focus{border-color:${acc};outline:none}
+    /* SECTION */
+    .ps-sec-hdr{padding:12px 12px 6px;font-size:.72rem;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:.08em;background:#f5f5f5}
+    .ps-items-box{background:#fff}
+    /* MENU ITEM */
+    .ps-item{display:flex;padding:12px;border-bottom:1px solid #f5f5f5;align-items:flex-start;gap:10px}
+    .ps-item:last-child{border-bottom:none}
+    .ps-item-left{flex:1;min-width:0}
+    .ps-dot{width:13px;height:13px;border-radius:2px;display:flex;align-items:center;justify-content:center;margin-bottom:4px}
+    .ps-dot.veg{border:2px solid #22c55e}.ps-dot.veg::after{content:'';width:5px;height:5px;border-radius:50%;background:#22c55e;display:block}
+    .ps-dot.nv{border:2px solid #ef4444}.ps-dot.nv::after{content:'';width:5px;height:5px;border-radius:50%;background:#ef4444;display:block}
+    .ps-iname{font-size:.88rem;font-weight:700;color:#1a1a1a;margin-bottom:2px;line-height:1.3}
+    .ps-idesc{font-size:.72rem;color:#888;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+    .ps-iprice{font-size:.9rem;font-weight:800;color:#1a1a1a;margin-top:5px}
+    .ps-item-right{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:6px}
+    .ps-img{width:78px;height:78px;border-radius:10px;background:linear-gradient(135deg,#fffbeb,#fef3c7);display:flex;align-items:center;justify-content:center;font-size:2.1rem;border:1px solid #f0f0f0}
+    .ps-add{background:#fff;border:2px solid ${acc};border-radius:8px;padding:5px 16px;font-size:.8rem;font-weight:800;color:${acc};cursor:pointer}
+    .ps-qty{display:flex;align-items:center;border:2px solid ${acc};border-radius:8px;overflow:hidden;background:#fff}
+    .ps-qb{width:30px;height:30px;border:none;background:none;font-size:1rem;font-weight:800;color:${acc};cursor:pointer;display:flex;align-items:center;justify-content:center}
+    .ps-qn{min-width:22px;text-align:center;font-size:.86rem;font-weight:800;color:${acc}}
+    /* SERVICE CARD */
+    .ps-svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px}
+    .ps-svc-card{background:#fff;border:1.5px solid #f0f0f0;border-radius:12px;padding:14px;cursor:pointer;transition:.15s;text-align:left}
+    .ps-svc-card:active{border-color:${acc};background:#f0fff8}
+    .ps-svc-ico{font-size:1.8rem;margin-bottom:6px}
+    .ps-svc-name{font-size:.84rem;font-weight:700;color:#1a1a1a;margin-bottom:2px}
+    .ps-svc-desc{font-size:.71rem;color:#888;line-height:1.4}
+    .ps-svc-price{font-size:.88rem;font-weight:800;color:${acc};margin-top:6px}
+    /* BOOKING SLOTS */
+    .ps-slots{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 12px}
+    .ps-slot{border:1.5px solid #e8e8e8;border-radius:8px;padding:8px 4px;text-align:center;font-size:.75rem;font-weight:700;color:#555;cursor:pointer;transition:.15s}
+    .ps-slot.sel{border-color:${acc};background:#f0fff8;color:${acc}}
+    .ps-slot.full{background:#f5f5f5;color:#ccc;cursor:not-allowed;text-decoration:line-through}
+    /* ENQUIRY CARD */
+    .ps-enq-list{padding:10px 12px;display:grid;gap:8px}
+    .ps-enq-card{background:#fff;border:1px solid #f0f0f0;border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px}
+    .ps-enq-ico{font-size:1.6rem;flex-shrink:0}
+    .ps-enq-name{font-size:.86rem;font-weight:700;color:#1a1a1a;margin-bottom:2px}
+    .ps-enq-desc{font-size:.72rem;color:#888;line-height:1.4}
+    /* CONTACT SECTION */
+    .ps-contact{padding:12px}
+    .ps-wa-cta{background:linear-gradient(135deg,#075E54,#25D366);border-radius:14px;padding:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;margin-bottom:10px}
+    .ps-wa-cta-txt{font-size:.9rem;font-weight:800;color:#fff;margin-bottom:2px}
+    .ps-wa-cta-sub{font-size:.72rem;color:rgba(255,255,255,.7)}
+    .ps-wa-cta-btn{background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:999px;padding:8px 14px;font-size:.76rem;font-weight:700;cursor:pointer}
+    .ps-map-link{background:#f5f5f5;border:1px solid #e8e8e8;border-radius:12px;padding:13px;display:flex;align-items:center;gap:10px;font-size:.83rem;font-weight:700;color:#1a1a1a;text-decoration:none;margin-bottom:8px}
+    /* CART BAR */
+    .ps-cart{position:fixed;bottom:0;left:0;right:0;z-index:200;padding:10px 12px 22px;display:none}
+    .ps-cart.show{display:block;animation:psup .3s cubic-bezier(.34,1.1,.64,1)}
+    @keyframes psup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    .ps-cart-in{background:${acc};border-radius:14px;padding:13px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 8px 28px rgba(0,0,0,.18)}
+    .ps-cart-info{color:#fff}
+    .ps-cart-cnt{font-size:.79rem;font-weight:600;opacity:.9}
+    .ps-cart-tot{font-size:1.05rem;font-weight:900}
+    .ps-cart-btn{background:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:.86rem;font-weight:800;color:${acc};cursor:pointer}
+    /* SHEET */
+    .ps-ov{display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.5)}
+    .ps-ov.open{display:block;animation:psfade .2s ease}
+    @keyframes psfade{from{opacity:0}to{opacity:1}}
+    .ps-sheet{position:fixed;bottom:0;left:0;right:0;z-index:301;background:#fff;border-radius:20px 20px 0 0;max-height:93vh;overflow-y:auto;display:none}
+    .ps-sheet.open{display:block;animation:pssh .3s cubic-bezier(.34,1.1,.64,1)}
+    @keyframes pssh{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    .ps-handle{width:36px;height:4px;background:#e0e0e0;border-radius:2px;margin:12px auto 0}
+    .ps-shdr{padding:12px 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f0f0f0;position:sticky;top:0;background:#fff;z-index:5}
+    .ps-stitle{font-size:.95rem;font-weight:800;color:#1a1a1a}
+    .ps-sclose{width:30px;height:30px;border-radius:50%;background:#f5f5f5;border:none;font-size:.85rem;cursor:pointer}
+    .ps-sbody{padding:14px 16px 32px}
+    /* FORM */
+    .ps-fsec{font-size:.72rem;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:.07em;margin:14px 0 8px}
+    .ps-field{margin-bottom:10px}
+    .ps-flbl{font-size:.75rem;font-weight:700;color:#555;display:block;margin-bottom:4px}
+    .ps-finp{width:100%;border:1.5px solid #e0e0e0;border-radius:10px;padding:11px 13px;font-size:.87rem;color:#1a1a1a;transition:.15s}
+    .ps-finp:focus{border-color:${acc};outline:none}
+    .ps-finp::placeholder{color:#ccc}
+    textarea.ps-finp{resize:vertical;min-height:64px}
+    .ps-del{display:flex;align-items:center;justify-content:space-between;background:#f8fffe;border:1.5px solid #d1fae5;border-radius:10px;padding:11px 13px;margin-bottom:10px}
+    .ps-del-lbl{font-size:.85rem;font-weight:700;color:#1a1a1a}
+    .ps-del-sub{font-size:.7rem;color:#888;margin-top:1px}
+    .ps-tog{position:relative;width:42px;height:24px;flex-shrink:0}
+    .ps-tog input{opacity:0;position:absolute;width:0;height:0}
+    .ps-togsl{position:absolute;inset:0;background:#ccc;border-radius:999px;cursor:pointer;transition:.25s}
+    .ps-tog input:checked+.ps-togsl{background:${acc}}
+    .ps-togsl::after{content:'';position:absolute;width:18px;height:18px;background:#fff;border-radius:50%;top:3px;left:3px;transition:.25s}
+    .ps-tog input:checked+.ps-togsl::after{transform:translateX(18px)}
+    .ps-pays{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+    .ps-pay{border:2px solid #e8e8e8;border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;background:#fff;transition:.15s}
+    .ps-pay.sel{border-color:${acc};background:#f0fff8}
+    .ps-pay-ico{font-size:1.2rem;margin-bottom:3px}
+    .ps-pay-lbl{font-size:.7rem;font-weight:700;color:#1a1a1a}
+    .ps-place{width:100%;padding:14px;background:${acc};color:#fff;border:none;border-radius:14px;font-size:.93rem;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;box-shadow:0 4px 16px rgba(0,0,0,.12)}
+    .ps-secnote{text-align:center;font-size:.69rem;color:#aaa}
+    /* TOTALS */
+    .ps-tots{background:#f8fffe;border:1.5px solid #d1fae5;border-radius:12px;padding:12px 13px;margin:12px 0}
+    .ps-trow{display:flex;justify-content:space-between;font-size:.81rem;padding:4px 0;color:#666}
+    .ps-tgrand{display:flex;justify-content:space-between;font-size:1rem;font-weight:900;padding:10px 0 0;margin-top:6px;border-top:2px dashed #a7f3d0}
+    /* OTP */
+    .ps-otpbox{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;border-radius:14px;padding:16px;text-align:center;margin:12px 0}
+    .ps-otptitle{font-size:.95rem;font-weight:800;color:#15803d;margin-bottom:4px}
+    .ps-otpcode{font-size:2rem;font-weight:900;color:#166534;letter-spacing:.2em;margin:8px 0;background:#fff;border-radius:10px;padding:8px 18px;display:inline-block}
+    .ps-otpsub{font-size:.74rem;color:#15803d;margin-bottom:12px;line-height:1.55}
+    .ps-otpdigs{display:flex;gap:7px;justify-content:center;margin-bottom:12px}
+    .ps-otpd{width:42px;height:50px;border:2px solid #e0e0e0;border-radius:9px;text-align:center;font-size:1.35rem;font-weight:800;color:#1a1a1a;background:#fff}
+    .ps-otpd:focus{border-color:${acc};outline:none}
+    .ps-otperr{color:#ef4444;font-size:.75rem;margin-bottom:8px;display:none;text-align:center}
+    .ps-otpverify{width:100%;padding:12px;background:#128C7E;color:#fff;border:none;border-radius:12px;font-size:.88rem;font-weight:800;cursor:pointer}
+    /* BILL */
+    .ps-bill{background:#fff;border:1px solid #e8e8e8;border-radius:14px;padding:15px;margin:10px 0;box-shadow:0 2px 12px rgba(0,0,0,.05)}
+    .ps-billhdr{text-align:center;padding-bottom:11px;margin-bottom:11px;border-bottom:2px dashed #e8e8e8}
+    .ps-billshop{font-size:1rem;font-weight:900;color:#1a1a1a}
+    .ps-billaddr{font-size:.71rem;color:#aaa;margin-top:2px}
+    .ps-billid{font-size:.67rem;color:#ccc;margin-top:3px;font-family:monospace}
+    .ps-billrow{display:flex;justify-content:space-between;font-size:.81rem;padding:5px 0;border-bottom:1px solid #f5f5f5}
+    .ps-billtot{display:flex;justify-content:space-between;font-size:.95rem;font-weight:900;padding:11px 0 0;margin-top:7px;border-top:2px solid #e8e8e8}
+    .ps-billfoot{text-align:center;margin-top:11px;padding-top:10px;border-top:1px dashed #e8e8e8;font-size:.68rem;color:#aaa;line-height:1.7}
+    /* SUCCESS */
+    .ps-succ{text-align:center;padding:20px 8px}
+    .ps-succ-ico{font-size:3.8rem;margin-bottom:10px;display:inline-block;animation:pspop .4s cubic-bezier(.34,1.56,.64,1)}
+    @keyframes pspop{from{transform:scale(0)}to{transform:scale(1)}}
+    .ps-succ-title{font-size:1.2rem;font-weight:900;color:#15803d;margin-bottom:5px}
+    .ps-succ-sub{font-size:.83rem;color:#888;line-height:1.7;margin-bottom:14px}
+    .ps-succ-card{background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:12px;text-align:left;margin-bottom:12px}
+    .ps-succ-row{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #d1fae5;font-size:.8rem}
+    .ps-succ-row:last-child{border-bottom:none}
+    .ps-succ-lbl{color:#888;width:68px;flex-shrink:0;font-size:.72rem}
+    .ps-done{width:100%;padding:13px;background:${acc};color:#fff;border:none;border-radius:12px;font-size:.88rem;font-weight:900;cursor:pointer;margin-bottom:8px}
+    .ps-share{width:100%;padding:11px;background:#fff;border:2px solid #25D366;color:#128C7E;border-radius:12px;font-size:.85rem;font-weight:800;cursor:pointer}
+    /* CART REVIEW */
+    .ps-citem{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f5f5f5}
+    .ps-citem:last-child{border-bottom:none}
+    .ps-cname{font-size:.86rem;font-weight:700;color:#1a1a1a}
+    .ps-csub{font-size:.74rem;color:#888;margin-top:2px}
+    .ps-ctot{font-size:.88rem;font-weight:800;color:#1a1a1a;min-width:50px;text-align:right}
+    /* TOAST */
+    .ps-toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%) translateY(16px);background:#1a1a1a;color:#fff;border-radius:999px;padding:9px 18px;font-size:.77rem;font-weight:700;opacity:0;transition:.28s;z-index:500;white-space:nowrap;pointer-events:none}
+    .ps-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  `;
+  document.head.appendChild(st);
 
-  function rGrid(){
-    var items=swCat==='All'?prods:prods.filter(function(p){return(p.cat||'Menu')===swCat;});
-    document.getElementById('swGrid').innerHTML=items.map(function(item){
-      var id=item.id||item.n||item.name;
-      var qty=swCart[id]||0;
-      var price=parseFloat(item.p||item.price)||0;
-      var nm=item.n||item.name||'Item';
-      return'<div class="sw-item">'+
-        '<div class="sw-item-ico">'+(item.emoji||item.e||'🍽️')+'</div>'+
-        '<div class="sw-item-body"><div class="sw-item-name">'+nm+'</div>'+(item.desc?'<div class="sw-item-desc">'+item.desc+'</div>':'')+'</div>'+
-        '<div class="sw-item-right"><div class="sw-item-price" style="color:'+t.acc+'">₹'+price+'</div>'+
-        (qty===0
-          ?'<button class="sw-add-btn" style="background:'+t.acc+';color:'+t.at+'" onclick="swAdd(\''+id+'\','+price+',\''+nm.replace(/'/g,"\\'")+'\')">'+'+ Add</button>'
-          :'<div class="sw-qty"><button class="sw-qty-btn" onclick="swChg(\''+id+'\','+price+',-1)">−</button><span class="sw-qty-n">'+qty+'</span><button class="sw-qty-btn" onclick="swChg(\''+id+'\','+price+',1)">+</button></div>'
-        )+'</div></div>';
-    }).join('')||'<div style="text-align:center;padding:28px;color:rgba(255,255,255,.3);font-size:.83rem">No items in this category</div>';
+  // ── STATE ──
+  var swCart={},swPayMethod='upi',swIsDelivery=true;
+  var swOtp='',swOrderId='',swGrand=0,swAddr='',swCustName='',swCustPhone='';
+  var swActiveCat='All';
+  var swSelSlot='';
+
+  // ── CATEGORIES ──
+  var cats=sectorType==='food'
+    ?['All',...new Set(prods.map(function(p){return p.cat||'Menu';}))]
+    :['Menu','About','Contact'];
+
+  // For non-food with products, add their categories
+  if(sectorType!=='food'&&prods.length){
+    cats=['All',...new Set(prods.map(function(p){return p.cat||'Services';})),'About','Contact'];
   }
-  rGrid();
 
-  window.swCatClick=function(el,cat){
-    swCat=cat;
-    document.querySelectorAll('.sw-cat').forEach(function(b){b.classList.remove('on');});
-    el.classList.add('on');rGrid();
-  };
-  window.swAdd=function(id,price,name){swCart[id]=(swCart[id]||0)+1;swUpCart();rGrid();};
-  window.swChg=function(id,price,d){
-    swCart[id]=Math.max(0,(swCart[id]||0)+d);
-    if(!swCart[id])delete swCart[id];
-    swUpCart();rGrid();
-  };
-  function swUpCart(){
-    var ids=Object.keys(swCart);
-    var total=ids.reduce(function(s,id){
-      var it=prods.find(function(p){return(p.id||p.n||p.name)===id;});
-      return s+(it?parseFloat(it.p||it.price||0)*swCart[id]:0);
-    },0);
-    var count=ids.reduce(function(s,id){return s+swCart[id];},0);
-    var strip=document.getElementById('swCart');
-    if(count>0){strip.classList.add('show');document.getElementById('swCartTxt').textContent='🛒 '+count+' item'+(count>1?'s':'')+' · ₹'+total;}
-    else strip.classList.remove('show');
+  function isOpen(){
+    try{var now=new Date(),c=now.getHours()*60+now.getMinutes();var oh=parseInt((shop.oh||'9').split(':')[0]);var oc=parseInt((shop.oc||'21').split(':')[0]);return c>=(oh*60)&&c<=(oc*60);}catch(e){return true;}
   }
-  window.swOpenCheckout=function(){swShowStep1();document.getElementById('swOv').classList.add('open');document.body.style.overflow='hidden';};
-  window.swClose=function(){document.getElementById('swOv').classList.remove('open');document.body.style.overflow='';};
 
-  function getSwItems(){
+  // ── BUILD PAGE ──
+  document.body.innerHTML=`
+    <div class="ps-nav">
+      <button class="ps-nav-back" onclick="window.history.back()">←</button>
+      <div class="ps-nav-info">
+        <div class="ps-nav-name">${shopName}</div>
+        <div class="ps-nav-sub">${isOpen()?'🟢 Open':'🔴 Closed'} · ${shop.city||''}</div>
+      </div>
+      <button class="ps-nav-wa" onclick="psWaChat()">💬 WhatsApp</button>
+    </div>
+    <div class="ps-hero" style="background:${heroGrad}">
+      <div class="ps-hero-bg">${emoji}</div>
+      <div class="ps-hero-cnt">
+        <div class="ps-hero-e">${emoji}</div>
+        <div class="ps-hero-name">${shopName}</div>
+        <div class="ps-hero-desc">${shop.desc||'Quality service · Best prices · Trusted by locals'}</div>
+        <div class="ps-hero-chips">
+          <span class="ps-chip ps-chip-open">${isOpen()?'● Open Now':'● Closed'}</span>
+          ${shop.delivery!=='false'&&shop.delivery!==false?'<span class="ps-chip">🚚 Delivery</span>':''}
+          <span class="ps-chip">📞 ${shopPhone||'Call us'}</span>
+        </div>
+      </div>
+    </div>
+    <div class="ps-info">
+      <div class="ps-info-it">📍 <span><strong>${shop.city||'Local'}</strong>${shop.addr?(' · '+shop.addr):''}</span></div>
+      <div class="ps-info-it">⏰ <span><strong>${shop.oh||'9AM'} – ${shop.oc||'9PM'}</strong></span></div>
+      ${shopPhone?'<div class="ps-info-it">📞 <span><strong>'+shopPhone+'</strong></span></div>':''}
+      <div class="ps-info-it">🔐 <span><strong>OTP Secured</strong></span></div>
+    </div>
+    <div class="ps-layout">
+      <!-- LEFT SIDEBAR -->
+      <div class="ps-sidebar" id="psSidebar"></div>
+      <!-- RIGHT CONTENT -->
+      <div class="ps-content">
+        <div class="ps-search-bar">
+          <input class="ps-sinp" id="psSearch" placeholder="Search…" oninput="psBuildContent()"/>
+        </div>
+        <div id="psContent"></div>
+      </div>
+    </div>
+    <div class="ps-cart" id="psCartBar">
+      <div class="ps-cart-in">
+        <div class="ps-cart-info">
+          <div class="ps-cart-cnt" id="psCartCnt">0 items</div>
+          <div class="ps-cart-tot" id="psCartTot">₹0</div>
+        </div>
+        <button class="ps-cart-btn" onclick="psOpenCheckout()">View Cart →</button>
+      </div>
+    </div>
+    <div class="ps-ov" id="psOv" onclick="psCloseSheet()"></div>
+    <div class="ps-sheet" id="psSheet">
+      <div class="ps-handle"></div>
+      <div class="ps-shdr"><div class="ps-stitle" id="psStitle">Cart</div><button class="ps-sclose" onclick="psCloseSheet()">✕</button></div>
+      <div class="ps-sbody" id="psSbody"></div>
+    </div>
+    <div class="ps-toast" id="psToast"></div>
+  `;
+
+  // ── SIDEBAR ──
+  function buildSidebar(){
+    var sidebarCats=sectorType==='food'
+      ?(['All',...new Set(prods.map(function(p){return p.cat||'Menu';}))])
+      :(['All',...new Set(prods.map(function(p){return p.cat||'Services';}))],'About','Contact').filter(Boolean);
+
+    if(sectorType!=='food'&&prods.length){
+      sidebarCats=['All',...new Set(prods.map(function(p){return p.cat||'Services';}))]
+    }
+    // Always add About and Contact
+    if(!sidebarCats.includes('About'))sidebarCats.push('About');
+    if(!sidebarCats.includes('Contact'))sidebarCats.push('Contact');
+
+    var CAT_ICONS={'All':'🏠','Meals':'🍱','Biryani':'🍲','Tiffin':'🥐','Drinks':'☕','Snacks':'🍿','Desserts':'🍮','Services':'🔧','Haircut':'✂️','Facial':'🧴','About':'ℹ️','Contact':'📞','Menu':'📋','Products':'📦','Repairs':'🔧','Treatments':'💊','Packages':'🎁','Classes':'📚','Slots':'📅','More':'➕'};
+    document.getElementById('psSidebar').innerHTML=sidebarCats.map(function(c){
+      return'<button class="ps-sibtn'+(c===swActiveCat?' on':'')+'" onclick="psSetCat(\''+c+'\')" id="psib-'+c.replace(/\s/g,'_')+'">'+
+        '<span class="ps-sibtn-ico">'+(CAT_ICONS[c]||emoji)+'</span>'+
+        '<span class="ps-sibtn-lbl">'+c+'</span>'+
+        '</button>';
+    }).join('');
+  }
+
+  function psSetCat(cat){
+    swActiveCat=cat;
+    document.querySelectorAll('.ps-sibtn').forEach(function(b){b.classList.remove('on');});
+    var el=document.getElementById('psib-'+cat.replace(/\s/g,'_'));
+    if(el)el.classList.add('on');
+    psBuildContent();
+  }
+  window.psSetCat=psSetCat;
+
+  // ── CONTENT BUILDER ──
+  function psBuildContent(){
+    var search=(document.getElementById('psSearch')?.value||'').toLowerCase();
+    var html='';
+
+    if(swActiveCat==='Contact'||(!prods.length&&swActiveCat!=='About'&&swActiveCat!=='Contact'&&prods.length===0)){
+      html=buildContactSection();
+    } else if(swActiveCat==='About'){
+      html=buildAboutSection();
+    } else if(sectorType==='food'){
+      html=buildFoodMenu(search);
+    } else if(sectorType==='booking'){
+      html=buildBookingSection(search);
+    } else if(sectorType==='service'){
+      html=buildServiceSection(search);
+    } else if(sectorType==='enquiry'){
+      html=buildEnquirySection(search);
+    } else {
+      // fallback — show as food/product menu
+      html=buildFoodMenu(search);
+    }
+
+    document.getElementById('psContent').innerHTML=html;
+  }
+  window.psBuildContent=psBuildContent;
+
+  // ── FOOD MENU ──
+  function buildFoodMenu(search){
+    var items=prods;
+    if(search)items=items.filter(function(p){return(p.n||p.name||'').toLowerCase().includes(search)||(p.desc||'').toLowerCase().includes(search);});
+    var showCats=swActiveCat==='All'?[...new Set(items.map(function(p){return p.cat||'Menu';}))]:[swActiveCat];
+    var html='';
+    showCats.forEach(function(cat){
+      var ci=items.filter(function(p){return(p.cat||'Menu')===cat;});
+      if(!ci.length)return;
+      html+='<div class="ps-sec-hdr">'+cat+'</div><div class="ps-items-box">';
+      ci.forEach(function(item){
+        var id=item.id||item.n||item.name;
+        var name=item.n||item.name||'Item';
+        var price=parseFloat(item.p||item.price)||0;
+        var emo=item.emoji||item.e||'🍽️';
+        var desc=item.desc||item.description||'';
+        var veg=item.veg!==false;
+        var qty=swCart[id]||0;
+        html+='<div class="ps-item">'+
+          '<div class="ps-item-left">'+
+          '<div class="ps-dot '+(veg?'veg':'nv')+'"></div>'+
+          '<div class="ps-iname">'+name+'</div>'+
+          (desc?'<div class="ps-idesc">'+desc+'</div>':'')+
+          '<div class="ps-iprice">₹'+price+'</div>'+
+          '</div>'+
+          '<div class="ps-item-right">'+
+          '<div class="ps-img">'+emo+'</div>'+
+          (qty===0
+            ?'<button class="ps-add" onclick="psAdd(\''+id+'\','+price+',\''+name.replace(/'/g,"\\'")+'\')" >ADD</button>'
+            :'<div class="ps-qty"><button class="ps-qb" onclick="psChg(\''+id+'\','+price+',-1)">−</button><span class="ps-qn">'+qty+'</span><button class="ps-qb" onclick="psChg(\''+id+'\','+price+',1)">+</button></div>'
+          )+
+          '</div></div>';
+      });
+      html+='</div>';
+    });
+    if(!prods.length)html=buildEmptyMenu();
+    return html||'<div style="text-align:center;padding:40px;color:#aaa"><div style="font-size:2rem;margin-bottom:8px">🔍</div><div style="font-size:.88rem">No items found</div></div>';
+  }
+
+  // ── SERVICE SECTION (Mechanic, Welder, Plumber etc) ──
+  function buildServiceSection(search){
+    if(prods.length){
+      // Show their services as cards
+      var items=prods;
+      if(search)items=items.filter(function(p){return(p.n||p.name||'').toLowerCase().includes(search);});
+      var html='<div class="ps-sec-hdr">Our Services</div><div class="ps-svc-grid">';
+      items.forEach(function(item){
+        var id=item.id||item.n;
+        var name=item.n||item.name||'Service';
+        var price=parseFloat(item.p||item.price)||0;
+        var emo=item.emoji||item.e||'🔧';
+        var desc=item.desc||item.description||'';
+        html+='<div class="ps-svc-card" onclick="psEnquireService(\''+name+'\','+price+')">'+
+          '<div class="ps-svc-ico">'+emo+'</div>'+
+          '<div class="ps-svc-name">'+name+'</div>'+
+          (desc?'<div class="ps-svc-desc">'+desc+'</div>':'')+
+          (price?'<div class="ps-svc-price">₹'+price+'</div>':'<div class="ps-svc-price" style="color:#888">Call for price</div>')+
+          '</div>';
+      });
+      html+='</div>';
+      html+=buildContactSection();
+      return html;
+    }
+    // No products — show enquiry form
+    return'<div class="ps-sec-hdr">Request a Service</div>'+
+      '<div style="padding:12px">'+
+      '<div style="background:#fff;border-radius:12px;padding:16px;margin-bottom:10px">'+
+      '<div style="font-size:.84rem;font-weight:700;color:#1a1a1a;margin-bottom:4px">'+shopName+'</div>'+
+      '<div style="font-size:.76rem;color:#888;line-height:1.6;margin-bottom:14px">'+(shop.desc||'Professional service at your doorstep. Contact us to get a quote.')+'</div>'+
+      '<div class="ps-field"><label class="ps-flbl">Your Name</label><input class="ps-finp" id="svcName" placeholder="Full name"/></div>'+
+      '<div class="ps-field"><label class="ps-flbl">Phone</label><input class="ps-finp" id="svcPhone" placeholder="Your number" type="tel"/></div>'+
+      '<div class="ps-field"><label class="ps-flbl">What do you need?</label><textarea class="ps-finp" id="svcDesc" placeholder="Describe your requirement…"></textarea></div>'+
+      '<div class="ps-field"><label class="ps-flbl">Address / Location</label><input class="ps-finp" id="svcAddr" placeholder="Your address"/></div>'+
+      '<button style="width:100%;padding:13px;background:'+acc+';color:#fff;border:none;border-radius:12px;font-size:.88rem;font-weight:800;cursor:pointer;margin-bottom:8px" onclick="psSendServiceRequest()">📤 Send Request on WhatsApp</button>'+
+      '</div></div>'+
+      buildContactSection();
+  }
+
+  // ── BOOKING SECTION (Salon, Gym, Doctor etc) ──
+  function buildBookingSection(search){
+    var services=prods.length?prods:[
+      {n:'Standard Appointment',p:0,emoji:'📅',desc:'Book a slot with us'},
+    ];
+    if(search)services=services.filter(function(p){return(p.n||p.name||'').toLowerCase().includes(search);});
+    var slots=['9:00 AM','9:30 AM','10:00 AM','10:30 AM','11:00 AM','11:30 AM','12:00 PM','2:00 PM','2:30 PM','3:00 PM','3:30 PM','4:00 PM','4:30 PM','5:00 PM','5:30 PM','6:00 PM'];
+    var html='';
+    if(services.length>1){
+      html+='<div class="ps-sec-hdr">Select Service</div><div class="ps-svc-grid">';
+      services.forEach(function(s){
+        var id=s.id||s.n;
+        var name=s.n||s.name||'Service';
+        var price=parseFloat(s.p||s.price)||0;
+        html+='<div class="ps-svc-card '+(swCart[id]?'sel':'')+'" onclick="psSelService(\''+id+'\','+price+',\''+name.replace(/'/g,"\\'")+'\')" style="'+(swCart[id]?'border-color:'+acc+';background:#f0fff8':'')+'">'+
+          '<div class="ps-svc-ico">'+(s.emoji||'💆')+'</div>'+
+          '<div class="ps-svc-name">'+name+'</div>'+
+          (s.desc?'<div class="ps-svc-desc">'+s.desc+'</div>':'')+
+          (price?'<div class="ps-svc-price">₹'+price+'</div>':'<div class="ps-svc-price" style="color:#888">Free</div>')+
+          (swCart[id]?'<div style="font-size:.7rem;color:'+acc+';font-weight:700;margin-top:4px">✓ Selected</div>':'')+
+          '</div>';
+      });
+      html+='</div>';
+    }
+    html+='<div class="ps-sec-hdr">Pick a Time Slot</div><div class="ps-slots">';
+    slots.forEach(function(s){
+      html+='<div class="ps-slot'+(swSelSlot===s?' sel':'')+'" onclick="psSelSlot(\''+s+'\')">'+s+'</div>';
+    });
+    html+='</div>';
+    html+='<div style="padding:0 12px 12px">'+
+      '<div class="ps-field"><label class="ps-flbl">Your Name</label><input class="ps-finp" id="bkName" placeholder="Full name"/></div>'+
+      '<div class="ps-field"><label class="ps-flbl">Phone / WhatsApp</label><input class="ps-finp" id="bkPhone" placeholder="Your number" type="tel"/></div>'+
+      '<button style="width:100%;padding:13px;background:'+acc+';color:#fff;border:none;border-radius:12px;font-size:.88rem;font-weight:800;cursor:pointer;margin-bottom:8px" onclick="psBookAppointment()">📅 Book Appointment on WhatsApp</button>'+
+      '</div>';
+    html+=buildContactSection();
+    return html;
+  }
+
+  // ── ENQUIRY SECTION (Real Estate, Lawyer, Hardware etc) ──
+  function buildEnquirySection(search){
+    var items=prods.length?prods:[];
+    if(search&&items.length)items=items.filter(function(p){return(p.n||p.name||'').toLowerCase().includes(search);});
+    var html='';
+    if(items.length){
+      html+='<div class="ps-sec-hdr">Products & Services</div><div class="ps-enq-list">';
+      items.forEach(function(item){
+        var name=item.n||item.name||'Product';
+        var price=parseFloat(item.p||item.price)||0;
+        var emo=item.emoji||item.e||'📦';
+        var desc=item.desc||item.description||'';
+        html+='<div class="ps-enq-card" onclick="psEnquireService(\''+name+'\','+price+')">'+
+          '<div class="ps-enq-ico">'+emo+'</div>'+
+          '<div><div class="ps-enq-name">'+name+'</div>'+
+          (desc?'<div class="ps-enq-desc">'+desc+'</div>':'')+
+          (price?'<div style="font-size:.85rem;font-weight:800;color:'+acc+';margin-top:4px">₹'+price+'</div>':'<div style="font-size:.78rem;color:#888;margin-top:4px">Enquire for price</div>')+
+          '</div></div>';
+      });
+      html+='</div>';
+    } else {
+      html+='<div style="padding:12px"><div style="background:#fff;border-radius:12px;padding:16px;margin-bottom:10px">'+
+        '<div style="font-size:2rem;margin-bottom:8px">'+emoji+'</div>'+
+        '<div style="font-size:.95rem;font-weight:800;color:#1a1a1a;margin-bottom:6px">'+shopName+'</div>'+
+        '<div style="font-size:.8rem;color:#888;line-height:1.65;">'+(shop.desc||'Contact us for more information about our services and pricing.')+'</div>'+
+        '</div></div>';
+    }
+    html+='<div class="ps-sec-hdr">Send Enquiry</div>'+
+      '<div style="padding:0 12px 12px">'+
+      '<div class="ps-field"><label class="ps-flbl">Your Name</label><input class="ps-finp" id="enqName" placeholder="Full name"/></div>'+
+      '<div class="ps-field"><label class="ps-flbl">Phone</label><input class="ps-finp" id="enqPhone" placeholder="Your number" type="tel"/></div>'+
+      '<div class="ps-field"><label class="ps-flbl">Your Requirement</label><textarea class="ps-finp" id="enqMsg" placeholder="Tell us what you need…"></textarea></div>'+
+      '<button style="width:100%;padding:13px;background:#25D366;color:#fff;border:none;border-radius:12px;font-size:.88rem;font-weight:800;cursor:pointer;margin-bottom:8px" onclick="psSendEnquiry()">💬 Send Enquiry on WhatsApp</button>'+
+      '</div>';
+    html+=buildContactSection();
+    return html;
+  }
+
+  // ── EMPTY MENU ──
+  function buildEmptyMenu(){
+    return'<div style="padding:20px 14px">'+
+      '<div style="text-align:center;padding:28px;background:#fff;border-radius:14px;margin-bottom:12px">'+
+      '<div style="font-size:3rem;margin-bottom:10px">'+emoji+'</div>'+
+      '<div style="font-size:1rem;font-weight:800;color:#1a1a1a;margin-bottom:6px">'+shopName+'</div>'+
+      '<div style="font-size:.8rem;color:#888;line-height:1.65;margin-bottom:16px">'+(shop.desc||'Contact us to know more about our products and services.')+'</div>'+
+      '<button style="background:'+acc+';color:#fff;border:none;border-radius:999px;padding:11px 24px;font-size:.86rem;font-weight:800;cursor:pointer" onclick="psWaChat()">💬 Chat on WhatsApp</button>'+
+      '</div>'+
+      buildContactSection()+
+      '</div>';
+  }
+
+  // ── ABOUT SECTION ──
+  function buildAboutSection(){
+    return'<div style="padding:12px">'+
+      '<div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:10px">'+
+      '<div style="font-size:2.5rem;text-align:center;margin-bottom:12px">'+emoji+'</div>'+
+      '<div style="font-size:1rem;font-weight:800;color:#1a1a1a;margin-bottom:8px;text-align:center">'+shopName+'</div>'+
+      '<div style="font-size:.82rem;color:#666;line-height:1.75;margin-bottom:14px">'+(shop.desc||'We provide quality services to our customers.')+'</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+
+      '<div style="background:#f8fffe;border:1px solid #d1fae5;border-radius:10px;padding:12px">'+
+      '<div style="font-size:.69rem;font-weight:700;color:#888;text-transform:uppercase;margin-bottom:3px">Address</div>'+
+      '<div style="font-size:.8rem;font-weight:600;color:#1a1a1a">'+(shop.addr||shop.city||'—')+'</div></div>'+
+      '<div style="background:#f8fffe;border:1px solid #d1fae5;border-radius:10px;padding:12px">'+
+      '<div style="font-size:.69rem;font-weight:700;color:#888;text-transform:uppercase;margin-bottom:3px">Hours</div>'+
+      '<div style="font-size:.8rem;font-weight:600;color:#1a1a1a">'+(shop.oh||'9AM')+' – '+(shop.oc||'9PM')+'</div></div>'+
+      '<div style="background:#f8fffe;border:1px solid #d1fae5;border-radius:10px;padding:12px">'+
+      '<div style="font-size:.69rem;font-weight:700;color:#888;text-transform:uppercase;margin-bottom:3px">Phone</div>'+
+      '<div style="font-size:.8rem;font-weight:600;color:#1a1a1a">'+(shopPhone||'—')+'</div></div>'+
+      '<div style="background:#f8fffe;border:1px solid #d1fae5;border-radius:10px;padding:12px">'+
+      '<div style="font-size:.69rem;font-weight:700;color:#888;text-transform:uppercase;margin-bottom:3px">City</div>'+
+      '<div style="font-size:.8rem;font-weight:600;color:#1a1a1a">'+(shop.city||'—')+'</div></div>'+
+      '</div></div></div>'+
+      buildContactSection();
+  }
+
+  // ── CONTACT SECTION ──
+  function buildContactSection(){
+    return'<div class="ps-contact">'+
+      '<div class="ps-wa-cta" onclick="psWaChat()">'+
+      '<div><div class="ps-wa-cta-txt">💬 Chat on WhatsApp</div><div class="ps-wa-cta-sub">Quick replies · Order · Enquiry</div></div>'+
+      '<button class="ps-wa-cta-btn">Chat →</button>'+
+      '</div>'+
+      (shopPhone?'<a class="ps-map-link" href="tel:'+shopPhone+'">📞 Call '+shopPhone+'</a>':'')+
+      (shop.addr?'<a class="ps-map-link" href="https://maps.google.com/?q='+encodeURIComponent(shopName+' '+shop.addr+' '+shop.city)+'" target="_blank">📍 Get Directions</a>':'')+
+      '<div style="text-align:center;font-size:.68rem;color:#ccc;padding:10px 0">Powered by Deckscrab · <a href="/" style="color:#aaa">Browse more shops</a></div>'+
+      '</div>';
+  }
+
+  // ── CART FUNCTIONS ──
+  function psGetItems(){
     return Object.keys(swCart).map(function(id){
-      var it=prods.find(function(p){return(p.id||p.n||p.name)===id;});
-      return it?{name:it.n||it.name,price:parseFloat(it.p||it.price||0),qty:swCart[id]}:null;
+      var p=prods.find(function(x){return(x.id||x.n||x.name)===id;});
+      return p?{id:id,name:p.n||p.name,price:parseFloat(p.p||p.price)||0,emoji:p.emoji||p.e||'🍽️',qty:swCart[id]}:null;
     }).filter(Boolean);
   }
-
-  function swShowStep1(){
-    document.getElementById('swTitle').textContent='🛒 Your Order';
-    var items=getSwItems();
-    var subtotal=items.reduce(function(s,i){return s+i.price*i.qty;},0);
-    var gst=Math.round(subtotal*0.05);
-    var total=subtotal+gst;
-    document.getElementById('swBody').innerHTML=
-      '<div style="margin-bottom:12px">'+
-      items.map(function(i){return'<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:.85rem"><span style="color:#fff">'+i.name+' <span style="color:rgba(255,255,255,.4)">×'+i.qty+'</span></span><span style="font-weight:700;color:'+t.acc+'">₹'+(i.price*i.qty)+'</span></div>';}).join('')+
-      '</div>'+
-      '<div style="background:#111827;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;margin-bottom:14px">'+
-      '<div style="display:flex;justify-content:space-between;font-size:.81rem;padding:4px 0;color:rgba(255,255,255,.5)"><span>Subtotal</span><span>₹'+subtotal+'</span></div>'+
-      '<div style="display:flex;justify-content:space-between;font-size:.81rem;padding:4px 0;color:rgba(255,255,255,.5)"><span>GST (5%)</span><span>₹'+gst+'</span></div>'+
-      '<div style="display:flex;justify-content:space-between;font-size:.96rem;font-weight:800;color:#fff;padding:10px 0 0;margin-top:7px;border-top:1.5px solid rgba(255,255,255,.1)"><span>Total</span><span style="color:'+t.acc+'">₹'+total+'</span></div></div>'+
-      '<div style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.07em;margin-bottom:9px">Delivery Details</div>'+
-      '<div class="sw-field"><label>Your Name *</label><input class="sw-fi" id="swN" placeholder="Full name"/></div>'+
-      '<div class="sw-field"><label>Phone / WhatsApp *</label><input class="sw-fi" id="swP" placeholder="Your WhatsApp number" type="tel"/></div>'+
-      '<div class="sw-field"><label>Delivery Address *</label><textarea class="sw-fi" id="swA" placeholder="House no, Street, Area, City, Pincode"></textarea></div>'+
-      '<div style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.07em;margin:13px 0 9px">Payment Method</div>'+
-      '<div class="sw-pay-grid">'+
-      '<div class="sw-pm sel" onclick="swPay(this,\'upi\')"><div class="sw-pm-ico">📱</div><div class="sw-pm-lbl">UPI</div></div>'+
-      '<div class="sw-pm" onclick="swPay(this,\'cod\')"><div class="sw-pm-ico">💵</div><div class="sw-pm-lbl">Cash</div></div>'+
-      '<div class="sw-pm" onclick="swPay(this,\'card\')"><div class="sw-pm-ico">💳</div><div class="sw-pm-lbl">Card</div></div></div>'+
-      '<div id="swUpiA"><input class="sw-fi" id="swUpi" placeholder="UPI ID or phone (e.g. 9876@gpay)" style="margin-bottom:10px"/></div>'+
-      '<button class="sw-pay-btn" style="background:'+t.acc+';color:'+t.at+'" onclick="swConfirm('+total+','+subtotal+','+gst+')">🔐 Confirm & Pay ₹'+total+'</button>'+
-      '<div style="text-align:center;font-size:.68rem;color:rgba(255,255,255,.3);margin-top:6px">🔒 OTP verified · Secure · Anti-fraud</div>';
+  function psUpdateCart(){
+    var items=psGetItems();
+    var count=items.reduce(function(s,i){return s+i.qty;},0);
+    var total=items.reduce(function(s,i){return s+i.price*i.qty;},0);
+    var bar=document.getElementById('psCartBar');
+    if(count>0){
+      bar.classList.add('show');
+      document.getElementById('psCartCnt').textContent=count+' item'+(count>1?'s':'');
+      document.getElementById('psCartTot').textContent='₹'+total;
+    } else bar.classList.remove('show');
   }
 
-  window.swPay=function(el,m){
-    swPayMethod=m;
-    document.querySelectorAll('.sw-pm').forEach(function(e){e.classList.remove('sel');});
-    el.classList.add('sel');
-    document.getElementById('swUpiA').style.display=m==='upi'?'block':'none';
+  window.psAdd=function(id,price,name){swCart[id]=(swCart[id]||0)+1;psUpdateCart();psBuildContent();psShowToast('Added: '+name);};
+  window.psChg=function(id,price,d){
+    swCart[id]=Math.max(0,(swCart[id]||0)+d);
+    if(!swCart[id])delete swCart[id];
+    psUpdateCart();psBuildContent();
+  };
+  window.psWaChat=function(){window.open('https://wa.me/91'+shopPhone+'?text='+encodeURIComponent('Hi! I found your shop on Deckscrab. I want to know more about '+shopName+'.'),'_blank');};
+  window.psSelSlot=function(slot){swSelSlot=slot;psBuildContent();};
+  window.psSelService=function(id,price,name){
+    if(swCart[id])delete swCart[id];else swCart[id]=1;
+    psUpdateCart();psBuildContent();
+  };
+  window.psEnquireService=function(name,price){
+    window.open('https://wa.me/91'+shopPhone+'?text='+encodeURIComponent('Hi! I am interested in "'+name+'"'+(price?' (₹'+price+')':'')+' from '+shopName+'. Please share more details.'),'_blank');
+  };
+  window.psSendServiceRequest=function(){
+    var n=document.getElementById('svcName')?.value.trim();
+    var p=document.getElementById('svcPhone')?.value.trim();
+    var d=document.getElementById('svcDesc')?.value.trim();
+    var a=document.getElementById('svcAddr')?.value.trim();
+    if(!n||!p){psShowToast('⚠️ Enter your name and phone');return;}
+    var msg='🔧 *Service Request — '+shopName+'*\n\n👤 Name: '+n+'\n📞 Phone: '+p+(d?'\n📝 Requirement: '+d:'')+(a?'\n📍 Address: '+a:'');
+    window.open('https://wa.me/91'+shopPhone+'?text='+encodeURIComponent(msg),'_blank');
+  };
+  window.psBookAppointment=function(){
+    var n=document.getElementById('bkName')?.value.trim();
+    var p=document.getElementById('bkPhone')?.value.trim();
+    if(!n||!p){psShowToast('⚠️ Enter your name and phone');return;}
+    if(!swSelSlot){psShowToast('⚠️ Please select a time slot');return;}
+    var services=psGetItems().map(function(i){return i.name;}).join(', ');
+    var msg='📅 *Appointment Request — '+shopName+'*\n\n👤 Name: '+n+'\n📞 Phone: '+p+'\n⏰ Slot: '+swSelSlot+(services?'\n💆 Services: '+services:'')+'\n\nPlease confirm my appointment.';
+    window.open('https://wa.me/91'+shopPhone+'?text='+encodeURIComponent(msg),'_blank');
+  };
+  window.psSendEnquiry=function(){
+    var n=document.getElementById('enqName')?.value.trim();
+    var p=document.getElementById('enqPhone')?.value.trim();
+    var m=document.getElementById('enqMsg')?.value.trim();
+    if(!n||!p){psShowToast('⚠️ Enter your name and phone');return;}
+    var msg='📋 *Enquiry — '+shopName+'*\n\n👤 Name: '+n+'\n📞 Phone: '+p+(m?'\n📝 Requirement: '+m:'');
+    window.open('https://wa.me/91'+shopPhone+'?text='+encodeURIComponent(msg),'_blank');
   };
 
-  window.swConfirm=function(total,subtotal,gst){
-    var name=document.getElementById('swN').value.trim();
-    var phone=document.getElementById('swP').value.trim();
-    var addr=document.getElementById('swA').value.trim();
-    if(!name||!phone||!addr){alert('Please fill all required fields');return;}
-    if(swPayMethod==='upi'&&!document.getElementById('swUpi').value.trim()){alert('Please enter your UPI ID');return;}
-    swGrand=total;swAddr=addr;
+  // ── CHECKOUT ──
+  function psOpenSheet(title,html){
+    document.getElementById('psStitle').textContent=title;
+    document.getElementById('psSbody').innerHTML=html;
+    document.getElementById('psOv').classList.add('open');
+    document.getElementById('psSheet').classList.add('open');
+    document.getElementById('psSheet').scrollTop=0;
+    document.body.style.overflow='hidden';
+  }
+  window.psCloseSheet=function(){
+    document.getElementById('psOv').classList.remove('open');
+    document.getElementById('psSheet').classList.remove('open');
+    document.body.style.overflow='';
+  };
+  window.psOpenCheckout=function(){
+    var items=psGetItems();if(!items.length)return;
+    var sub=items.reduce(function(s,i){return s+i.price*i.qty;},0);
+    var gst=Math.round(sub*0.05);var total=sub+gst;
+    psOpenSheet('🛒 Your Cart',buildCartHtml(items,sub,gst,total));
+  };
+
+  function buildCartHtml(items,sub,gst,total){
+    return'<div style="margin-bottom:10px">'+
+      items.map(function(i){
+        return'<div class="ps-citem">'+
+          '<div><div class="ps-cname">'+i.emoji+' '+i.name+'</div><div class="ps-csub">₹'+i.price+' × '+i.qty+'</div></div>'+
+          '<div style="display:flex;align-items:center;gap:8px">'+
+          '<div class="ps-qty" style="border-color:#ddd">'+
+          '<button class="ps-qb" style="color:#666" onclick="psChgCart(\''+i.id+'\',-1)">−</button>'+
+          '<span class="ps-qn" style="color:#333">'+i.qty+'</span>'+
+          '<button class="ps-qb" style="color:'+acc+'" onclick="psChgCart(\''+i.id+'\',1)">+</button>'+
+          '</div>'+
+          '<div class="ps-ctot">₹'+(i.price*i.qty)+'</div></div></div>';
+      }).join('')+'</div>'+
+      '<div class="ps-tots">'+
+      '<div class="ps-trow"><span>Subtotal</span><span>₹'+sub+'</span></div>'+
+      '<div class="ps-trow"><span>GST (5%)</span><span>₹'+gst+'</span></div>'+
+      '<div class="ps-trow"><span>Delivery</span><span style="color:#22c55e;font-weight:700">FREE</span></div>'+
+      '<div class="ps-tgrand"><span>Total</span><span style="color:'+acc+'">₹'+total+'</span></div></div>'+
+      '<div class="ps-del"><div><div class="ps-del-lbl">🚚 Home Delivery</div><div class="ps-del-sub">Off = pickup yourself</div></div>'+
+      '<label class="ps-tog"><input type="checkbox" id="psDelT" checked onchange="swIsDelivery=this.checked;document.getElementById(\'psAddrF\').style.display=this.checked?\'block\':\'none\'"/><span class="ps-togsl"></span></label></div>'+
+      '<div class="ps-fsec">Your Details</div>'+
+      '<div class="ps-field"><label class="ps-flbl">Name *</label><input class="ps-finp" id="psCN" placeholder="Full name"/></div>'+
+      '<div class="ps-field"><label class="ps-flbl">WhatsApp Number *</label><input class="ps-finp" id="psCP" placeholder="Your number" type="tel"/></div>'+
+      '<div id="psAddrF"><div class="ps-field"><label class="ps-flbl">Delivery Address *</label><textarea class="ps-finp" id="psCA" placeholder="House no, Street, Area, City, Pincode"></textarea></div></div>'+
+      '<div class="ps-fsec">Payment</div>'+
+      '<div class="ps-pays">'+
+      '<div class="ps-pay sel" onclick="psSelPay(this,\'upi\')"><div class="ps-pay-ico">📱</div><div class="ps-pay-lbl">UPI</div></div>'+
+      '<div class="ps-pay" onclick="psSelPay(this,\'cod\')"><div class="ps-pay-ico">💵</div><div class="ps-pay-lbl">Cash</div></div>'+
+      '<div class="ps-pay" onclick="psSelPay(this,\'card\')"><div class="ps-pay-ico">💳</div><div class="ps-pay-lbl">Card</div></div></div>'+
+      '<div id="psUpiA"><div class="ps-field"><input class="ps-finp" id="psUpi" placeholder="UPI ID (e.g. 9876@gpay)"/></div></div>'+
+      '<button class="ps-place" onclick="psPlace('+total+','+sub+','+gst+')">🔐 Place Order · ₹'+total+'</button>'+
+      '<div class="ps-secnote">🔒 OTP verified · Secure · Bill auto-sent to shopkeeper</div>';
+  }
+
+  window.psChgCart=function(id,d){
+    swCart[id]=Math.max(0,(swCart[id]||0)+d);
+    if(!swCart[id])delete swCart[id];
+    psUpdateCart();
+    var items=psGetItems();
+    if(!items.length){psCloseSheet();return;}
+    var sub=items.reduce(function(s,i){return s+i.price*i.qty;},0);
+    var gst=Math.round(sub*0.05);
+    document.getElementById('psSbody').innerHTML=buildCartHtml(items,sub,gst,sub+gst);
+    psBuildContent();
+  };
+  window.psSelPay=function(el,m){
+    swPayMethod=m;
+    document.querySelectorAll('.ps-pay').forEach(function(e){e.classList.remove('sel');});
+    el.classList.add('sel');
+    document.getElementById('psUpiA').style.display=m==='upi'?'block':'none';
+  };
+  window.psPlace=function(total,sub,gst){
+    var n=document.getElementById('psCN')?.value.trim();
+    var p=document.getElementById('psCP')?.value.trim();
+    var a=swIsDelivery?(document.getElementById('psCA')?.value.trim()||''):'Pickup';
+    if(!n){psShowToast('⚠️ Enter your name');return;}
+    if(!p){psShowToast('⚠️ Enter your WhatsApp number');return;}
+    if(swIsDelivery&&!a){psShowToast('⚠️ Enter delivery address');return;}
+    swCustName=n;swCustPhone=p;swAddr=a;swGrand=total;
     swOrderId='DS'+Date.now().toString().slice(-6);
     swOtp=String(Math.floor(100000+Math.random()*900000));
-    var items=getSwItems();
-    document.getElementById('swTitle').textContent='🧾 Bill & OTP';
-    document.getElementById('swBody').innerHTML=
-      '<div class="sw-bill">'+
-      '<div class="sw-bill-shop">'+shop.name+'</div>'+
-      '<div class="sw-bill-id">Order #'+swOrderId+' · '+new Date().toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'})+'</div>'+
-      items.map(function(i){return'<div class="sw-bill-row"><span>'+i.name+' ×'+i.qty+'</span><span style="color:'+t.acc+'">₹'+(i.price*i.qty)+'</span></div>';}).join('')+
-      '<div class="sw-bill-row"><span style="color:rgba(255,255,255,.4)">GST (5%)</span><span style="color:rgba(255,255,255,.4)">₹'+gst+'</span></div>'+
-      '<div class="sw-bill-total"><span>Total</span><span style="color:#10b981">₹'+total+'</span></div>'+
-      '<div style="font-size:.72rem;color:rgba(255,255,255,.35);margin-top:10px;line-height:1.65">📍 '+addr+'<br/>👤 '+name+' · 📞 '+phone+'</div></div>'+
-      '<div class="sw-otp-box">'+
-      '<div class="sw-otp-title">🔐 Enter OTP to Pay</div>'+
-      '<div class="sw-otp-sub">Your OTP: <strong style="color:#C4B5FD;font-size:1.15rem;letter-spacing:.12em">'+swOtp+'</strong><br/>Enter it below to confirm ₹'+total+' payment</div>'+
-      '<div class="sw-otp-digits">'+
-      ['sw1','sw2','sw3','sw4','sw5','sw6'].map(function(id,i,arr){
-        var prev=i>0?arr[i-1]:null;var next=i<5?arr[i+1]:null;
-        return'<input type="tel" class="sw-od" id="'+id+'" maxlength="1" inputmode="numeric" oninput="swON(this,'+(next?'\''+next+'\'':'null')+')" onkeydown="swOB(event,this,'+(prev?'\''+prev+'\'':'null')+')" />';
+    psOpenSheet('🧾 Bill & OTP',buildBillOtpHtml(total,sub,gst));
+  };
+
+  function buildBillOtpHtml(total,sub,gst){
+    var items=psGetItems();
+    return'<div class="ps-bill"><div class="ps-billhdr">'+
+      '<div style="font-size:1.8rem;margin-bottom:5px">'+emoji+'</div>'+
+      '<div class="ps-billshop">'+shopName+'</div>'+
+      '<div class="ps-billaddr">'+(shop.addr||'')+', '+(shop.city||'')+'</div>'+
+      '<div class="ps-billid">Order #'+swOrderId+' · '+new Date().toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'})+'</div>'+
+      '</div>'+
+      items.map(function(i){return'<div class="ps-billrow"><span>'+i.name+' ×'+i.qty+'</span><span style="font-weight:700">₹'+(i.price*i.qty)+'</span></div>';}).join('')+
+      '<div class="ps-billrow"><span style="color:#aaa">GST (5%)</span><span style="color:#aaa">₹'+gst+'</span></div>'+
+      '<div class="ps-billrow"><span style="color:#aaa">Delivery</span><span style="color:#22c55e;font-weight:700">FREE</span></div>'+
+      '<div class="ps-billtot"><span>Grand Total</span><span style="color:'+acc+'">₹'+total+'</span></div>'+
+      '<div class="ps-billfoot">👤 '+swCustName+' · 📞 '+swCustPhone+'<br/>'+(swIsDelivery?'📍 '+swAddr:'📦 Pickup')+'<br/>💳 '+swPayMethod.toUpperCase()+'</div>'+
+      '</div>'+
+      '<div class="ps-otpbox">'+
+      '<div class="ps-otptitle">🔐 Confirm Payment with OTP</div>'+
+      '<div class="ps-otpcode">'+swOtp+'</div>'+
+      '<div class="ps-otpsub">Enter this OTP below to confirm ₹'+total+' payment.<br/>Bill will be sent to <strong>'+shopName+'</strong> on WhatsApp automatically.</div>'+
+      '<div class="ps-otpdigs">'+
+      ['z1','z2','z3','z4','z5','z6'].map(function(id,i,arr){
+        var prev=i>0?arr[i-1]:null,next=i<5?arr[i+1]:null;
+        return'<input type="tel" class="ps-otpd" id="'+id+'" maxlength="1" inputmode="numeric" oninput="psON(this,'+(next?'\''+next+'\'':'null')+')" onkeydown="psOB(event,this,'+(prev?'\''+prev+'\'':'null')+')" />';
       }).join('')+
       '</div>'+
-      '<div id="swOErr" style="display:none;color:#ef4444;font-size:.75rem;margin-bottom:8px">❌ Wrong OTP. Try again.</div>'+
-      '<button class="sw-otp-verify" onclick="swVerify(\''+name+'\',\''+phone+'\','+total+','+subtotal+','+gst+')">✅ Verify & Confirm Payment</button>'+
-      '<div style="font-size:.69rem;color:rgba(255,255,255,.3);margin-top:8px">OTP valid for 10 minutes</div></div>';
-  };
+      '<div class="ps-otperr" id="psOtpErr">❌ Wrong OTP. Try again.</div>'+
+      '<button class="ps-otpverify" onclick="psVerify('+total+','+sub+','+gst+')">✅ Verify & Confirm Order</button>'+
+      '</div>';
+  }
 
-  window.swON=function(el,nid){
+  window.psON=function(el,nid){
     el.value=el.value.replace(/\D/g,'').slice(-1);
-    if(el.value&&nid)document.getElementById(nid).focus();
-    var all=['sw1','sw2','sw3','sw4','sw5','sw6'].map(function(id){return document.getElementById(id)?document.getElementById(id).value:'';}).join('');
-    if(all.length===6)setTimeout(function(){swVerify(null,null,swGrand,null,null);},350);
+    if(el.value&&nid)document.getElementById(nid)?.focus();
+    var all=['z1','z2','z3','z4','z5','z6'].map(function(id){var e=document.getElementById(id);return e?e.value:'';}).join('');
+    if(all.length===6)setTimeout(function(){psVerify(swGrand,0,0);},350);
   };
-  window.swOB=function(e,el,pid){if(e.key==='Backspace'&&!el.value&&pid)document.getElementById(pid).focus();};
-
-  window.swVerify=function(name,phone,total,subtotal,gst){
-    var entered=['sw1','sw2','sw3','sw4','sw5','sw6'].map(function(id){var el=document.getElementById(id);return el?el.value:'';}).join('');
+  window.psOB=function(e,el,pid){if(e.key==='Backspace'&&!el.value&&pid)document.getElementById(pid)?.focus();};
+  window.psVerify=function(total){
+    var entered=['z1','z2','z3','z4','z5','z6'].map(function(id){var e=document.getElementById(id);return e?e.value:'';}).join('');
     if(entered!==swOtp){
-      document.getElementById('swOErr').style.display='block';
-      ['sw1','sw2','sw3','sw4','sw5','sw6'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
-      document.getElementById('sw1').focus();return;
+      var err=document.getElementById('psOtpErr');if(err)err.style.display='block';
+      ['z1','z2','z3','z4','z5','z6'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+      document.getElementById('z1')?.focus();return;
     }
-    // ✅ OTP CORRECT — Send bill to shopkeeper WhatsApp AUTOMATICALLY
-    var items=getSwItems();
-    var shopPhone=shop.wa||shop.phone;
-    var billMsg=
-      '🔔 *NEW ORDER — '+shop.name+'*\n'+
-      '━━━━━━━━━━━━━━━━━━━━\n'+
-      '🧾 *Order ID:* #'+swOrderId+'\n'+
-      '⏰ '+new Date().toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'})+'\n'+
-      '━━━━━━━━━━━━━━━━━━━━\n'+
-      '📦 *ITEMS ORDERED:*\n'+
-      items.map(function(i){return'• '+i.name+' ×'+i.qty+' = ₹'+(i.price*i.qty);}).join('\n')+'\n'+
-      '━━━━━━━━━━━━━━━━━━━━\n'+
-      'Subtotal: ₹'+items.reduce(function(s,i){return s+i.price*i.qty;},0)+'\n'+
-      'GST (5%): ₹'+Math.round(items.reduce(function(s,i){return s+i.price*i.qty;},0)*0.05)+'\n'+
-      '*TOTAL: ₹'+total+'*\n'+
-      '━━━━━━━━━━━━━━━━━━━━\n'+
-      '📍 *Deliver to:*\n'+swAddr+'\n'+
-      '━━━━━━━━━━━━━━━━━━━━\n'+
-      '💳 Payment: ✅ PAID & OTP VERIFIED\n'+
-      'Ordered from: '+window.location.href;
-
-    setTimeout(function(){
-      window.open('https://wa.me/91'+shopPhone+'?text='+encodeURIComponent(billMsg),'_blank');
-    },600);
-
-    // Show success
-    document.getElementById('swTitle').textContent='✅ Order Confirmed!';
-    document.getElementById('swBody').innerHTML=
-      '<div class="sw-success">'+
-      '<div class="sw-success-ico">🎉</div>'+
-      '<div class="sw-success-title">Payment Done!</div>'+
-      '<div class="sw-success-sub">Your order is confirmed and<br/>the bill has been sent to<br/><strong style="color:#fff">'+shop.name+'</strong> on WhatsApp automatically.</div>'+
-      '<div class="sw-success-card">'+
-      '<div class="sw-success-row"><span class="sw-success-row-lbl">Order ID</span><span style="color:'+t.acc+';font-family:monospace">#'+swOrderId+'</span></div>'+
-      '<div class="sw-success-row"><span class="sw-success-row-lbl">Items</span><span>'+items.map(function(i){return i.name;}).join(', ')+'</span></div>'+
-      '<div class="sw-success-row"><span class="sw-success-row-lbl">Total Paid</span><span style="color:#10b981;font-weight:800">₹'+total+'</span></div>'+
-      '<div class="sw-success-row"><span class="sw-success-row-lbl">Status</span><span style="color:#10b981">✅ Bill sent to shop</span></div></div>'+
-      '<button onclick="swClose()" style="width:100%;padding:13px;background:'+t.acc+';color:'+t.at+';border:none;border-radius:12px;font-size:.88rem;font-weight:800;cursor:pointer;font-family:DM Sans,sans-serif">✅ Done</button></div>';
-    swCart={};document.getElementById('swCart').classList.remove('show');document.body.style.overflow='';
+    // ✅ Send bill to shopkeeper WhatsApp
+    var items=psGetItems();
+    var billMsg='🔔 *NEW ORDER — '+shopName+'*\n━━━━━━━━━━━━━━━━━━━━\n🧾 Order: #'+swOrderId+'\n⏰ '+new Date().toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'})+'\n━━━━━━━━━━━━━━━━━━━━\n'+
+      items.map(function(i){return'• '+i.name+' ×'+i.qty+' = ₹'+(i.price*i.qty);}).join('\n')+
+      '\n━━━━━━━━━━━━━━━━━━━━\n*TOTAL: ₹'+total+'*\n💳 '+swPayMethod.toUpperCase()+' — ✅ OTP VERIFIED\n━━━━━━━━━━━━━━━━━━━━\n📍 '+swAddr+'\n👤 '+swCustName+'\n📞 '+swCustPhone+'\n━━━━━━━━━━━━━━━━━━━━\nPlease prepare and deliver. Customer has paid.';
+    setTimeout(function(){window.open('https://wa.me/91'+shopPhone+'?text='+encodeURIComponent(billMsg),'_blank');},500);
+    swCart={};psUpdateCart();
+    psOpenSheet('✅ Order Placed!',buildSuccessHtml(total,items));
   };
+
+  function buildSuccessHtml(total,items){
+    return'<div class="ps-succ">'+
+      '<div class="ps-succ-ico">🎉</div>'+
+      '<div class="ps-succ-title">Order Confirmed!</div>'+
+      '<div class="ps-succ-sub">Payment verified! Bill sent to<br/><strong>'+shopName+'</strong> on WhatsApp automatically.</div>'+
+      '<div class="ps-succ-card">'+
+      '<div class="ps-succ-row"><span class="ps-succ-lbl">Order</span><span style="font-family:monospace;color:'+acc+'">#'+swOrderId+'</span></div>'+
+      '<div class="ps-succ-row"><span class="ps-succ-lbl">Items</span><span>'+items.map(function(i){return i.name;}).join(', ')+'</span></div>'+
+      '<div class="ps-succ-row"><span class="ps-succ-lbl">Total</span><span style="font-weight:800;color:'+acc+'">₹'+total+'</span></div>'+
+      '<div class="ps-succ-row"><span class="ps-succ-lbl">Status</span><span style="color:#15803d;font-weight:700">✅ Bill sent to shop</span></div>'+
+      '</div>'+
+      '<button class="ps-done" onclick="psCloseSheet();psBuildContent()">✅ Done — Back to Menu</button>'+
+      '<button class="ps-share" onclick="window.open(\'https://wa.me/?text=\'+encodeURIComponent(\'✅ I ordered from '+shopName+'! Order #'+swOrderId+' · ₹'+total+'\'),\'_blank\')">💬 Share on WhatsApp</button>'+
+      '</div>';
+  }
+
+  // ── TOAST ──
+  var psT;
+  window.psShowToast=function(msg){
+    var e=document.getElementById('psToast');if(!e)return;
+    e.textContent=msg;e.classList.add('show');
+    clearTimeout(psT);psT=setTimeout(function(){e.classList.remove('show');},2500);
+  };
+
+  // ── INIT ──
+  buildSidebar();
+  psBuildContent();
 }
 </script>
 </head>
@@ -1328,6 +1927,36 @@ function renderShopSite(shop){
             <div class="field"><label>Est. Year <span class="opt">(optional)</span></label><input class="fi" id="f-yr" placeholder="e.g. 2018" type="number"/></div>
             <div class="field"><label>Price Range</label><select class="fi" id="f-pr"><option value="1">₹ Budget</option><option value="2" selected>₹₹ Mid-range</option><option value="3">₹₹₹ Premium</option></select></div>
           </div>
+
+          <!-- PHOTO UPLOAD -->
+          <div style="margin-top:4px">
+            <div style="font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:4px">Shop Photos <span style="font-size:.7rem;color:var(--mut);font-weight:400">(up to 4 images)</span></div>
+            <div style="font-size:.72rem;color:var(--mut);margin-bottom:10px">Add photos of your shop, products, menu board — helps customers trust you</div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px" id="shopPhotoGrid">
+              <div class="photo-slot" id="ps0" onclick="triggerPhotoUpload(0)">
+                <div class="photo-slot-ico">📷</div>
+                <div class="photo-slot-lbl">Add Photo</div>
+              </div>
+              <div class="photo-slot" id="ps1" onclick="triggerPhotoUpload(1)">
+                <div class="photo-slot-ico">📷</div>
+                <div class="photo-slot-lbl">Add Photo</div>
+              </div>
+              <div class="photo-slot" id="ps2" onclick="triggerPhotoUpload(2)">
+                <div class="photo-slot-ico">📷</div>
+                <div class="photo-slot-lbl">Add Photo</div>
+              </div>
+              <div class="photo-slot" id="ps3" onclick="triggerPhotoUpload(3)">
+                <div class="photo-slot-ico">📷</div>
+                <div class="photo-slot-lbl">Add Photo</div>
+              </div>
+            </div>
+            <!-- Hidden file inputs for each slot -->
+            <input type="file" id="photoInput0" accept="image/*" style="display:none" onchange="handlePhotoUpload(0,this)"/>
+            <input type="file" id="photoInput1" accept="image/*" style="display:none" onchange="handlePhotoUpload(1,this)"/>
+            <input type="file" id="photoInput2" accept="image/*" style="display:none" onchange="handlePhotoUpload(2,this)"/>
+            <input type="file" id="photoInput3" accept="image/*" style="display:none" onchange="handlePhotoUpload(3,this)"/>
+            <div style="font-size:.69rem;color:var(--mut)">📱 Tap any box to choose a photo from your phone · JPG, PNG, WEBP</div>
+          </div>
         </div>
       </div>
       <div class="nav-btns"><button class="btn-back" onclick="prevStep(1)">← Back</button><button class="btn-next" onclick="nextStep(1)">Next: Location →</button></div>
@@ -1388,7 +2017,7 @@ function renderShopSite(shop){
         <div class="success-title">You're Live!</div>
         <div class="success-sub">Your business is now visible to everyone on Deckscrab.<br/>Customers can find you, call you, and order from you.</div>
         <div class="success-card" id="successCard"></div>
-        <button onclick="goTo('myshops')" style="width:100%;padding:12px;background:var(--gold);color:var(--bg);border:none;border-radius:var(--rs);font-size:.87rem;font-weight:700;margin-bottom:8px">📋 View My Shops →</button>
+        <button onclick="goTo('profile')" style="width:100%;padding:12px;background:var(--gold);color:var(--bg);border:none;border-radius:var(--rs);font-size:.87rem;font-weight:700;margin-bottom:8px">📋 View My Shops →</button>
         <button onclick="goTo('home')" style="width:100%;padding:12px;background:none;border:1.5px solid var(--bor);color:var(--txt);border-radius:var(--rs);font-size:.86rem;font-weight:600">🏠 Back to Home</button>
       </div>
     </div>
@@ -1575,20 +2204,20 @@ function renderShopSite(shop){
       <div id="gbs1" class="gbstep" style="display:none">
         <div style="background:var(--sur);border:1.5px solid var(--bor);border-radius:var(--r);overflow:hidden;margin-bottom:14px">
           <div style="padding:14px 16px 10px;border-bottom:1px solid var(--bor)">
-            <div style="font-family:'Syne',sans-serif;font-size:.98rem;font-weight:700;color:var(--wht);margin-bottom:2px">Step 2 — Your Menu / Products</div>
-            <div style="font-size:.74rem;color:var(--mut)">Customers order these from your website — add at least 3 items</div>
+            <div style="font-family:'Syne',sans-serif;font-size:.98rem;font-weight:700;color:var(--wht);margin-bottom:2px" id="gbStep2Title">Step 2 — Your Services / Products</div>
+            <div style="font-size:.74rem;color:var(--mut)" id="gbStep2Sub">Add what customers can book or order — name, price, description</div>
           </div>
           <div style="padding:14px 16px">
             <div id="gbProdList"></div>
-            <button onclick="addGbProd()" style="width:100%;padding:9px;background:rgba(255,255,255,.03);border:1.5px dashed var(--bor);border-radius:var(--rs);font-size:.77rem;color:var(--mut);cursor:pointer;margin-bottom:10px;font-family:'DM Sans',sans-serif">+ Add Product / Menu Item</button>
-            <div style="background:rgba(245,197,24,.05);border:1px solid rgba(245,197,24,.15);border-radius:var(--rs);padding:10px 12px;font-size:.73rem;color:rgba(245,197,24,.7);line-height:1.6">
-              💡 Add real prices. Customers can order directly from your website and pay online.
+            <button onclick="addGbProd()" style="width:100%;padding:9px;background:rgba(255,255,255,.03);border:1.5px dashed var(--bor);border-radius:var(--rs);font-size:.77rem;color:var(--mut);cursor:pointer;margin-bottom:10px;font-family:'DM Sans',sans-serif" id="gbAddProdBtn">+ Add Service / Product</button>
+            <div style="background:rgba(245,197,24,.05);border:1px solid rgba(245,197,24,.15);border-radius:var(--rs);padding:10px 12px;font-size:.73rem;color:rgba(245,197,24,.7);line-height:1.6" id="gbStep2Tip">
+              💡 Add real prices. Example: "Haircut ₹100", "Facial ₹250", "Bridal Package ₹2000"
             </div>
           </div>
         </div>
         <div style="display:flex;gap:8px">
           <button onclick="prevGbStep(1)" style="padding:11px 16px;background:none;border:1.5px solid var(--bor);color:var(--mut);border-radius:var(--rs);font-size:.84rem;font-weight:600;cursor:pointer">← Back</button>
-          <button onclick="nextGbStep(1)" style="flex:1;padding:12px;background:var(--vio);color:#fff;border:none;border-radius:var(--rs);font-size:.87rem;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif">Next: Pick Theme →</button>
+          <button onclick="nextGbStep(1)" style="flex:1;padding:12px;background:var(--vio);color:#fff;border:none;border-radius:var(--rs);font-size:.87rem;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif">Next: Pick Colour →</button>
         </div>
       </div>
 
@@ -1596,23 +2225,75 @@ function renderShopSite(shop){
       <div id="gbs2" class="gbstep" style="display:none">
         <div style="background:var(--sur);border:1.5px solid var(--bor);border-radius:var(--r);overflow:hidden;margin-bottom:14px">
           <div style="padding:14px 16px 10px;border-bottom:1px solid var(--bor)">
-            <div style="font-family:'Syne',sans-serif;font-size:.98rem;font-weight:700;color:var(--wht);margin-bottom:2px">Step 3 — Choose Your Website Theme</div>
-            <div style="font-size:.74rem;color:var(--mut)">Pick the colour that fits your business</div>
+            <div style="font-family:'Syne',sans-serif;font-size:.98rem;font-weight:700;color:var(--wht);margin-bottom:2px">Step 3 — Pick Your Brand Colour</div>
+            <div style="font-size:.74rem;color:var(--mut)">This sets the colour of your entire website — header, buttons, accents</div>
           </div>
           <div style="padding:14px 16px">
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px" id="gbThemeGrid">
-              <div class="gbtheme sel" data-t="dark" onclick="pickGbTheme(this,'dark')" style="border-radius:11px;overflow:hidden;cursor:pointer;border:2px solid var(--gold)"><div style="height:64px;background:linear-gradient(135deg,#111827,#1f2937);display:flex;align-items:center;justify-content:center;font-size:1.3rem">🌙</div><div style="background:#0a0f1a;padding:6px;text-align:center;font-size:.67rem;font-weight:700;color:var(--wht)">Classic Dark</div></div>
-              <div class="gbtheme" data-t="warm" onclick="pickGbTheme(this,'warm')" style="border-radius:11px;overflow:hidden;cursor:pointer;border:2px solid transparent"><div style="height:64px;background:linear-gradient(135deg,#7c2d12,#1a0a00);display:flex;align-items:center;justify-content:center;font-size:1.3rem">🔥</div><div style="background:#0a0f1a;padding:6px;text-align:center;font-size:.67rem;font-weight:700;color:var(--wht)">Warm Orange</div></div>
-              <div class="gbtheme" data-t="green" onclick="pickGbTheme(this,'green')" style="border-radius:11px;overflow:hidden;cursor:pointer;border:2px solid transparent"><div style="height:64px;background:linear-gradient(135deg,#052e16,#021a0e);display:flex;align-items:center;justify-content:center;font-size:1.3rem">🌿</div><div style="background:#0a0f1a;padding:6px;text-align:center;font-size:.67rem;font-weight:700;color:var(--wht)">Fresh Green</div></div>
-              <div class="gbtheme" data-t="blue" onclick="pickGbTheme(this,'blue')" style="border-radius:11px;overflow:hidden;cursor:pointer;border:2px solid transparent"><div style="height:64px;background:linear-gradient(135deg,#0f172a,#030712);display:flex;align-items:center;justify-content:center;font-size:1.3rem">🌊</div><div style="background:#0a0f1a;padding:6px;text-align:center;font-size:.67rem;font-weight:700;color:var(--wht)">Ocean Blue</div></div>
-              <div class="gbtheme" data-t="pink" onclick="pickGbTheme(this,'pink')" style="border-radius:11px;overflow:hidden;cursor:pointer;border:2px solid transparent"><div style="height:64px;background:linear-gradient(135deg,#2d0022,#1a0015);display:flex;align-items:center;justify-content:center;font-size:1.3rem">🌸</div><div style="background:#0a0f1a;padding:6px;text-align:center;font-size:.67rem;font-weight:700;color:var(--wht)">Bold Pink</div></div>
-              <div class="gbtheme" data-t="teal" onclick="pickGbTheme(this,'teal')" style="border-radius:11px;overflow:hidden;cursor:pointer;border:2px solid transparent"><div style="height:64px;background:linear-gradient(135deg,#002929,#001a1a);display:flex;align-items:center;justify-content:center;font-size:1.3rem">💎</div><div style="background:#0a0f1a;padding:6px;text-align:center;font-size:.67rem;font-weight:700;color:var(--wht)">Deep Teal</div></div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px" id="gbThemeGrid">
+
+              <div class="gbtheme sel" data-t="dark" onclick="pickGbTheme(this,'dark')" style="border-radius:12px;overflow:hidden;cursor:pointer;border:2.5px solid var(--gold)">
+                <div style="height:72px;background:linear-gradient(135deg,#1a1a2e,#374151);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+                  <div style="background:#f59e0b;border-radius:999px;padding:3px 12px;font-size:.65rem;font-weight:800;color:#111">ORDER</div>
+                  <div style="font-size:.6rem;color:rgba(255,255,255,.5)">Classic Dark</div>
+                </div>
+                <div style="background:#f59e0b;height:6px"></div>
+                <div style="background:#0a0f1a;padding:5px;text-align:center;font-size:.63rem;font-weight:700;color:var(--wht)">🌙 Premium Dark</div>
+              </div>
+
+              <div class="gbtheme" data-t="warm" onclick="pickGbTheme(this,'warm')" style="border-radius:12px;overflow:hidden;cursor:pointer;border:2.5px solid transparent">
+                <div style="height:72px;background:linear-gradient(135deg,#92400e,#c2410c);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+                  <div style="background:#f97316;border-radius:999px;padding:3px 12px;font-size:.65rem;font-weight:800;color:#fff">ORDER</div>
+                  <div style="font-size:.6rem;color:rgba(255,255,255,.5)">Warm Orange</div>
+                </div>
+                <div style="background:#f97316;height:6px"></div>
+                <div style="background:#1a0a00;padding:5px;text-align:center;font-size:.63rem;font-weight:700;color:var(--wht)">🔥 Bold Orange</div>
+              </div>
+
+              <div class="gbtheme" data-t="green" onclick="pickGbTheme(this,'green')" style="border-radius:12px;overflow:hidden;cursor:pointer;border:2.5px solid transparent">
+                <div style="height:72px;background:linear-gradient(135deg,#14532d,#15803d);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+                  <div style="background:#22c55e;border-radius:999px;padding:3px 12px;font-size:.65rem;font-weight:800;color:#fff">ORDER</div>
+                  <div style="font-size:.6rem;color:rgba(255,255,255,.5)">Fresh Green</div>
+                </div>
+                <div style="background:#22c55e;height:6px"></div>
+                <div style="background:#021a0e;padding:5px;text-align:center;font-size:.63rem;font-weight:700;color:var(--wht)">🌿 Nature Green</div>
+              </div>
+
+              <div class="gbtheme" data-t="blue" onclick="pickGbTheme(this,'blue')" style="border-radius:12px;overflow:hidden;cursor:pointer;border:2.5px solid transparent">
+                <div style="height:72px;background:linear-gradient(135deg,#1e3a5f,#1d4ed8);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+                  <div style="background:#3b82f6;border-radius:999px;padding:3px 12px;font-size:.65rem;font-weight:800;color:#fff">ORDER</div>
+                  <div style="font-size:.6rem;color:rgba(255,255,255,.5)">Ocean Blue</div>
+                </div>
+                <div style="background:#3b82f6;height:6px"></div>
+                <div style="background:#030712;padding:5px;text-align:center;font-size:.63rem;font-weight:700;color:var(--wht)">🌊 Ocean Blue</div>
+              </div>
+
+              <div class="gbtheme" data-t="pink" onclick="pickGbTheme(this,'pink')" style="border-radius:12px;overflow:hidden;cursor:pointer;border:2.5px solid transparent">
+                <div style="height:72px;background:linear-gradient(135deg,#4a044e,#9333ea);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+                  <div style="background:#ec4899;border-radius:999px;padding:3px 12px;font-size:.65rem;font-weight:800;color:#fff">ORDER</div>
+                  <div style="font-size:.6rem;color:rgba(255,255,255,.5)">Bold Pink</div>
+                </div>
+                <div style="background:#ec4899;height:6px"></div>
+                <div style="background:#1a0015;padding:5px;text-align:center;font-size:.63rem;font-weight:700;color:var(--wht)">🌸 Glamour Pink</div>
+              </div>
+
+              <div class="gbtheme" data-t="teal" onclick="pickGbTheme(this,'teal')" style="border-radius:12px;overflow:hidden;cursor:pointer;border:2.5px solid transparent">
+                <div style="height:72px;background:linear-gradient(135deg,#134e4a,#0f766e);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+                  <div style="background:#14b8a6;border-radius:999px;padding:3px 12px;font-size:.65rem;font-weight:800;color:#fff">ORDER</div>
+                  <div style="font-size:.6rem;color:rgba(255,255,255,.5)">Deep Teal</div>
+                </div>
+                <div style="background:#14b8a6;height:6px"></div>
+                <div style="background:#001a1a;padding:5px;text-align:center;font-size:.63rem;font-weight:700;color:var(--wht)">💎 Deep Teal</div>
+              </div>
+
+            </div>
+            <div style="margin-top:10px;background:rgba(255,255,255,.04);border-radius:var(--rs);padding:9px 12px;font-size:.72rem;color:var(--mut);line-height:1.6">
+              💡 <strong style="color:var(--wht)">Tip:</strong> Salons → Pink or Teal · Restaurants → Orange or Green · Electronics → Blue · General → Dark
             </div>
           </div>
         </div>
         <div style="display:flex;gap:8px">
           <button onclick="prevGbStep(2)" style="padding:11px 16px;background:none;border:1.5px solid var(--bor);color:var(--mut);border-radius:var(--rs);font-size:.84rem;font-weight:600;cursor:pointer">← Back</button>
-          <button onclick="nextGbStep(2)" style="flex:1;padding:12px;background:var(--vio);color:#fff;border:none;border-radius:var(--rs);font-size:.87rem;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif">Next: Preview Website →</button>
+          <button onclick="nextGbStep(2)" style="flex:1;padding:12px;background:var(--vio);color:#fff;border:none;border-radius:var(--rs);font-size:.87rem;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif">Next: Preview →</button>
         </div>
       </div>
 
@@ -1672,22 +2353,32 @@ function renderShopSite(shop){
             <!-- SUCCESS -->
             <div id="gbSuccess" style="display:none;text-align:center;padding:24px 8px;animation:pageIn .3s ease">
               <div style="font-size:3.5rem;margin-bottom:12px;animation:popin .4s cubic-bezier(.34,1.56,.64,1)">🎉</div>
-              <div style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:var(--grn);margin-bottom:8px">You're Live!</div>
-              <div style="font-size:.83rem;color:var(--mut);line-height:1.75;margin-bottom:18px">Your website is live and accepting orders.<br/>Share your link on WhatsApp, Instagram, everywhere!</div>
+              <div style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:var(--grn);margin-bottom:8px">Your Website is Live!</div>
+              <div style="font-size:.83rem;color:var(--mut);line-height:1.75;margin-bottom:16px">Share your link everywhere — WhatsApp, Instagram, print it on a board!</div>
 
-              <div style="background:#0a0f1a;border:1px solid var(--bor);border-radius:var(--rs);padding:11px 13px;margin-bottom:9px;display:flex;align-items:center;gap:9px;text-align:left">
+              <!-- Website Link -->
+              <div style="background:#0a0f1a;border:1px solid var(--bor);border-radius:var(--rs);padding:11px 13px;margin-bottom:8px;display:flex;align-items:center;gap:9px;text-align:left">
                 <span style="font-size:1rem;flex-shrink:0">🌐</span>
-                <span style="color:var(--teal);font-weight:700;font-size:.82rem;flex:1;word-break:break-all" id="gbLiveWebUrl">yourshop.deckscrab.in</span>
+                <span style="color:var(--teal);font-weight:700;font-size:.8rem;flex:1;word-break:break-all" id="gbLiveWebUrl">yourshop.deckscrab.in</span>
                 <button onclick="copyGbLink('gbLiveWebUrl')" style="background:rgba(20,184,166,.1);border:1px solid rgba(20,184,166,.25);color:var(--teal);border-radius:var(--rs);padding:5px 10px;font-size:.7rem;font-weight:700;cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif">Copy</button>
               </div>
-              <div style="background:#0a0f1a;border:1px solid var(--bor);border-radius:var(--rs);padding:11px 13px;margin-bottom:12px;display:flex;align-items:center;gap:9px;text-align:left">
+              <div style="background:#0a0f1a;border:1px solid var(--bor);border-radius:var(--rs);padding:11px 13px;margin-bottom:14px;display:flex;align-items:center;gap:9px;text-align:left">
                 <span style="font-size:1rem;flex-shrink:0">💬</span>
-                <span style="color:var(--grn);font-weight:700;font-size:.82rem;flex:1;word-break:break-all" id="gbLiveBotUrl">WhatsApp Bot Link</span>
+                <span style="color:var(--grn);font-weight:700;font-size:.8rem;flex:1;word-break:break-all" id="gbLiveBotUrl">WhatsApp Bot Link</span>
                 <button onclick="copyGbLink('gbLiveBotUrl')" style="background:rgba(31,217,122,.1);border:1px solid rgba(31,217,122,.25);color:var(--grn);border-radius:var(--rs);padding:5px 10px;font-size:.7rem;font-weight:700;cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif">Copy</button>
               </div>
 
-              <div style="background:rgba(31,217,122,.06);border:1px solid rgba(31,217,122,.18);border-radius:var(--rs);padding:12px 14px;font-size:.77rem;color:rgba(31,217,122,.8);margin-bottom:16px;line-height:1.7;text-align:left">
-                💬 <strong style="color:#fff">These links appear in every WhatsApp bot message permanently.</strong><br/>Customer gets your site link → orders → pays → you verify OTP → confirm.
+              <!-- QR CODE -->
+              <div style="background:#fff;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 20px rgba(0,0,0,.2)">
+                <div style="font-size:.72rem;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">📱 Your QR Code</div>
+                <div id="gbQrCode" style="display:flex;justify-content:center;margin-bottom:10px"></div>
+                <div style="font-size:.74rem;color:#888;line-height:1.6">Customers scan this to open your website instantly.<br/><strong style="color:#1a1a1a">Print it and paste it in your shop!</strong></div>
+                <button onclick="downloadQR()" style="margin-top:10px;background:#1a1a1a;color:#fff;border:none;border-radius:999px;padding:8px 18px;font-size:.76rem;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">⬇️ Download QR Code</button>
+              </div>
+
+              <!-- How it works note -->
+              <div style="background:rgba(31,217,122,.06);border:1px solid rgba(31,217,122,.18);border-radius:var(--rs);padding:12px 14px;font-size:.76rem;color:rgba(31,217,122,.8);margin-bottom:14px;line-height:1.7;text-align:left">
+                💬 <strong style="color:#fff">Permanent WhatsApp bot link.</strong><br/>Every time a customer messages your bot, they see your website link. They click → order → pay → you get the bill on WhatsApp.
               </div>
 
               <button onclick="gbShareLink()" style="width:100%;padding:13px;background:rgba(37,211,102,.12);border:1.5px solid rgba(37,211,102,.28);color:#4ade80;border-radius:var(--rs);font-size:.86rem;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;margin-bottom:8px">💬 Share Website on WhatsApp</button>
@@ -2001,6 +2692,11 @@ function renderShopSite(shop){
       </div>
     </div>
     <div class="modal-body">
+      <!-- Shop Photos -->
+      <div id="modalPhotosRow" style="display:none;margin-bottom:2px">
+        <div class="sec-lbl">📸 Shop Photos</div>
+        <div class="modal-photos" id="modalPhotosList"></div>
+      </div>
       <div class="quick-strip" id="modalQuick"></div>
       <div class="order-box" id="modalOrderBox"></div>
       <div class="sec-lbl">📝 About</div>
@@ -2551,6 +3247,18 @@ function openDetail(id){
   eEl.textContent=getSectorEmoji(s);
   hero.insertBefore(eEl,hero.querySelector('.modal-hero-ov').nextSibling);
   setTxt('modalName',s.name);
+  // Show photos if available
+  const photos=(s.photos||[]).filter(Boolean);
+  const photosRow=document.getElementById('modalPhotosRow');
+  const photosList=document.getElementById('modalPhotosList');
+  if(photos.length&&photosRow&&photosList){
+    photosRow.style.display='block';
+    photosList.innerHTML=photos.map((src,i)=>
+      `<img src="${src}" class="modal-photo" alt="Shop photo ${i+1}" onclick="this.style.transform=this.style.transform?'':'scale(1.8);z-index:99'" style="cursor:zoom-in;transition:.2s"/>`
+    ).join('');
+  }else if(photosRow){
+    photosRow.style.display='none';
+  }
   const open=isOpen(s);const dist=uLat?km(uLat,uLng,s.lat,s.lng):null;
   document.getElementById('modalSub').innerHTML=`
     <span style="color:${open?'var(--grn)':'var(--rose)'}">${open?'● Open Now':'● Closed'}</span>
@@ -2574,7 +3282,9 @@ function openDetail(id){
   `;
   // Order box
   const shopSlug=(s.name||'shop').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
-  const shopWebsite=s.website||null;
+  // Always generate website URL — every registered shop has a website
+  const shopWebsite=s.websiteUrl||s.website||s.botLink&&null||`https://waseem-2007.github.io/deckscrab/?shop=${shopSlug}`;
+  const qrUrl=`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(shopWebsite)}&bgcolor=ffffff&color=1a1a1a&margin=6`;
   document.getElementById('modalOrderBox').innerHTML=`
     <div class="order-box-title">🛒 Order / Contact</div>
     <div class="order-grid">
@@ -2585,26 +3295,25 @@ function openDetail(id){
     </div>
     ${s.wa?`<div class="order-note">Bot generates bill + OTP payment confirmation automatically</div>`:''}
     <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)">
-      ${shopWebsite
-        ?`<a href="${shopWebsite}" target="_blank" style="display:flex;align-items:center;gap:9px;background:rgba(61,134,255,.1);border:1.5px solid rgba(61,134,255,.25);border-radius:var(--rs);padding:10px 12px;text-decoration:none">
-            <span style="font-size:1.1rem">🌐</span>
-            <div style="flex:1;min-width:0">
-              <div style="font-size:.76rem;font-weight:700;color:#6EB8FF">Visit Website</div>
-              <div style="font-size:.68rem;color:rgba(110,184,255,.65);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${shopWebsite}</div>
-            </div>
-            <span style="font-size:.75rem;color:rgba(110,184,255,.5)">↗</span>
-          </a>`
-        :`<div style="display:flex;align-items:center;justify-content:space-between;background:rgba(124,92,255,.07);border:1px solid rgba(124,92,255,.2);border-radius:var(--rs);padding:10px 12px">
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:1rem">🌐</span>
-              <div>
-                <div style="font-size:.74rem;font-weight:700;color:#C4B5FD">${shopSlug}.deckscrab.in</div>
-                <div style="font-size:.65rem;color:var(--mut)">Website not active yet</div>
-              </div>
-            </div>
-            <button onclick="goTo('grow');closeDetail()" style="background:var(--vio);color:#fff;border:none;border-radius:var(--rs);padding:5px 11px;font-size:.7rem;font-weight:700;white-space:nowrap">🚀 Activate</button>
-          </div>`
-      }
+      <!-- Website link — always shown -->
+      <a href="${shopWebsite}" target="_blank" style="display:flex;align-items:center;gap:9px;background:rgba(61,134,255,.1);border:1.5px solid rgba(61,134,255,.25);border-radius:var(--rs);padding:10px 12px;text-decoration:none;margin-bottom:8px">
+        <span style="font-size:1.1rem">🌐</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.76rem;font-weight:700;color:#6EB8FF">Order Online</div>
+          <div style="font-size:.66rem;color:rgba(110,184,255,.65);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${shopWebsite}</div>
+        </div>
+        <span style="font-size:.75rem;color:rgba(110,184,255,.5)">↗</span>
+      </a>
+      <!-- QR Code -->
+      <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);padding:10px;display:flex;align-items:center;gap:10px">
+        <img src="${qrUrl}" width="72" height="72" style="border-radius:6px;border:2px solid rgba(255,255,255,.1)" alt="QR"/>
+        <div style="flex:1">
+          <div style="font-size:.74rem;font-weight:700;color:var(--wht);margin-bottom:3px">📱 QR Code</div>
+          <div style="font-size:.68rem;color:var(--mut);line-height:1.55;margin-bottom:6px">Scan to open ordering website instantly</div>
+          <button onclick="window.open('https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(shopWebsite)}&bgcolor=ffffff&color=1a1a1a&margin=15','_blank')" style="background:rgba(255,255,255,.08);border:1px solid var(--bor);color:var(--mut);border-radius:6px;padding:4px 10px;font-size:.67rem;font-weight:700;cursor:pointer">⬇️ Download</button>
+          <button onclick="navigator.clipboard?.writeText('${shopWebsite}').then(()=>showToast('✅ Link copied!'))" style="background:rgba(61,134,255,.1);border:1px solid rgba(61,134,255,.2);color:#6EB8FF;border-radius:6px;padding:4px 10px;font-size:.67rem;font-weight:700;cursor:pointer;margin-left:4px">📋 Copy Link</button>
+        </div>
+      </div>
     </div>
   `;
   setTxt('modalDesc',s.desc||'');
@@ -3005,6 +3714,8 @@ async function submitShop(){
     // local-only fields
     oh:'09:00',oc:'21:00',rating:0,rc:0,views:1,verified:false,
     prods:getProds(),revs:[],reg:Date.now(),
+    // shop photos — up to 4
+    photos:shopPhotos.filter(Boolean),
   };
   // Save to Railway if online
   if(apiOnline){
@@ -3029,6 +3740,62 @@ async function submitShop(){
     <div class="success-row"><span class="success-row-lbl">Server</span><span class="success-row-val" style="color:${apiOnline?'var(--grn)':'var(--gold)'}">${apiOnline?'✅ Saved to Railway':'📱 Saved locally'}</span></div>
     <div class="success-row"><span class="success-row-lbl">Status</span><span class="success-row-val" style="color:var(--grn)">✅ Live on Deckscrab</span></div>`;
 }
+// ═══ SHOP PHOTO UPLOAD ═══
+let shopPhotos=[null,null,null,null]; // up to 4 base64 images
+
+function triggerPhotoUpload(idx){
+  document.getElementById('photoInput'+idx)?.click();
+}
+
+function handlePhotoUpload(idx,input){
+  const file=input.files[0];
+  if(!file)return;
+  // Validate
+  if(!file.type.startsWith('image/')){showToast('⚠️ Please select an image file');return;}
+  if(file.size>5*1024*1024){showToast('⚠️ Image too large — max 5MB');return;}
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const base64=e.target.result;
+    shopPhotos[idx]=base64;
+    renderPhotoSlot(idx,base64);
+    showToast('✅ Photo '+(idx+1)+' added!');
+  };
+  reader.readAsDataURL(file);
+  input.value=''; // reset so same file can be re-selected
+}
+
+function renderPhotoSlot(idx,base64){
+  const slot=document.getElementById('ps'+idx);
+  if(!slot)return;
+  slot.innerHTML=`
+    <img src="${base64}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:calc(var(--rs) - 2px)" alt="Shop photo ${idx+1}"/>
+    <button class="photo-slot-del" onclick="removePhoto(event,${idx})" title="Remove">✕</button>`;
+  slot.classList.add('has-img');
+}
+
+function removePhoto(e,idx){
+  e.stopPropagation();
+  shopPhotos[idx]=null;
+  const slot=document.getElementById('ps'+idx);
+  if(slot){
+    slot.innerHTML='<div class="photo-slot-ico">📷</div><div class="photo-slot-lbl">Add Photo</div>';
+    slot.classList.remove('has-img');
+  }
+}
+
+function resetPhotoSlots(){
+  shopPhotos=[null,null,null,null];
+  for(let i=0;i<4;i++){
+    const slot=document.getElementById('ps'+i);
+    if(slot){
+      slot.innerHTML='<div class="photo-slot-ico">📷</div><div class="photo-slot-lbl">Add Photo</div>';
+      slot.classList.remove('has-img');
+    }
+    const inp=document.getElementById('photoInput'+i);
+    if(inp)inp.value='';
+  }
+}
+
 function resetAddShop(){
   curStep=0;selSector=null;pinned=false;pCnt=0;
   document.querySelectorAll('.step-panel').forEach(p=>p.classList.remove('on'));
@@ -3042,6 +3809,7 @@ function resetAddShop(){
   document.getElementById('mapPh').querySelector('.map-ph-ico').textContent='🗺️';
   document.getElementById('mapPh').querySelector('.map-ph-txt').textContent='Tap to pin your location on map';
   document.getElementById('pinConfirm').classList.remove('show');
+  resetPhotoSlots();
   addProd();addProd();
 }
 
@@ -3090,14 +3858,32 @@ function renderMyShopsView(){
   }
   el.innerHTML=`<div style="font-family:'Syne',sans-serif;font-size:.98rem;font-weight:700;color:var(--wht);margin:16px 0 12px">🏪 My Listed Shops</div>`+myShops.map(s=>{
     const sec=SECTORS.find(x=>x.n===s.sector)||{e:'🏪'};
+    const slug=(s.name||'').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+    const webUrl=s.websiteUrl||`https://waseem-2007.github.io/deckscrab/?shop=${slug}`;
+    const qrUrl=`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(webUrl)}&bgcolor=ffffff&color=1a1a1a&margin=8`;
     return`<div class="myshop-card">
       <div class="myshop-banner">${sec.e}<div class="myshop-live">🟢 LIVE</div></div>
       <div class="myshop-body">
         <div class="myshop-name">${s.name}</div>
-        <div class="myshop-cat">${s.sector}</div>
+        <div class="myshop-cat">${s.sector||''}</div>
         <div class="myshop-meta">📍 ${s.addr||''}, ${s.city||''}</div>
         <div class="myshop-meta">📞 ${s.phone||'—'}</div>
-        <div class="myshop-meta" style="color:var(--teal);font-family:monospace;font-size:.62rem">ID: ${s.bizId||'—'}</div>
+        ${s.websiteEnabled||s.websiteUrl?`
+        <div style="margin:10px 0;background:rgba(20,184,166,.08);border:1px solid rgba(20,184,166,.2);border-radius:var(--rs);padding:10px">
+          <div style="font-size:.68rem;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">🌐 Your Website</div>
+          <div style="font-size:.67rem;color:var(--teal);font-family:monospace;word-break:break-all;margin-bottom:7px">${webUrl}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <a href="${webUrl}" target="_blank" style="background:var(--teal);color:#fff;border-radius:6px;padding:5px 10px;font-size:.68rem;font-weight:700;text-decoration:none">🌐 Open</a>
+            <button onclick="navigator.clipboard?.writeText('${webUrl}').then(()=>showToast('✅ Link copied!'))" style="background:rgba(20,184,166,.1);border:1px solid rgba(20,184,166,.25);color:var(--teal);border-radius:6px;padding:5px 10px;font-size:.68rem;font-weight:700;cursor:pointer">📋 Copy</button>
+            <button onclick="window.open('https://wa.me/?text='+encodeURIComponent('Order from ${s.name.replace(/'/g,"\\'")}:\\n${webUrl}'),'_blank')" style="background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.25);color:var(--grn);border-radius:6px;padding:5px 10px;font-size:.68rem;font-weight:700;cursor:pointer">💬 Share</button>
+          </div>
+        </div>
+        <!-- QR CODE -->
+        <div style="background:#fff;border-radius:var(--rs);padding:10px;text-align:center;margin-bottom:8px">
+          <div style="font-size:.67rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">📱 QR Code — Paste in your shop!</div>
+          <img src="${qrUrl}" width="120" height="120" style="border-radius:8px;display:block;margin:0 auto 7px" alt="QR"/>
+          <button onclick="window.open('https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(webUrl)}&bgcolor=ffffff&color=1a1a1a&margin=15','_blank')" style="background:#1a1a1a;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:.68rem;font-weight:700;cursor:pointer">⬇️ Download QR</button>
+        </div>`:''}
         <div class="myshop-stats">
           <div class="myshop-stat"><div class="myshop-stat-n" style="color:var(--teal)">${s.views||1}</div><div class="myshop-stat-l">Views</div></div>
           <div class="myshop-stat"><div class="myshop-stat-n" style="color:var(--gold)">${(s.prods||[]).length}</div><div class="myshop-stat-l">Products</div></div>
@@ -3138,6 +3924,36 @@ function openGrowBuilder(plan,amt){
   const gbr=document.getElementById('gbBackRow');if(gbr)gbr.style.display='flex';
   const btn=document.getElementById('gbPayBtn');
   if(btn){btn.textContent='🚀 Go Live Now — Free!';btn.disabled=false;}
+  // Set sector-smart step 2 labels
+  const catVal=document.getElementById('gb-cat')?.value||'🏪';
+  const FOOD_E=['🍛','🥐','☕','🛒','🍎','🍲','🥛'];
+  const BOOKING_E=['💇','✂️','🏋️','🧖','👨‍⚕️','🦷','🏥','📖','💻'];
+  const SERVICE_E=['⚡','🔧','🚿','🔌','🪚','📱','📲','🚗','📦'];
+  let step2Title='Step 2 — Your Services / Products';
+  let step2Sub='Add what customers can book or order — name, price, description';
+  let step2Tip='💡 Add real prices. Example: "Service Name ₹price"';
+  let step2Btn='+ Add Service / Product';
+  if(FOOD_E.includes(catVal)){
+    step2Title='Step 2 — Your Menu Items';
+    step2Sub='Add food items, prices and descriptions for your menu';
+    step2Tip='💡 Example: "Chicken Biryani ₹120", "Full Meals ₹80", "Filter Coffee ₹15"';
+    step2Btn='+ Add Menu Item';
+  } else if(BOOKING_E.includes(catVal)){
+    step2Title='Step 2 — Your Services & Prices';
+    step2Sub='Add services customers can book — haircut, facial, membership etc';
+    step2Tip='💡 Example: "Haircut ₹100", "Facial ₹250", "Full Body Massage ₹500"';
+    step2Btn='+ Add Service';
+  } else if(SERVICE_E.includes(catVal)){
+    step2Title='Step 2 — Your Services';
+    step2Sub='Add services you offer with pricing — customers will enquire via WhatsApp';
+    step2Tip='💡 Example: "AC Service ₹500", "Bike Repair ₹200", "Welding Work ₹300"';
+    step2Btn='+ Add Service';
+  }
+  setTxt('gbStep2Title',step2Title);
+  setTxt('gbStep2Sub',step2Sub);
+  setTxt('gbStep2Tip',step2Tip);
+  const addBtn=document.getElementById('gbAddProdBtn');
+  if(addBtn)addBtn.textContent=step2Btn;
   // Set titles
   const titles={website:'🌐 Build Your Website',ads:'📣 Run Ads on Deckscrab'};
   const subs={website:'Your shop goes live in 5 minutes — free!',ads:'Boost your shop to top results'};
@@ -3211,40 +4027,195 @@ function pickGbTheme(el,t){
   gbSelTheme=t;
   document.querySelectorAll('.gbtheme').forEach(c=>c.style.border='2px solid transparent');
   el.style.border='2px solid var(--gold)';
+  // Refresh preview if on preview step
+  if(gbStep===3)buildGbPreview();
 }
 function buildGbPreview(){
   const name=document.getElementById('gb-name').value||'Your Shop';
-  const tagline=document.getElementById('gb-tagline').value||'Quality products & services';
+  const tagline=document.getElementById('gb-tagline').value||'Quality service · Best in town';
   const phone=document.getElementById('gb-phone').value||'';
-  const emoji=document.getElementById('gb-cat').value||'🏪';
+  const catEmoji=document.getElementById('gb-cat').value||'🏪';
   const prods=getGbProds();
   const slug=name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
-  document.getElementById('gbPreviewUrl').textContent=slug+'.deckscrab.in';
-  const TCOLS={dark:{bg:'linear-gradient(160deg,#1f2937,#111827)',acc:'#f59e0b'},warm:{bg:'linear-gradient(160deg,#7c2d12,#1a0a00)',acc:'#f97316'},green:{bg:'linear-gradient(160deg,#052e16,#021a0e)',acc:'#22c55e'},blue:{bg:'linear-gradient(160deg,#0f172a,#030712)',acc:'#3b82f6'},pink:{bg:'linear-gradient(160deg,#2d0022,#1a0015)',acc:'#ec4899'},teal:{bg:'linear-gradient(160deg,#002929,#001a1a)',acc:'#14b8a6'}};
-  const t=TCOLS[gbSelTheme]||TCOLS.dark;
-  document.getElementById('gbSitePreview').innerHTML=`
-    <div style="font-family:sans-serif;background:#111827">
-      <div style="background:${t.bg};padding:22px 16px 18px;text-align:center">
-        <div style="font-size:2.8rem;margin-bottom:6px">${emoji}</div>
-        <div style="font-size:1.5rem;font-weight:900;color:#fff;margin-bottom:5px">${name}</div>
-        <div style="font-size:.76rem;color:rgba(255,255,255,.6);margin-bottom:13px">${tagline}</div>
+  const websiteUrl=`https://waseem-2007.github.io/deckscrab/?shop=${slug}`;
+  document.getElementById('gbPreviewUrl').textContent=websiteUrl;
+
+  // Detect sector type from emoji
+  const FOOD_E=['🍛','🥐','☕','🛒','🍎','🍲','🥛','❄️'];
+  const BOOKING_E=['💇','✂️','🏋️','🧖','👨‍⚕️','🦷','🏥','📖','💻'];
+  const SERVICE_E=['⚡','🔧','🚿','🔌','🪚','📱','📲','🚗','📦'];
+  let sType='product';
+  if(FOOD_E.includes(catEmoji))sType='food';
+  else if(BOOKING_E.includes(catEmoji))sType='booking';
+  else if(SERVICE_E.includes(catEmoji))sType='service';
+
+  const GRADS={
+    dark:{h:'linear-gradient(135deg,#1a1a2e,#374151)',a:'#f59e0b',bg:'#f5f5f5'},
+    warm:{h:'linear-gradient(135deg,#92400e,#c2410c)',a:'#f97316',bg:'#fff8f5'},
+    green:{h:'linear-gradient(135deg,#14532d,#15803d)',a:'#22c55e',bg:'#f0fdf4'},
+    blue:{h:'linear-gradient(135deg,#1e3a5f,#1d4ed8)',a:'#3b82f6',bg:'#eff6ff'},
+    pink:{h:'linear-gradient(135deg,#4a044e,#9333ea)',a:'#ec4899',bg:'#fdf4ff'},
+    teal:{h:'linear-gradient(135deg,#134e4a,#0f766e)',a:'#14b8a6',bg:'#f0fdfa'},
+  };
+  const g=GRADS[gbSelTheme]||GRADS.dark;
+
+  // Build preview based on sector
+  let previewHtml='';
+
+  if(sType==='booking'){
+    // SALON / GYM / DOCTOR style
+    previewHtml=`
+    <div style="font-family:'DM Sans',sans-serif;background:#fff;min-height:380px">
+      <!-- Hero -->
+      <div style="background:${g.h};padding:24px 16px 20px;text-align:center;position:relative;overflow:hidden">
+        <div style="position:absolute;right:-10px;top:50%;transform:translateY(-50%);font-size:80px;opacity:.1">${catEmoji}</div>
+        <div style="font-size:2.2rem;margin-bottom:6px">${catEmoji}</div>
+        <div style="font-size:1.2rem;font-weight:900;color:#fff;margin-bottom:3px">${name}</div>
+        <div style="font-size:.72rem;color:rgba(255,255,255,.65);margin-bottom:12px">${tagline}</div>
+        <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(37,211,102,.25);border-radius:999px;padding:4px 12px;font-size:.68rem;font-weight:700;color:#4ade80;margin-bottom:10px">● Open Now</div>
         <div style="display:flex;gap:8px;justify-content:center">
-          <div style="background:${t.acc};color:#fff;border-radius:999px;padding:10px 20px;font-size:.83rem;font-weight:800">🛒 Order Now</div>
-          <div style="background:rgba(255,255,255,.1);color:#fff;border-radius:999px;padding:10px 16px;font-size:.83rem;font-weight:700">📞 Call</div>
+          <div style="background:${g.a};color:#fff;border-radius:999px;padding:8px 18px;font-size:.78rem;font-weight:800">📅 Book Now</div>
+          <div style="background:rgba(255,255,255,.15);color:#fff;border-radius:999px;padding:8px 14px;font-size:.78rem;font-weight:700">📞 Call</div>
         </div>
-        <div style="margin-top:10px;font-size:.68rem;color:rgba(255,255,255,.35)">🔗 ${slug}.deckscrab.in</div>
       </div>
-      <div style="padding:14px">
-        <div style="font-size:.8rem;font-weight:700;color:#fff;margin-bottom:10px">🛒 Menu & Prices</div>
-        ${prods.slice(0,4).map(p=>`<div style="background:#1f2937;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 12px;margin-bottom:7px;display:flex;align-items:center;justify-content:space-between"><div style="font-size:.85rem;font-weight:700;color:#fff">${p.emoji} ${p.n}</div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:.9rem;font-weight:800;color:${t.acc}">₹${p.p}</span><div style="background:${t.acc};color:#fff;border-radius:6px;padding:4px 10px;font-size:.7rem;font-weight:800">+ Add</div></div></div>`).join('')}
-        ${!prods.length?'<div style="text-align:center;padding:14px;color:rgba(255,255,255,.3);font-size:.8rem">Add products in Step 2</div>':''}
-        <div style="background:#075E54;border-radius:10px;padding:12px;margin-top:10px;display:flex;align-items:center;justify-content:space-between">
-          <div><div style="font-size:.82rem;font-weight:800;color:#fff">💬 Order via WhatsApp</div><div style="font-size:.67rem;color:rgba(255,255,255,.6)">Link to your website always included</div></div>
-          <div style="background:rgba(255,255,255,.15);color:#fff;border-radius:999px;padding:7px 14px;font-size:.72rem;font-weight:700">Chat →</div>
+      <!-- Services -->
+      <div style="padding:14px;background:#f5f5f5">
+        <div style="font-size:.72rem;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Our Services</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+          ${prods.slice(0,4).map(p=>`
+          <div style="background:#fff;border-radius:12px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,.06)">
+            <div style="font-size:1.4rem;margin-bottom:4px">${p.emoji||catEmoji}</div>
+            <div style="font-size:.8rem;font-weight:700;color:#1a1a1a;margin-bottom:2px">${p.n}</div>
+            ${p.p?`<div style="font-size:.85rem;font-weight:800;color:${g.a}">₹${p.p}</div>`:'<div style="font-size:.72rem;color:#888">Call for price</div>'}
+          </div>`).join('')}
+          ${!prods.length?`<div style="grid-column:1/-1;text-align:center;padding:16px;color:#aaa;font-size:.8rem;background:#fff;border-radius:12px">Add your services in Step 2</div>`:''}
         </div>
-        <div style="text-align:center;font-size:.62rem;color:rgba(255,255,255,.18);margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.05)">Powered by Deckscrab · OTP verified · Secure</div>
+        <!-- Slots -->
+        <div style="font-size:.72rem;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Available Slots Today</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+          ${['9:00 AM','10:00 AM','11:00 AM','2:00 PM','3:00 PM','4:00 PM'].map((s,i)=>`
+          <div style="border:1.5px solid ${i===1?g.a:'#e0e0e0'};border-radius:7px;padding:5px 10px;font-size:.72rem;font-weight:700;color:${i===1?g.a:'#555'};background:${i===1?g.bg:'#fff'}">${s}</div>`).join('')}
+        </div>
+        <!-- WhatsApp -->
+        <div style="background:linear-gradient(135deg,#075E54,#25D366);border-radius:12px;padding:12px;display:flex;align-items:center;justify-content:space-between">
+          <div><div style="font-size:.82rem;font-weight:800;color:#fff">💬 Book via WhatsApp</div><div style="font-size:.67rem;color:rgba(255,255,255,.7)">Quick confirmation · No waiting</div></div>
+          <div style="background:rgba(255,255,255,.2);color:#fff;border-radius:999px;padding:6px 12px;font-size:.7rem;font-weight:700">Chat →</div>
+        </div>
       </div>
     </div>`;
+
+  } else if(sType==='service'){
+    // MECHANIC / WELDER / PLUMBER style
+    previewHtml=`
+    <div style="font-family:'DM Sans',sans-serif;background:#f5f5f5;min-height:380px">
+      <div style="background:${g.h};padding:20px 16px;position:relative;overflow:hidden">
+        <div style="position:absolute;right:-8px;top:50%;transform:translateY(-50%);font-size:70px;opacity:.1">${catEmoji}</div>
+        <div style="font-size:1.8rem;margin-bottom:5px">${catEmoji}</div>
+        <div style="font-size:1.1rem;font-weight:900;color:#fff;margin-bottom:3px">${name}</div>
+        <div style="font-size:.72rem;color:rgba(255,255,255,.6);margin-bottom:10px">${tagline}</div>
+        <div style="display:flex;gap:7px">
+          <div style="background:${g.a};color:#fff;border-radius:999px;padding:7px 16px;font-size:.76rem;font-weight:800">📤 Request Service</div>
+          <div style="background:rgba(255,255,255,.15);color:#fff;border-radius:999px;padding:7px 12px;font-size:.76rem;font-weight:700">📞 Call</div>
+        </div>
+      </div>
+      <div style="padding:14px">
+        <div style="font-size:.72rem;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Our Services</div>
+        ${prods.slice(0,4).map(p=>`
+        <div style="background:#fff;border-radius:12px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 6px rgba(0,0,0,.06)">
+          <div style="font-size:1.6rem;width:44px;height:44px;background:${g.bg};border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${p.emoji||catEmoji}</div>
+          <div style="flex:1"><div style="font-size:.86rem;font-weight:700;color:#1a1a1a">${p.n}</div>${p.desc?`<div style="font-size:.7rem;color:#888">${p.desc.slice(0,40)}</div>`:''}</div>
+          <div style="font-size:.9rem;font-weight:800;color:${g.a}">${p.p?'₹'+p.p:'Get Quote'}</div>
+        </div>`).join('')}
+        ${!prods.length?`<div style="text-align:center;padding:16px;color:#aaa;font-size:.8rem;background:#fff;border-radius:12px">Add your services in Step 2</div>`:''}
+        <!-- Request Form Preview -->
+        <div style="background:#fff;border-radius:12px;padding:13px;margin-top:10px;box-shadow:0 1px 6px rgba(0,0,0,.06)">
+          <div style="font-size:.78rem;font-weight:700;color:#1a1a1a;margin-bottom:8px">📤 Send Service Request</div>
+          <div style="background:#f5f5f5;border-radius:8px;padding:9px 12px;font-size:.76rem;color:#bbb;margin-bottom:6px">Your name…</div>
+          <div style="background:#f5f5f5;border-radius:8px;padding:9px 12px;font-size:.76rem;color:#bbb;margin-bottom:6px">Your WhatsApp number…</div>
+          <div style="background:#f5f5f5;border-radius:8px;padding:9px 12px;font-size:.76rem;color:#bbb;margin-bottom:8px;height:44px">Describe what you need…</div>
+          <div style="background:#25D366;border-radius:8px;padding:9px;text-align:center;font-size:.78rem;font-weight:800;color:#fff">Send on WhatsApp →</div>
+        </div>
+      </div>
+    </div>`;
+
+  } else if(sType==='food'){
+    // RESTAURANT / FOOD style — clean white positeasy look
+    previewHtml=`
+    <div style="font-family:'DM Sans',sans-serif;background:#f5f5f5;min-height:380px">
+      <div style="background:${g.h};padding:20px 14px;position:relative;overflow:hidden">
+        <div style="position:absolute;right:-8px;top:50%;transform:translateY(-50%);font-size:80px;opacity:.1">${catEmoji}</div>
+        <div style="font-size:1.8rem;margin-bottom:5px">${catEmoji}</div>
+        <div style="font-size:1.1rem;font-weight:900;color:#fff;margin-bottom:3px">${name}</div>
+        <div style="font-size:.71rem;color:rgba(255,255,255,.6);margin-bottom:10px">${tagline}</div>
+        <div style="display:flex;gap:7px">
+          <div style="background:${g.a};color:#fff;border-radius:999px;padding:7px 16px;font-size:.76rem;font-weight:800">🛒 Order Now</div>
+          <div style="background:rgba(255,255,255,.15);color:#fff;border-radius:999px;padding:7px 12px;font-size:.76rem">📞 Call</div>
+        </div>
+      </div>
+      <!-- Category tabs -->
+      <div style="background:#fff;padding:0 12px;display:flex;gap:0;border-bottom:2px solid #f0f0f0;overflow:hidden">
+        ${[...(new Set(prods.map(p=>p.cat||'Menu'))).values()].slice(0,4).map((c,i)=>`
+        <div style="padding:10px 12px;font-size:.76rem;font-weight:700;color:${i===0?g.a:'#999'};border-bottom:2px solid ${i===0?g.a:'transparent'};white-space:nowrap">${c}</div>`).join('')}
+        ${!prods.length?'<div style="padding:10px 12px;font-size:.76rem;font-weight:700;color:'+g.a+';border-bottom:2px solid '+g.a+'">Menu</div>':''}
+      </div>
+      <!-- Items -->
+      <div style="background:#fff">
+        ${prods.slice(0,3).map(p=>`
+        <div style="display:flex;padding:12px;border-bottom:1px solid #f5f5f5;align-items:center;gap:10px">
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
+              <div style="width:12px;height:12px;border:2px solid #22c55e;border-radius:2px;display:flex;align-items:center;justify-content:center"><div style="width:5px;height:5px;border-radius:50%;background:#22c55e"></div></div>
+              <div style="font-size:.86rem;font-weight:700;color:#1a1a1a">${p.n}</div>
+            </div>
+            ${p.desc?`<div style="font-size:.71rem;color:#aaa;margin-bottom:4px">${p.desc.slice(0,35)}…</div>`:''}
+            <div style="font-size:.88rem;font-weight:800;color:#1a1a1a">₹${p.p}</div>
+          </div>
+          <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:6px">
+            <div style="width:72px;height:72px;background:linear-gradient(135deg,#fffbeb,#fef3c7);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.9rem">${p.emoji||catEmoji}</div>
+            <div style="border:2px solid ${g.a};border-radius:7px;padding:4px 14px;font-size:.76rem;font-weight:800;color:${g.a}">ADD</div>
+          </div>
+        </div>`).join('')}
+        ${!prods.length?`<div style="text-align:center;padding:20px;color:#aaa;font-size:.8rem">Add menu items in Step 2</div>`:''}
+      </div>
+      <!-- Cart bar preview -->
+      ${prods.length?`<div style="background:${g.a};margin:10px;border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-size:.78rem;color:rgba(255,255,255,.8)">1 item added</div><div style="font-size:1rem;font-weight:900;color:#fff">₹${prods[0]?.p||'--'}</div></div>
+        <div style="background:#fff;border-radius:9px;padding:8px 14px;font-size:.78rem;font-weight:800;color:${g.a}">View Cart →</div>
+      </div>`:''}
+    </div>`;
+
+  } else {
+    // PRODUCT / RETAIL / ENQUIRY style
+    previewHtml=`
+    <div style="font-family:'DM Sans',sans-serif;background:#f5f5f5;min-height:380px">
+      <div style="background:${g.h};padding:20px 14px;position:relative;overflow:hidden">
+        <div style="position:absolute;right:-8px;top:50%;transform:translateY(-50%);font-size:80px;opacity:.1">${catEmoji}</div>
+        <div style="font-size:1.8rem;margin-bottom:5px">${catEmoji}</div>
+        <div style="font-size:1.1rem;font-weight:900;color:#fff;margin-bottom:3px">${name}</div>
+        <div style="font-size:.71rem;color:rgba(255,255,255,.6);margin-bottom:10px">${tagline}</div>
+        <div style="display:flex;gap:7px">
+          <div style="background:${g.a};color:#fff;border-radius:999px;padding:7px 16px;font-size:.76rem;font-weight:800">📋 Enquire Now</div>
+          <div style="background:rgba(255,255,255,.15);color:#fff;border-radius:999px;padding:7px 12px;font-size:.76rem">📞 Call</div>
+        </div>
+      </div>
+      <div style="padding:12px">
+        <div style="font-size:.72rem;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Products & Services</div>
+        ${prods.slice(0,4).map(p=>`
+        <div style="background:#fff;border-radius:12px;padding:12px;margin-bottom:7px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+          <div style="font-size:1.5rem;width:42px;height:42px;background:${g.bg};border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${p.emoji||catEmoji}</div>
+          <div style="flex:1"><div style="font-size:.85rem;font-weight:700;color:#1a1a1a">${p.n}</div>${p.p?`<div style="font-size:.85rem;font-weight:800;color:${g.a};margin-top:2px">₹${p.p}</div>`:'<div style="font-size:.72rem;color:#888">Enquire for price</div>'}</div>
+          <div style="font-size:.72rem;font-weight:700;color:${g.a}">Enquire →</div>
+        </div>`).join('')}
+        ${!prods.length?`<div style="text-align:center;padding:20px;color:#aaa;font-size:.8rem;background:#fff;border-radius:12px">Add your products in Step 2</div>`:''}
+        <div style="background:linear-gradient(135deg,#075E54,#25D366);border-radius:12px;padding:12px;margin-top:6px;display:flex;align-items:center;justify-content:space-between">
+          <div><div style="font-size:.82rem;font-weight:800;color:#fff">💬 Chat on WhatsApp</div><div style="font-size:.67rem;color:rgba(255,255,255,.7)">Quick replies · Best prices</div></div>
+          <div style="background:rgba(255,255,255,.2);color:#fff;border-radius:999px;padding:6px 12px;font-size:.7rem;font-weight:700">Chat →</div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  document.getElementById('gbSitePreview').innerHTML=previewHtml;
 }
 function buildGbPaySummary(){
   const name=(document.getElementById('gb-name')?.value)||'Your Shop';
@@ -3321,17 +4292,60 @@ async function processGbPayment(){
     const pba=document.getElementById('gbPayBtnArea');if(pba)pba.style.display='none';
     const gbr=document.getElementById('gbBackRow');if(gbr)gbr.style.display='none';
     const suc=document.getElementById('gbSuccess');if(suc)suc.style.display='block';
+    // Generate QR code
+    generateQR(websiteUrl);
     showToast('🎉 Your website is live!');
   },2000);
 }
 function copyGbLink(elId){
-  const text=document.getElementById(elId).textContent;
-  navigator.clipboard?.writeText(text).then(()=>showToast('✅ Copied!')).catch(()=>showToast('Long press to copy'));
+  // Use stored URL directly — avoids "Copy" button text being included
+  let text='';
+  if(elId==='gbLiveWebUrl'&&gbBuiltShop?.websiteUrl){
+    text=gbBuiltShop.websiteUrl;
+  } else if(elId==='gbLiveBotUrl'&&gbBuiltShop){
+    text=`https://wa.me/91${gbBuiltShop.phone}?text=${encodeURIComponent('Hi! I want to order from '+gbBuiltShop.name+'. View menu: '+gbBuiltShop.websiteUrl)}`;
+  } else {
+    text=(document.getElementById(elId)?.textContent||'').replace(/Copy$/,'').trim();
+  }
+  navigator.clipboard?.writeText(text)
+    .then(()=>showToast('✅ Link copied!'))
+    .catch(()=>{
+      // Fallback for phones that block clipboard
+      const el=document.getElementById(elId);
+      if(el){el.select&&el.select();el.setSelectionRange&&el.setSelectionRange(0,9999);}
+      showToast('Long press the link to copy');
+    });
 }
 function gbShareLink(){
   if(!gbBuiltShop)return;
   const msg=`🌐 *Order Online from ${gbBuiltShop.name}!*\n\n${gbBuiltShop.websiteUrl}\n\nTap to browse menu and order directly. Secure · OTP verified.\n\n_Powered by Deckscrab_`;
   window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,'_blank');
+}
+
+// ═══ QR CODE GENERATOR ═══
+let currentQRUrl='';
+function generateQR(url){
+  currentQRUrl=url;
+  const qrEl=document.getElementById('gbQrCode');
+  if(!qrEl)return;
+  // Use free QR code API
+  const encodedUrl=encodeURIComponent(url);
+  const qrSrc=`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodedUrl}&bgcolor=ffffff&color=1a1a1a&margin=10&format=png`;
+  qrEl.innerHTML=`<img src="${qrSrc}" width="180" height="180" style="border-radius:10px;border:4px solid #f0f0f0" alt="QR Code" id="gbQrImg"/>`;
+}
+function downloadQR(){
+  if(!currentQRUrl)return;
+  const name=gbBuiltShop?.name||'shop';
+  const encodedUrl=encodeURIComponent(currentQRUrl);
+  const qrSrc=`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodedUrl}&bgcolor=ffffff&color=1a1a1a&margin=15&format=png`;
+  // Open QR in new tab so user can save it
+  const win=window.open(qrSrc,'_blank');
+  if(!win){
+    // Fallback: copy URL
+    navigator.clipboard?.writeText(currentQRUrl).then(()=>showToast('✅ Website URL copied — use qrserver.com to generate QR'));
+  }else{
+    showToast('📱 Right-click the QR image to save it!');
+  }
 }
 
 // ═══ TOAST ═══
