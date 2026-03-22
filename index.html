@@ -963,14 +963,14 @@ textarea.sw-fi{resize:vertical;min-height:68px}
           if(found){
             shop={
               name:found.name,
-              e:found.sectorEmoji||found.emoji||'🏪',
+              e:found.sectorEmoji||found.emoji||found.e||'🏪',
               desc:found.description||found.desc||'',
-              phone:found.phone||'',
-              wa:found.whatsapp||found.wa||found.phone||'',
-              addr:found.address||found.addr||'',
-              city:found.city||'',
-              oh:found.hours?.Monday?.open||found.oh||'9:00 AM',
-              oc:found.hours?.Monday?.close||found.oc||'9:00 PM',
+              phone:found.phone||found.phoneNumber||found.contact||'',
+              wa:found.whatsapp||found.wa||found.whatsappNumber||found.phone||found.phoneNumber||'',
+              addr:found.address||found.addr||found.streetAddress||'',
+              city:found.city||found.town||'',
+              oh:found.hours?.Monday?.open||found.oh||found.openTime||'9:00 AM',
+              oc:found.hours?.Monday?.close||found.oc||found.closeTime||'9:00 PM',
               delivery:found.delivery!==false,
               theme:found.theme||'dark',
               sector:found.sectorName||found.sector||'',
@@ -980,6 +980,7 @@ textarea.sw-fi{resize:vertical;min-height:68px}
                 emoji:p.emoji||'🍽️',
                 cat:p.cat||p.category||'Menu',
                 desc:p.description||p.desc||'',
+                img:p.img||p.image||p.photo||'',
               })),
             };
           }
@@ -1704,36 +1705,46 @@ function renderShopSite(shop){
     el.classList.add('sel');
     document.getElementById('psUpiA').style.display=m==='upi'?'block':'none';
   };
+  // ── OTP state (one-time use) ──
+  var swOtpVerified=false;
+
   window.psPlace=function(total,sub,gst){
     var n=document.getElementById('psCN')?.value.trim();
     var p=document.getElementById('psCP')?.value.trim();
     var a=swIsDelivery?(document.getElementById('psCA')?.value.trim()||''):'Pickup';
     if(!n){psShowToast('⚠️ Enter your name');return;}
-    if(!p){psShowToast('⚠️ Enter your WhatsApp number');return;}
+    if(!p||p.length<10){psShowToast('⚠️ Enter a valid WhatsApp number');return;}
     if(swIsDelivery&&!a){psShowToast('⚠️ Enter delivery address');return;}
-    swCustName=n;swCustPhone=p;swAddr=a;swGrand=total;
+
+    swCustName=n; swCustPhone=p; swAddr=a; swGrand=total;
     swOrderId='DS'+Date.now().toString().slice(-6);
     swOtp=String(Math.floor(100000+Math.random()*900000));
-    var swOtpUsed=false; // one-time use flag
+    swOtpVerified=false;
 
-    // ─── STEP 1: Send OTP to CUSTOMER WhatsApp ───
+    var items=psGetItems();
+
+    // ── STEP 1: Send OTP to CUSTOMER WhatsApp ──
     var custMsg=
-      '🛒 *Order Placed — '+shopName+'*\n\n'+
-      '📦 *Your Items:*\n'+
-      psGetItems().map(function(i){return'• '+i.name+' ×'+i.qty+' = ₹'+(i.price*i.qty);}).join('\n')+'\n\n'+
+      '🛒 *Order Placed — '+shopName+'*\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      '🧾 *Order ID:* #'+swOrderId+'\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      items.map(function(i){return'• '+i.name+' ×'+i.qty+' = ₹'+(i.price*i.qty);}).join('\n')+'\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
       '💰 *Total: ₹'+total+'*\n'+
-      (swIsDelivery?'📍 Delivering to: '+a:'📦 Pickup from shop')+'\n\n'+
+      (swIsDelivery?'📍 Deliver to: '+a:'📦 Pickup from shop')+'\n'+
       '━━━━━━━━━━━━━━━━━━━━\n'+
       '🔐 *YOUR OTP: '+swOtp+'*\n'+
       '━━━━━━━━━━━━━━━━━━━━\n'+
-      'Share this OTP *only with the shopkeeper* when:\n'+
-      (swIsDelivery?'• Delivery person arrives at your door':'• You go to pick up your order')+'\n\n'+
-      '_Order ID: #'+swOrderId+'_\n'+
-      '_This OTP is valid for one-time use only._';
+      (swIsDelivery
+        ?'Tell this OTP to the delivery person when they arrive.'
+        :'Show this OTP to the shopkeeper when you collect.')+'\n'+
+      '_One-time use only. Do not share._';
 
+    // → Send to CUSTOMER phone
     window.open('https://wa.me/91'+p+'?text='+encodeURIComponent(custMsg),'_blank');
 
-    // ─── STEP 2: Send order details to SHOPKEEPER ───
+    // ── STEP 2: Send order to SHOPKEEPER WhatsApp ──
     var shopMsg=
       '🔔 *NEW ORDER — '+shopName+'*\n'+
       '━━━━━━━━━━━━━━━━━━━━\n'+
@@ -1741,130 +1752,224 @@ function renderShopSite(shop){
       '⏰ '+new Date().toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'})+'\n'+
       '━━━━━━━━━━━━━━━━━━━━\n'+
       '*ITEMS:*\n'+
-      psGetItems().map(function(i){return'• '+i.name+' ×'+i.qty+' = ₹'+(i.price*i.qty);}).join('\n')+'\n'+
+      items.map(function(i){return'• '+i.name+' ×'+i.qty+' = ₹'+(i.price*i.qty);}).join('\n')+'\n'+
       '━━━━━━━━━━━━━━━━━━━━\n'+
-      '*TOTAL: ₹'+total+'*\n'+
-      '💳 '+swPayMethod.toUpperCase()+'\n'+
+      '*TOTAL: ₹'+total+'*  💳 '+swPayMethod.toUpperCase()+'\n'+
       '━━━━━━━━━━━━━━━━━━━━\n'+
       '👤 Customer: '+n+'\n'+
-      '📞 Phone: '+p+'\n'+
-      (swIsDelivery?'📍 Deliver to: '+a:'📦 Pickup order')+'\n'+
+      '📞 Phone: +91'+p+'\n'+
+      (swIsDelivery?'📍 Deliver to:\n'+a:'📦 Customer will pickup')+'\n'+
       '━━━━━━━━━━━━━━━━━━━━\n'+
-      '🔐 Ask customer for OTP when '+
-      (swIsDelivery?'delivering':'they come to pick up')+'\n'+
-      'Enter OTP on their order page to confirm.';
+      '🔐 Ask customer for OTP on '+(swIsDelivery?'delivery':'pickup')+'\n'+
+      'Open their order page → enter OTP → Confirm Order';
 
-    setTimeout(function(){
-      window.open('https://wa.me/91'+shopPhone+'?text='+encodeURIComponent(shopMsg),'_blank');
-    },800);
+    // → Send to SHOPKEEPER phone (not customer!)
+    if(shopPhone&&shopPhone!==p){
+      setTimeout(function(){
+        window.open('https://wa.me/91'+shopPhone+'?text='+encodeURIComponent(shopMsg),'_blank');
+      },1000);
+    }else if(!shopPhone){
+      psShowToast('⚠️ Shop phone not set — contact shop directly');
+    }
 
-    // ─── STEP 3: Show order confirmation screen to customer ───
-    // Customer doesn't enter OTP — SHOPKEEPER does
-    psOpenSheet('✅ Order Placed!',buildOrderPlacedHtml(total,sub,gst,swOtp,swOrderId,a,n,p,swIsDelivery));
+    // Clear cart and show confirmation screen
+    swCart={};psUpdateCart();
+    psOpenSheet('✅ Order Placed!',buildOrderPlacedHtml(total,sub,gst,items));
   };
 
-  function buildOrderPlacedHtml(total,sub,gst,otp,orderId,addr,custName,custPhone,isDelivery){
-    var items=psGetItems();
-    return'<div style="text-align:center;padding:12px 0 8px">'+
-      '<div style="font-size:3.5rem;margin-bottom:10px;animation:pspop .4s cubic-bezier(.34,1.56,.64,1)">🎉</div>'+
-      '<div style="font-family:\'DM Sans\',sans-serif;font-size:1.2rem;font-weight:900;color:#15803d;margin-bottom:6px">Order Placed!</div>'+
-      '<div style="font-size:.82rem;color:#666;line-height:1.7;margin-bottom:16px">'+
-        'Your OTP has been sent to <strong>'+custPhone+'</strong> on WhatsApp.<br/>'+
-        (isDelivery
-          ? 'Share it with the <strong>delivery person</strong> when they arrive.'
-          : 'Show it to the <strong>shopkeeper</strong> when you go to pick up.')+
+  function buildOrderPlacedHtml(total,sub,gst,items){
+    return(
+      // Customer confirmation header
+      '<div style="text-align:center;padding:10px 0 6px">'+
+        '<div style="font-size:3rem;margin-bottom:8px">🎉</div>'+
+        '<div style="font-size:1.1rem;font-weight:900;color:#15803d;margin-bottom:5px">Order Placed!</div>'+
+        '<div style="font-size:.8rem;color:#666;line-height:1.65;margin-bottom:14px">'+
+          'OTP sent to <strong style="color:#1a1a1a">+91'+swCustPhone+'</strong><br/>'+
+          (swIsDelivery?'Tell it to the delivery person at your door':'Show it to the shopkeeper at the counter')+
+        '</div>'+
+      '</div>'+
+
+      // OTP — big digits like Rapido
+      '<div style="background:linear-gradient(135deg,#0f172a,#1e293b);border-radius:16px;padding:18px 14px;margin-bottom:14px;text-align:center">'+
+        '<div style="font-size:.63rem;font-weight:800;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.12em;margin-bottom:10px">🔐 Your OTP</div>'+
+        '<div style="display:flex;gap:7px;justify-content:center;margin-bottom:10px">'+
+          swOtp.split('').map(function(d){
+            return'<div style="width:40px;height:50px;background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.45rem;font-weight:900;color:#fff;font-family:monospace">'+d+'</div>';
+          }).join('')+
+        '</div>'+
+        '<div style="font-size:.7rem;color:rgba(255,255,255,.4);margin-bottom:8px">'+
+          (swIsDelivery?'Delivery person asks for this':'Shopkeeper asks for this at counter')+
+        '</div>'+
+        '<div style="background:rgba(239,68,68,.18);border-radius:8px;padding:5px 12px;font-size:.67rem;color:#fca5a5">'+
+          '⚠️ One-time use only · Do not share'+
+        '</div>'+
       '</div>'+
 
       // Bill summary
-      '<div style="background:#fff;border:1px solid #e8e8e8;border-radius:14px;padding:14px;text-align:left;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)">'+
-        '<div style="font-size:.7rem;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Your Bill</div>'+
-        items.map(function(i){return'<div style="display:flex;justify-content:space-between;font-size:.84rem;padding:5px 0;border-bottom:1px solid #f5f5f5"><span>'+i.name+' ×'+i.qty+'</span><span style="font-weight:700">₹'+(i.price*i.qty)+'</span></div>';}).join('')+
-        '<div style="display:flex;justify-content:space-between;font-size:.82rem;padding:5px 0;color:#aaa"><span>GST 5%</span><span>₹'+gst+'</span></div>'+
-        '<div style="display:flex;justify-content:space-between;font-size:.98rem;font-weight:900;padding:10px 0 0;margin-top:6px;border-top:2px solid #e8e8e8"><span>Total</span><span style="color:'+acc+'">₹'+total+'</span></div>'+
-        '<div style="font-size:.72rem;color:#888;margin-top:8px;padding-top:8px;border-top:1px solid #f0f0f0;line-height:1.65">'+
-          '👤 '+custName+' · 📞 '+custPhone+'<br/>'+
-          (isDelivery?'📍 '+addr:'📦 Pickup')+
+      '<div style="background:#fff;border:1px solid #e8e8e8;border-radius:14px;padding:13px;text-align:left;margin-bottom:14px">'+
+        '<div style="font-size:.67rem;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:.07em;margin-bottom:9px">Bill</div>'+
+        items.map(function(i){
+          return'<div style="display:flex;justify-content:space-between;font-size:.83rem;padding:5px 0;border-bottom:1px solid #f5f5f5">'+
+            '<span>'+i.name+' ×'+i.qty+'</span><span style="font-weight:700">₹'+(i.price*i.qty)+'</span></div>';
+        }).join('')+
+        '<div style="display:flex;justify-content:space-between;font-size:.79rem;padding:4px 0;color:#aaa"><span>GST 5%</span><span>₹'+gst+'</span></div>'+
+        '<div style="display:flex;justify-content:space-between;font-size:.95rem;font-weight:900;padding:9px 0 0;margin-top:5px;border-top:2px solid #e8e8e8">'+
+          '<span>Total</span><span style="color:'+acc+'">₹'+total+'</span></div>'+
+        '<div style="font-size:.7rem;color:#888;margin-top:8px;line-height:1.65">'+
+          '👤 '+swCustName+' · 📞 +91'+swCustPhone+'<br/>'+
+          (swIsDelivery?'📍 '+swAddr:'📦 Pickup')+
         '</div>'+
       '</div>'+
 
-      // OTP card - styled like Rapido
-      '<div style="background:linear-gradient(135deg,#1a1a2e,#374151);border-radius:16px;padding:18px;margin-bottom:14px;text-align:center">'+
-        '<div style="font-size:.7rem;font-weight:800;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">🔐 Your OTP</div>'+
-        '<div style="display:flex;gap:8px;justify-content:center;margin-bottom:10px">'+
-          otp.split('').map(function(d){
-            return'<div style="width:42px;height:52px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:900;color:#fff;font-family:monospace">'+d+'</div>';
+      // ── SHOPKEEPER CONFIRM PANEL ──
+      '<div id="shopkeeperPanel" style="background:#fff8f0;border:2px solid #fed7aa;border-radius:16px;padding:16px;margin-bottom:12px">'+
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">'+
+          '<div style="width:34px;height:34px;border-radius:50%;background:#f97316;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0">🏪</div>'+
+          '<div>'+
+            '<div style="font-size:.88rem;font-weight:800;color:#1a1a1a">Shopkeeper Panel</div>'+
+            '<div style="font-size:.7rem;color:#888">Ask customer for OTP → Enter below → Confirm</div>'+
+          '</div>'+
+        '</div>'+
+
+        // Shopkeeper phone display
+        (shopPhone?
+          '<div style="background:#fff;border:1px solid #fed7aa;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:.77rem;color:#1a1a1a;display:flex;align-items:center;gap:8px">'+
+            '<span>📞</span>'+
+            '<div><div style="font-weight:700">Shopkeeper: '+shopName+'</div>'+
+            '<div style="color:#888">+91 '+shopPhone+'</div></div>'+
+            '<a href="tel:'+shopPhone+'" style="margin-left:auto;background:#f97316;color:#fff;border-radius:999px;padding:5px 12px;font-size:.7rem;font-weight:700;text-decoration:none">Call</a>'+
+          '</div>'
+        :
+          '<div style="background:#fff3e0;border:1px solid #fed7aa;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:.74rem;color:#b45309">'+
+            '⚠️ Shop phone not set. Ask shopkeeper to update their profile.'+
+          '</div>'
+        )+
+
+        // OTP entry boxes for shopkeeper
+        '<div style="font-size:.72rem;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;text-align:center">'+
+          'Enter Customer OTP to Confirm Delivery'+
+        '</div>'+
+        '<div style="display:flex;gap:7px;justify-content:center;margin-bottom:10px" id="shopOtpDigs">'+
+          ['sk1','sk2','sk3','sk4','sk5','sk6'].map(function(sid,i,arr){
+            var prev=i>0?arr[i-1]:null;
+            var next=i<5?arr[i+1]:null;
+            return'<input type="tel" id="'+sid+'" maxlength="1" inputmode="numeric" '+
+              'style="width:44px;height:52px;border:2px solid #e0e0e0;border-radius:10px;text-align:center;font-size:1.4rem;font-weight:800;color:#1a1a1a;background:#fff;font-family:monospace;outline:none;transition:.15s" '+
+              'oninput="skOtpN(this,'+(next?'\''+next+'\'':'null')+')" '+
+              'onkeydown="skOtpB(event,this,'+(prev?'\''+prev+'\'':'null')+')" />';
           }).join('')+
         '</div>'+
-        '<div style="font-size:.74rem;color:rgba(255,255,255,.55);line-height:1.6">'+
-          (isDelivery
-            ? 'Tell this OTP to the delivery person<br/>when your order arrives at your door'
-            : 'Show this OTP to the shopkeeper<br/>when you go to collect your order')+
-        '</div>'+
-        '<div style="margin-top:10px;background:rgba(239,68,68,.15);border-radius:8px;padding:7px 12px;font-size:.7rem;color:#fca5a5">'+
-          '⚠️ One-time use only · Do not share with anyone else'+
-        '</div>'+
+
+        '<div id="skOtpErr" style="display:none;text-align:center;color:#ef4444;font-size:.76rem;margin-bottom:8px">❌ Wrong OTP — ask the customer to check their WhatsApp</div>'+
+        '<div id="skOtpUsed" style="display:none;text-align:center;color:#ef4444;font-size:.76rem;margin-bottom:8px">❌ This OTP has already been used — order already confirmed</div>'+
+
+        '<button id="skConfirmBtn" onclick="skConfirmOrder('+total+')" '+
+          'style="width:100%;padding:14px;background:#22c55e;color:#fff;border:none;border-radius:12px;font-size:.92rem;font-weight:900;cursor:pointer;box-shadow:0 4px 14px rgba(34,197,94,.3)">'+
+          '✅ Confirm Delivery / Pickup'+
+        '</button>'+
+        '<div style="text-align:center;font-size:.68rem;color:#aaa;margin-top:7px">Order #'+swOrderId+' · ₹'+total+'</div>'+
       '</div>'+
 
-      // What happens next
-      '<div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:13px;margin-bottom:14px;text-align:left">'+
-        '<div style="font-size:.78rem;font-weight:800;color:#15803d;margin-bottom:8px">📋 What happens next?</div>'+
-        '<div style="font-size:.76rem;color:#16a34a;line-height:1.8">'+
-          (isDelivery
-            ? '1. Shop prepares your order<br/>2. Delivery person comes to your address<br/>3. Tell them your OTP <strong>'+otp+'</strong><br/>4. Order completed ✅'
-            : '1. Shop prepares your order<br/>2. Go to the shop<br/>3. Show OTP <strong>'+otp+'</strong> to shopkeeper<br/>4. Collect your order ✅')+
-        '</div>'+
-      '</div>'+
-
-      '<button class="ps-done" onclick="psCloseSheet();psBuildContent()" style="margin-bottom:8px">🏪 Back to Menu</button>'+
-      '<button class="ps-share" onclick="psShareOrder(\''+orderId+'\','+total+')">💬 Share Order on WhatsApp</button>'+
-    '</div>';
+      '<button class="ps-share" onclick="psShareOrder(\''+swOrderId+'\','+total+')">💬 Share Order</button>'
+    );
   }
 
+  // Shopkeeper OTP handlers
+  window.skOtpN=function(el,nid){
+    el.value=el.value.replace(/\D/g,'').slice(-1);
+    el.style.borderColor=el.value?'#22c55e':'#e0e0e0';
+    if(el.value&&nid)document.getElementById(nid)?.focus();
+    var all=['sk1','sk2','sk3','sk4','sk5','sk6'].map(function(id){var e=document.getElementById(id);return e?e.value:'';}).join('');
+    if(all.length===6)setTimeout(function(){skConfirmOrder(swGrand);},300);
+  };
+  window.skOtpB=function(e,el,pid){
+    if(e.key==='Backspace'){el.style.borderColor='#e0e0e0';if(!el.value&&pid)document.getElementById(pid)?.focus();}
+  };
+
+  window.skConfirmOrder=function(total){
+    var entered=['sk1','sk2','sk3','sk4','sk5','sk6'].map(function(id){var e=document.getElementById(id);return e?e.value:'';}).join('');
+
+    // Already used
+    if(swOtpVerified){
+      var u=document.getElementById('skOtpUsed');if(u)u.style.display='block';
+      return;
+    }
+
+    // Wrong OTP
+    if(entered!==swOtp){
+      var err=document.getElementById('skOtpErr');if(err)err.style.display='block';
+      ['sk1','sk2','sk3','sk4','sk5','sk6'].forEach(function(id){
+        var e=document.getElementById(id);
+        if(e){e.value='';e.style.borderColor='#ef4444';}
+      });
+      setTimeout(function(){
+        var er=document.getElementById('skOtpErr');if(er)er.style.display='none';
+        ['sk1','sk2','sk3','sk4','sk5','sk6'].forEach(function(id){
+          var e=document.getElementById(id);if(e)e.style.borderColor='#e0e0e0';
+        });
+      },2000);
+      document.getElementById('sk1')?.focus();
+      return;
+    }
+
+    // ✅ CORRECT OTP
+    swOtpVerified=true; // one-time use — mark consumed
+
+    // Replace panel with success
+    var panel=document.getElementById('shopkeeperPanel');
+    if(panel){
+      panel.innerHTML=
+        '<div style="text-align:center;padding:16px 8px">'+
+          '<div style="font-size:3rem;margin-bottom:8px">✅</div>'+
+          '<div style="font-size:1rem;font-weight:900;color:#15803d;margin-bottom:4px">OTP Verified! Order Confirmed</div>'+
+          '<div style="font-size:.78rem;color:#16a34a;margin-bottom:14px">Order #'+swOrderId+' is complete</div>'+
+          '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;font-size:.79rem;color:#15803d;text-align:left;line-height:1.75">'+
+            '💰 Amount: ₹'+total+'<br/>'+
+            '👤 Customer: '+swCustName+'<br/>'+
+            '📞 +91 '+swCustPhone+'<br/>'+
+            (swIsDelivery?'📍 '+swAddr:'📦 Pickup — Customer collected')+
+          '</div>'+
+        '</div>';
+      panel.style.background='#f0fdf4';
+      panel.style.borderColor='#86efac';
+    }
+
+    // Send confirmed notification to SHOPKEEPER
+    var confirmedMsg=
+      '✅ *ORDER CONFIRMED — '+shopName+'*\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      '🧾 Order: #'+swOrderId+'\n'+
+      '💰 Total: ₹'+total+'\n'+
+      '🔐 OTP Verified ✅\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      '👤 '+swCustName+' · +91 '+swCustPhone+'\n'+
+      (swIsDelivery?'📍 Delivered to: '+swAddr:'📦 Customer collected from shop')+'\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      'Order completed successfully.';
+
+    if(shopPhone){
+      setTimeout(function(){
+        window.open('https://wa.me/91'+shopPhone+'?text='+encodeURIComponent(confirmedMsg),'_blank');
+      },400);
+    }
+
+    psShowToast('✅ Order confirmed!');
+  };
+
   window.psShareOrder=function(orderId,total){
-    var msg='🛒 I just ordered from *'+shopName+'*!\n\nOrder #'+orderId+' · ₹'+total+'\n\nOrder here: '+window.location.href;
+    var msg='🛒 I just ordered from *'+shopName+'*!\nOrder #'+orderId+' · ₹'+total+'\nOrder here: '+window.location.href;
     window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
   };
 
-  // ─── SHOPKEEPER OTP ENTRY (for delivery confirmation) ───
-  // This is exposed so shopkeeper can open shop page and enter OTP
-  window.psON=function(el,nid){
-    el.value=el.value.replace(/\D/g,'').slice(-1);
-    if(el.value&&nid)document.getElementById(nid)?.focus();
-    var all=['z1','z2','z3','z4','z5','z6'].map(function(id){var e=document.getElementById(id);return e?e.value:'';}).join('');
-    if(all.length===6)setTimeout(function(){psVerify(swGrand,0,0);},350);
-  };
+  window.psON=function(el,nid){el.value=el.value.replace(/\D/g,'').slice(-1);if(el.value&&nid)document.getElementById(nid)?.focus();};
   window.psOB=function(e,el,pid){if(e.key==='Backspace'&&!el.value&&pid)document.getElementById(pid)?.focus();};
-
-  // OTP verify kept for legacy WA bot flow
-  window.psVerify=function(total){
-    var entered=['z1','z2','z3','z4','z5','z6'].map(function(id){var e=document.getElementById(id);return e?e.value:'';}).join('');
-    if(entered!==swOtp){
-      var err=document.getElementById('psOtpErr');if(err)err.style.display='block';
-      ['z1','z2','z3','z4','z5','z6'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
-      document.getElementById('z1')?.focus();return;
-    }
-    var items=psGetItems();
-    var billMsg='🔔 *ORDER CONFIRMED — '+shopName+'*\n━━━━━━━━━━━━━━━━━━━━\n🧾 #'+swOrderId+'\n'+
-      items.map(function(i){return'• '+i.name+' ×'+i.qty+' = ₹'+(i.price*i.qty);}).join('\n')+
-      '\n*TOTAL: ₹'+total+'*\n💳 OTP VERIFIED ✅\n📍 '+swAddr+'\n👤 '+swCustName+' · 📞 '+swCustPhone;
-    setTimeout(function(){window.open('https://wa.me/91'+shopPhone+'?text='+encodeURIComponent(billMsg),'_blank');},500);
-    swCart={};psUpdateCart();
-    psOpenSheet('✅ Order Confirmed!',buildSuccessHtml(total,items));
-  };
+  window.psVerify=function(){};
 
   function buildSuccessHtml(total,items){
-    return'<div class="ps-succ">'+
-      '<div class="ps-succ-ico">🎉</div>'+
-      '<div class="ps-succ-title">Order Confirmed!</div>'+
-      '<div class="ps-succ-sub">Bill sent to <strong>'+shopName+'</strong> on WhatsApp.</div>'+
-      '<div class="ps-succ-card">'+
-      '<div class="ps-succ-row"><span class="ps-succ-lbl">Order</span><span style="font-family:monospace;color:'+acc+'">#'+swOrderId+'</span></div>'+
-      '<div class="ps-succ-row"><span class="ps-succ-lbl">Items</span><span>'+items.map(function(i){return i.name;}).join(', ')+'</span></div>'+
-      '<div class="ps-succ-row"><span class="ps-succ-lbl">Total</span><span style="font-weight:800;color:'+acc+'">₹'+total+'</span></div>'+
-      '<div class="ps-succ-row"><span class="ps-succ-lbl">Status</span><span style="color:#15803d;font-weight:700">✅ Confirmed</span></div>'+
-      '</div>'+
-      '<button class="ps-done" onclick="psCloseSheet();psBuildContent()">✅ Done</button>'+
-      '</div>';
+    return'<div class="ps-succ"><div class="ps-succ-ico">🎉</div>'+
+      '<div class="ps-succ-title">Confirmed!</div>'+
+      '<div class="ps-succ-sub">Order done.</div>'+
+      '<button class="ps-done" onclick="psCloseSheet();psBuildContent()">✅ Done</button></div>';
   }
 
   // ── TOAST ──
@@ -3859,7 +3964,7 @@ async function submitShop(){
     showPhone:document.getElementById('tg-sp').checked,
     hours:{Monday:{open:'09:00',close:'21:00',closed:false},Tuesday:{open:'09:00',close:'21:00',closed:false},Wednesday:{open:'09:00',close:'21:00',closed:false},Thursday:{open:'09:00',close:'21:00',closed:false},Friday:{open:'09:00',close:'21:00',closed:false},Saturday:{open:'09:00',close:'21:00',closed:false},Sunday:{open:'09:00',close:'21:00',closed:false}},
     lat:uLat||13.0772,lng:uLng||79.6712,
-    products:getProds().map(p=>({name:p.n,price:p.p,unit:'per item'})),
+    products:getProds().map(p=>({name:p.n,price:p.p,unit:'per item',img:p.img||'',emoji:p.emoji||'🍽️',category:p.cat||'Menu',description:p.desc||''})),
     registeredAt:Date.now(),bizId,
     // local-only fields
     oh:'09:00',oc:'21:00',rating:0,rc:0,views:1,verified:false,
@@ -4327,7 +4432,7 @@ function buildGbPreview(){
         ${prods.slice(0,4).map(p=>`
         <div style="background:#fff;border-radius:12px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 6px rgba(0,0,0,.06)">
           <div style="font-size:1.6rem;width:44px;height:44px;background:${g.bg};border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${p.emoji||catEmoji}</div>
-          <div style="flex:1"><div style="font-size:.86rem;font-weight:700;color:#1a1a1a">${p.n}</div>${p.desc?`<div style="font-size:.7rem;color:#888">${p.desc.slice(0,40)}</div>`:''}</div>
+          <div style="flex-shrink:0"><div style="font-size:.86rem;font-weight:700;color:#1a1a1a">${p.n}</div>${p.desc?`<div style="font-size:.7rem;color:#888">${p.desc.slice(0,40)}</div>`:''}</div>
           <div style="font-size:.9rem;font-weight:800;color:${g.a}">${p.p?'₹'+p.p:'Get Quote'}</div>
         </div>`).join('')}
         ${!prods.length?`<div style="text-align:center;padding:16px;color:#aaa;font-size:.8rem;background:#fff;border-radius:12px">Add your services in Step 2</div>`:''}
@@ -4375,7 +4480,10 @@ function buildGbPreview(){
             <div style="font-size:.88rem;font-weight:800;color:#1a1a1a">₹${p.p}</div>
           </div>
           <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:6px">
-            <div style="width:72px;height:72px;background:linear-gradient(135deg,#fffbeb,#fef3c7);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.9rem">${p.emoji||catEmoji}</div>
+            ${p.img
+              ?`<div style="width:72px;height:72px;border-radius:10px;overflow:hidden;border:1px solid #f0f0f0"><img src="${p.img}" style="width:100%;height:100%;object-fit:cover" alt="${p.n}"/></div>`
+              :`<div style="width:72px;height:72px;background:linear-gradient(135deg,#fffbeb,#fef3c7);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.9rem">${p.emoji||catEmoji}</div>`
+            }
             <div style="border:2px solid ${g.a};border-radius:7px;padding:4px 14px;font-size:.76rem;font-weight:800;color:${g.a}">ADD</div>
           </div>
         </div>`).join('')}
