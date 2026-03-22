@@ -4,6 +4,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <title>Deckscrab — Find Local Businesses Near You</title>
+<!-- Hide immediately if ?shop= detected to prevent main app flash -->
+<script>if(new URLSearchParams(window.location.search).get('shop'))document.documentElement.style.visibility='hidden';</script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -32,7 +34,7 @@ button,input,select,textarea{font-family:'DM Sans',sans-serif;cursor:pointer;out
   border-bottom:1px solid var(--bor)}
 .logo{font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;
   color:var(--wht);display:flex;align-items:center;gap:7px;letter-spacing:-.03em}
-.logo-dot{width:9px;height:9px;border-radius:50%;background:var(--gold);
+.logo-dot{width:9px;height:9px;border-radius:50%;background:#4b5563;transition:background .4s,box-shadow .4s;
   box-shadow:0 0 12px var(--gold);animation:pulse 2s ease infinite;flex-shrink:0}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.6)}}
 .topnav-r{display:flex;align-items:center;gap:8px}
@@ -915,9 +917,14 @@ textarea.sw-fi{resize:vertical;min-height:68px}
   const shopSlug=params.get('shop');
   if(!shopSlug)return;
 
+  // Hide entire page immediately before anything renders
+  document.documentElement.style.visibility='hidden';
+
   document.addEventListener('DOMContentLoaded',async function(){
+    // Completely wipe the main app DOM
     document.body.innerHTML='';
     document.body.className='sw-body';
+    document.documentElement.style.visibility='visible';
 
     // Show loading spinner
     document.body.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#111827;flex-direction:column;gap:12px">
@@ -1723,30 +1730,40 @@ function renderShopSite(shop){
 
     var items=psGetItems();
 
-    // ── Save order to localStorage for shopkeeper Profile ──
+    // ── Save order — localStorage + Railway ──
+    var orderData={
+      id:'ord_'+Date.now(),
+      orderId:swOrderId,
+      shopName:shopName,
+      shopPhone:shopPhone,
+      custName:n,
+      custPhone:p,
+      addr:a,
+      isDelivery:swIsDelivery,
+      items:items.map(function(i){return{name:i.name,price:i.price,qty:i.qty};}),
+      total:total,
+      gst:gst,
+      payMethod:swPayMethod,
+      otp:swOtp,
+      status:'pending',
+      time:new Date().toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'}),
+      createdAt:Date.now(),
+    };
+
+    // 1. Save to localStorage (works on same device instantly)
     try{
-      var orders=JSON.parse(localStorage.getItem('ds_orders')||'[]');
-      orders.unshift({
-        id:'ord_'+Date.now(),
-        orderId:swOrderId,
-        shopName:shopName,
-        shopPhone:shopPhone,
-        custName:n,
-        custPhone:p,
-        addr:a,
-        isDelivery:swIsDelivery,
-        items:items.map(function(i){return{name:i.name,price:i.price,qty:i.qty};}),
-        total:total,
-        gst:gst,
-        payMethod:swPayMethod,
-        otp:swOtp,
-        status:'pending',
-        time:new Date().toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'}),
-        createdAt:Date.now(),
-      });
-      if(orders.length>100)orders.splice(100);
-      localStorage.setItem('ds_orders',JSON.stringify(orders));
+      var stored=JSON.parse(localStorage.getItem('ds_orders_v2')||'[]');
+      stored.unshift(orderData);
+      if(stored.length>200)stored.splice(200);
+      localStorage.setItem('ds_orders_v2',JSON.stringify(stored));
     }catch(e){}
+
+    // 2. POST to Railway so shopkeeper sees it on ANY device
+    fetch('https://deckscrab-backend-production.up.railway.app/api/orders',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(orderData)
+    }).catch(function(){}); // silent fail — WhatsApp is backup
 
     // ── STEP 1: Send OTP to CUSTOMER WhatsApp ──
     var custMsg=
@@ -3033,17 +3050,82 @@ const DEVICE_ID=(()=>{let id=localStorage.getItem('ds_device');if(!id){id='ds_'+
 
 // ═══ API HELPERS ═══
 let apiOnline=false;
+let _apiWaking=false;
+
 async function apiGet(path){
-  try{const r=await fetch(API_BASE+path);if(!r.ok)throw new Error();return await r.json();}
+  try{const r=await fetch(API_BASE+path,{signal:AbortSignal.timeout(8000)});if(!r.ok)throw new Error();return await r.json();}
   catch{return null;}
 }
 async function apiPost(path,body){
-  try{const r=await fetch(API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error();return await r.json();}
+  try{const r=await fetch(API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(10000)});if(!r.ok)throw new Error();return await r.json();}
   catch{return null;}
 }
 async function apiDelete(path){
-  try{const r=await fetch(API_BASE+path,{method:'DELETE'});return await r.json();}
+  try{const r=await fetch(API_BASE+path,{method:'DELETE',signal:AbortSignal.timeout(8000)});return await r.json();}
   catch{return null;}
+}
+
+function setDot(state){
+  // state: 'online' | 'offline' | 'waking'
+  const dot=document.querySelector('.logo-dot');
+  if(!dot)return;
+  if(state==='online'){
+    dot.style.background='var(--grn)';
+    dot.style.boxShadow='0 0 6px var(--grn)';
+    dot.title='Server online';
+  } else if(state==='waking'){
+    dot.style.background='var(--gold)';
+    dot.style.boxShadow='0 0 6px var(--gold)';
+    dot.title='Connecting…';
+  } else {
+    dot.style.background='#4b5563'; // grey — not alarming yellow
+    dot.style.boxShadow='none';
+    dot.title='Offline — data saved locally';
+  }
+}
+
+async function checkAPI(silent=true){
+  setDot('waking');
+  // Try /health first (new endpoint), then / (fallback)
+  let r=await apiGet('/health');
+  if(!r)r=await apiGet('/');
+  // Accept status 'ok' OR 'running'
+  apiOnline=!!(r&&(r.status==='ok'||r.status==='running'||r.uptime));
+  if(apiOnline){
+    setDot('online');
+    if(!silent)showToast('✅ Server online');
+  } else {
+    setDot('offline');
+    if(!silent)showToast('📱 Offline — data saved locally');
+  }
+  return apiOnline;
+}
+
+// Wake Railway from sleep — try multiple times with delay
+async function wakeServer(){
+  if(_apiWaking)return;
+  _apiWaking=true;
+  setDot('waking');
+  // Try up to 3 times with 4s gap (Railway takes ~8s to wake)
+  for(let i=0;i<3;i++){
+    const ok=await checkAPI(true);
+    if(ok){_apiWaking=false;return true;}
+    if(i<2)await new Promise(r=>setTimeout(r,4000));
+  }
+  _apiWaking=false;
+  setDot('offline');
+  return false;
+}
+
+// Keep Railway awake — ping every 4 minutes
+function startKeepAlive(){
+  setInterval(async()=>{
+    if(!apiOnline){await wakeServer();}
+    else{
+      const r=await apiGet('/health');
+      if(!r){apiOnline=false;setDot('offline');}
+    }
+  },4*60*1000); // 4 minutes
 }
 
 // ═══ LOCAL FALLBACK ═══
@@ -3053,17 +3135,6 @@ const LOCAL={
   add(s){const a=this.shops;a.unshift(s);this.save(a);},
   del(id){this.save(this.shops.filter(x=>x.id!==id));}
 };
-
-// ═══ CHECK API ═══
-async function checkAPI(){
-  const r=await apiGet('/');
-  apiOnline=!!(r&&r.status==='running');
-  const dot=document.querySelector('.nav-loc .ld');
-  if(dot)dot.style.background=apiOnline?'var(--grn)':'var(--gold)';
-  if(apiOnline){showToast('✅ Connected to Deckscrab server');}
-  else showToast('📱 Offline mode — data saved locally');
-  return apiOnline;
-}
 
 // ═══ DEMO SHOPS ═══
 // No demo data — only real businesses from Railway server + user registered shops
@@ -3251,7 +3322,11 @@ function starsHtml(r,sz='.8rem'){return[1,2,3,4,5].map(i=>`<span style="color:${
 // ═══ HOME ═══
 async function renderHome(q=''){
   const search=q||(document.getElementById('homeSearch')?.value||'').toLowerCase();
-  if(apiOnline&&!search){_serverShops=await fetchServerShops()||[];}
+  // Always try to fetch from server (not gated by apiOnline)
+  if(!search){
+    const fresh=await fetchServerShops();
+    if(fresh&&fresh.length){_serverShops=fresh;apiOnline=true;setDot('online');}
+  }
   let shops=allShops();
   if(search)shops=shops.filter(s=>s.name.toLowerCase().includes(search)||getSectorName(s).toLowerCase().includes(search)||(s.desc||'').toLowerCase().includes(search)||(s.city||'').toLowerCase().includes(search));
   setTxt('homeCount',shops.length+' found');
@@ -4201,30 +4276,79 @@ function renderMyShopsView(){
     </div>`;
   }).join('');
 }
-// ═══ ORDER MANAGEMENT ═══
-// Orders stored in localStorage as ds_orders array
+// ═══ ORDER MANAGEMENT — CROSS DEVICE ═══
+// Uses shopPhone as the lookup key so shopkeeper sees orders on any device
+// Orders posted to Railway + stored in localStorage keyed by shopPhone
+
+const ORDERS_KEY='ds_orders_v2';
+
 function getOrders(){
-  try{return JSON.parse(localStorage.getItem('ds_orders')||'[]');}catch{return[];}
+  try{return JSON.parse(localStorage.getItem(ORDERS_KEY)||'[]');}catch{return[];}
 }
 function saveOrders(orders){
-  localStorage.setItem('ds_orders',JSON.stringify(orders));
+  try{localStorage.setItem(ORDERS_KEY,JSON.stringify(orders));}catch(e){}
 }
 function pendingOrderCount(){
-  return getOrders().filter(o=>o.status==='pending').length;
+  // Count pending orders for any of my shops
+  const myPhones=myShops.map(s=>(s.wa||s.phone||'').replace(/\D/g,''));
+  const myNames=myShops.map(s=>(s.name||'').toLowerCase().trim());
+  return getOrders().filter(o=>{
+    if(o.status!=='pending')return false;
+    const ph=(o.shopPhone||'').replace(/\D/g,'');
+    const nm=(o.shopName||'').toLowerCase().trim();
+    return myPhones.includes(ph)||myNames.includes(nm);
+  }).length;
 }
 
-// Called from shop website when order is placed
-function saveIncomingOrder(order){
-  const orders=getOrders();
-  orders.unshift(order);
-  // Keep last 100 orders only
-  if(orders.length>100)orders.splice(100);
-  saveOrders(orders);
-}
-
-function renderOrdersView(){
+async function renderOrdersView(){
   const el=document.getElementById('myShopsSection');if(!el)return;
-  const orders=getOrders();
+  el.innerHTML=`<div style="text-align:center;padding:20px;color:var(--mut);font-size:.82rem">⏳ Loading orders…</div>`;
+
+  // Get orders for this shopkeeper's shops
+  const myPhones=myShops.map(s=>(s.wa||s.phone||'').replace(/\D/g,''));
+  const myNames=myShops.map(s=>(s.name||'').toLowerCase().trim());
+
+  // Try Railway API first
+  let serverOrders=[];
+  try{
+    const r=await fetch(`${API_BASE}/api/orders?limit=200`,{signal:AbortSignal.timeout(6000)});
+    if(r.ok){
+      const d=await r.json();
+      serverOrders=(d.orders||d||[]).filter(o=>{
+        const ph=(o.shopPhone||'').replace(/\D/g,'');
+        const nm=(o.shopName||'').toLowerCase().trim();
+        return myPhones.includes(ph)||myNames.includes(nm);
+      });
+    }
+  }catch(e){}
+
+  // Merge with localStorage (dedup by orderId)
+  const localOrders=getOrders().filter(o=>{
+    const ph=(o.shopPhone||'').replace(/\D/g,'');
+    const nm=(o.shopName||'').toLowerCase().trim();
+    return myPhones.includes(ph)||myNames.includes(nm);
+  });
+
+  const seen=new Set();
+  const allOrders=[...serverOrders,...localOrders].filter(o=>{
+    if(seen.has(o.orderId))return false;
+    seen.add(o.orderId);
+    return true;
+  }).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+
+  // Merge back to localStorage
+  const existingOthers=getOrders().filter(o=>{
+    const ph=(o.shopPhone||'').replace(/\D/g,'');
+    const nm=(o.shopName||'').toLowerCase().trim();
+    return !myPhones.includes(ph)&&!myNames.includes(nm);
+  });
+  saveOrders([...allOrders,...existingOthers].slice(0,200));
+
+  renderOrdersDisplay(allOrders);
+}
+
+function renderOrdersDisplay(orders){
+  const el=document.getElementById('myShopsSection');if(!el)return;
 
   if(!orders.length){
     el.innerHTML=`
@@ -4236,16 +4360,13 @@ function renderOrdersView(){
           💡 <strong style="color:var(--wht)">How to get orders:</strong><br/>
           1. Build your website in Grow tab<br/>
           2. Share your link with customers<br/>
-          3. Customer orders → OTP sent → they tell you the OTP<br/>
-          4. You enter OTP here to confirm
+          3. Customer orders → OTP sent to their WhatsApp<br/>
+          4. You see order here → enter OTP → confirm
         </div>
+        <button onclick="refreshOrders()" style="margin-top:14px;background:var(--vio);color:#fff;border:none;border-radius:999px;padding:10px 22px;font-size:.82rem;font-weight:700;cursor:pointer">🔄 Refresh Orders</button>
       </div>`;
     return;
   }
-
-  const pending=orders.filter(o=>o.status==='pending');
-  const confirmed=orders.filter(o=>o.status==='confirmed');
-  const rejected=orders.filter(o=>o.status==='rejected');
 
   el.innerHTML=`
     <div style="margin-top:8px">
@@ -4400,7 +4521,13 @@ function confirmOrder(orderId){
   o.confirmedAt=new Date().toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'});
   saveOrders(orders);
 
-  // Send confirmation to customer WhatsApp
+  // Update on Railway too
+  fetch(`${API_BASE}/api/orders/${o.id}`,{
+    method:'PATCH',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({status:'confirmed',confirmedAt:o.confirmedAt})
+  }).catch(()=>{});
+
+  // Send WhatsApp confirmation to customer
   const confMsg=
     `✅ *Order Confirmed — ${o.shopName}*\n`+
     `━━━━━━━━━━━━━━━━━━━━\n`+
@@ -4408,13 +4535,12 @@ function confirmOrder(orderId){
     `💰 Total: ₹${o.total}\n`+
     `🔐 OTP Verified ✅\n`+
     `━━━━━━━━━━━━━━━━━━━━\n`+
-    `${o.isDelivery?`📍 Delivering to: ${o.addr}`:'📦 Please collect from shop'}\n`+
+    `${o.isDelivery?`📍 On the way to: ${o.addr}`:'📦 Ready for pickup!'}\n`+
     `━━━━━━━━━━━━━━━━━━━━\n`+
-    `Thank you for your order! 🙏`;
+    `Thank you! 🙏`;
 
   setTimeout(()=>window.open(`https://wa.me/91${o.custPhone}?text=${encodeURIComponent(confMsg)}`,'_blank'),300);
-
-  showToast('✅ Order confirmed!');
+  showToast('✅ Order confirmed! Customer notified.');
   renderOrdersView();
 }
 
@@ -4426,16 +4552,22 @@ function rejectOrder(orderId){
   o.status='rejected';
   saveOrders(orders);
 
+  // Update on Railway too
+  fetch(`${API_BASE}/api/orders/${o.id}`,{
+    method:'PATCH',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({status:'rejected'})
+  }).catch(()=>{});
+
   const rejMsg=
     `❌ *Order Update — ${o.shopName}*\n`+
-    `Order #${o.orderId} could not be confirmed.\n`+
-    `Please contact the shop for assistance.\n`+
-    `📞 ${o.shopPhone||''}`;
+    `Order #${o.orderId} could not be processed.\n`+
+    `Please contact: 📞 ${o.shopPhone||''}`;
   setTimeout(()=>window.open(`https://wa.me/91${o.custPhone}?text=${encodeURIComponent(rejMsg)}`,'_blank'),300);
-
-  showToast('Order rejected');
+  showToast('Order rejected — customer notified');
   renderOrdersView();
 }
+
+function refreshOrders(){showToast('🔄 Refreshing orders…');renderOrdersView();}
 
 async function deleteShop(id){
   if(!confirm('Delete this listing?'))return;
@@ -5095,9 +5227,18 @@ window.addEventListener('DOMContentLoaded',async()=>{
   // Safe init — elements guaranteed to exist
   if(el('secGrid'))buildSectors('');
   if(el('prodList')){addProd();addProd();}
-  await checkAPI();
+  // Wake Railway (may be sleeping — tries 3 times silently)
+  setDot('waking');
+  wakeServer().then(ok=>{
+    if(ok){
+      renderHome(); // Reload with server data once online
+    }
+  });
+  // Start local render immediately with cached data
   await renderHome();
   renderSupply();
+  // Keep server awake while app is open
+  startKeepAlive();
 });
 // ═══════════════════════════════════════
 //  SUPPLY CHAIN — DIRECT MANUFACTURER DATA
