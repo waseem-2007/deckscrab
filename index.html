@@ -1723,6 +1723,31 @@ function renderShopSite(shop){
 
     var items=psGetItems();
 
+    // ── Save order to localStorage for shopkeeper Profile ──
+    try{
+      var orders=JSON.parse(localStorage.getItem('ds_orders')||'[]');
+      orders.unshift({
+        id:'ord_'+Date.now(),
+        orderId:swOrderId,
+        shopName:shopName,
+        shopPhone:shopPhone,
+        custName:n,
+        custPhone:p,
+        addr:a,
+        isDelivery:swIsDelivery,
+        items:items.map(function(i){return{name:i.name,price:i.price,qty:i.qty};}),
+        total:total,
+        gst:gst,
+        payMethod:swPayMethod,
+        otp:swOtp,
+        status:'pending',
+        time:new Date().toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'}),
+        createdAt:Date.now(),
+      });
+      if(orders.length>100)orders.splice(100);
+      localStorage.setItem('ds_orders',JSON.stringify(orders));
+    }catch(e){}
+
     // ── STEP 1: Send OTP to CUSTOMER WhatsApp ──
     var custMsg=
       '🛒 *Order Placed — '+shopName+'*\n'+
@@ -1913,7 +1938,18 @@ function renderShopSite(shop){
     }
 
     // ✅ CORRECT OTP
-    swOtpVerified=true; // one-time use — mark consumed
+    swOtpVerified=true; // one-time use
+
+    // Sync with localStorage orders
+    try{
+      var orders=JSON.parse(localStorage.getItem('ds_orders')||'[]');
+      var ord=orders.find(function(o){return o.orderId===swOrderId;});
+      if(ord){
+        ord.status='confirmed';
+        ord.confirmedAt=new Date().toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'});
+        localStorage.setItem('ds_orders',JSON.stringify(orders));
+      }
+    }catch(e){}
 
     // Replace panel with success
     var panel=document.getElementById('shopkeeperPanel');
@@ -3190,6 +3226,7 @@ function goTo(pg){
   if(pg==='home')renderHome();
   if(pg==='addshop')resetAddShop();
   if(pg==='supply')renderSupply();
+  if(pg==='grow')renderGrow();
   window.scrollTo(0,0);
 }
 
@@ -4072,6 +4109,7 @@ function resetAddShop(){
 function renderProfile(){
   const shops=myShops;const first=shops[0];const has=!!first;
   const sec=has?SECTORS.find(s=>s.n===first?.sector)||{e:'🏪'}:{e:'👤'};
+  const pending=pendingOrderCount();
   document.getElementById('profileHero').innerHTML=`
     <div class="profile-hero">
       <div class="profile-hero-bg">${has?sec.e:'👤'}</div>
@@ -4079,6 +4117,7 @@ function renderProfile(){
       <div class="profile-hero-cnt">
         <div class="profile-name">${has?sec.e:'👤'} ${has?first.name:'Your Profile'} ${has?'<span class="live-badge">✅ Live</span>':''}</div>
         <div class="profile-sub">${has?`<span>📍 ${first.city}</span><span>📞 ${first.phone}</span>`:'<span>Register a business to get started</span>'}</div>
+        ${pending?`<div style="margin-top:6px;display:inline-flex;align-items:center;gap:6px;background:rgba(239,68,68,.2);border-radius:999px;padding:4px 12px;font-size:.72rem;font-weight:700;color:#fca5a5">📦 ${pending} new order${pending>1?'s':''} waiting</div>`:''}
       </div>
     </div>`;
   document.getElementById('profileBody').innerHTML=`
@@ -4100,8 +4139,17 @@ function renderProfile(){
       <button class="uc-btn" onclick="goTo('grow')">Upgrade</button>
     </div>
     <div class="prof-menu">
-      ${[{i:'📋',l:'My Listed Shops',f:`renderMyShopsView()`},{i:'➕',l:'Add New Business',f:`goTo('addshop')`},{i:'📍',l:'Set My Location',f:`openLocModal()`},{i:'❤️',l:'Saved Shops',f:`showToast('Coming soon!')`},{i:'⚙️',l:'Settings',f:`showToast('Coming soon!')`}]
-        .map(item=>`<div class="prof-menu-item" onclick="${item.f}"><span class="pmi-lbl">${item.i} ${item.l}</span><span class="pmi-arrow">›</span></div>`).join('')}
+      ${[
+        {i:'📦',l:'Orders Received',f:`renderOrdersView()`,badge:pendingOrderCount()},
+        {i:'📋',l:'My Listed Shops',f:`renderMyShopsView()`},
+        {i:'➕',l:'Add New Business',f:`goTo('addshop')`},
+        {i:'📍',l:'Set My Location',f:`openLocModal()`},
+        {i:'⚙️',l:'Settings',f:`showToast('Coming soon!')`}
+      ].map(item=>`<div class="prof-menu-item" onclick="${item.f}">
+        <span class="pmi-lbl">${item.i} ${item.l}</span>
+        ${item.badge?`<span style="background:var(--rose);color:#fff;border-radius:999px;padding:2px 8px;font-size:.68rem;font-weight:800;margin-right:4px">${item.badge}</span>`:''}
+        <span class="pmi-arrow">›</span>
+      </div>`).join('')}
     </div>
     <div id="myShopsSection"></div>`;
 }
@@ -4153,6 +4201,242 @@ function renderMyShopsView(){
     </div>`;
   }).join('');
 }
+// ═══ ORDER MANAGEMENT ═══
+// Orders stored in localStorage as ds_orders array
+function getOrders(){
+  try{return JSON.parse(localStorage.getItem('ds_orders')||'[]');}catch{return[];}
+}
+function saveOrders(orders){
+  localStorage.setItem('ds_orders',JSON.stringify(orders));
+}
+function pendingOrderCount(){
+  return getOrders().filter(o=>o.status==='pending').length;
+}
+
+// Called from shop website when order is placed
+function saveIncomingOrder(order){
+  const orders=getOrders();
+  orders.unshift(order);
+  // Keep last 100 orders only
+  if(orders.length>100)orders.splice(100);
+  saveOrders(orders);
+}
+
+function renderOrdersView(){
+  const el=document.getElementById('myShopsSection');if(!el)return;
+  const orders=getOrders();
+
+  if(!orders.length){
+    el.innerHTML=`
+      <div style="text-align:center;padding:40px 20px">
+        <div style="font-size:3rem;margin-bottom:12px">📦</div>
+        <div style="font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:var(--wht);margin-bottom:6px">No Orders Yet</div>
+        <div style="font-size:.82rem;color:var(--mut);line-height:1.65;margin-bottom:16px">When customers place orders from your website,<br/>they will appear here.</div>
+        <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:13px;font-size:.78rem;color:var(--mut);line-height:1.7;text-align:left">
+          💡 <strong style="color:var(--wht)">How to get orders:</strong><br/>
+          1. Build your website in Grow tab<br/>
+          2. Share your link with customers<br/>
+          3. Customer orders → OTP sent → they tell you the OTP<br/>
+          4. You enter OTP here to confirm
+        </div>
+      </div>`;
+    return;
+  }
+
+  const pending=orders.filter(o=>o.status==='pending');
+  const confirmed=orders.filter(o=>o.status==='confirmed');
+  const rejected=orders.filter(o=>o.status==='rejected');
+
+  el.innerHTML=`
+    <div style="margin-top:8px">
+      <!-- Tab bar -->
+      <div style="display:flex;gap:0;background:var(--sur);border-radius:var(--r);overflow:hidden;margin-bottom:14px;border:1px solid var(--bor)">
+        <button onclick="filterOrders('pending',this)" id="otab-pending" style="flex:1;padding:10px 6px;border:none;background:var(--rose);color:#fff;font-size:.78rem;font-weight:800;cursor:pointer;font-family:'DM Sans',sans-serif">
+          📦 New (${pending.length})
+        </button>
+        <button onclick="filterOrders('confirmed',this)" id="otab-confirmed" style="flex:1;padding:10px 6px;border:none;background:var(--sur);color:var(--mut);font-size:.78rem;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">
+          ✅ Done (${confirmed.length})
+        </button>
+        <button onclick="filterOrders('rejected',this)" id="otab-rejected" style="flex:1;padding:10px 6px;border:none;background:var(--sur);color:var(--mut);font-size:.78rem;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">
+          ❌ Rejected (${rejected.length})
+        </button>
+      </div>
+      <div id="ordersListBody"></div>
+    </div>`;
+
+  filterOrders('pending',document.getElementById('otab-pending'));
+}
+
+function filterOrders(status, tabEl){
+  // Update tab styles
+  ['otab-pending','otab-confirmed','otab-rejected'].forEach(id=>{
+    const t=document.getElementById(id);
+    if(!t)return;
+    t.style.background='var(--sur)';t.style.color='var(--mut)';
+  });
+  if(tabEl){
+    tabEl.style.background=status==='pending'?'var(--rose)':status==='confirmed'?'var(--grn)':'#374151';
+    tabEl.style.color='#fff';
+  }
+
+  const orders=getOrders().filter(o=>o.status===status);
+  const body=document.getElementById('ordersListBody');
+  if(!body)return;
+
+  if(!orders.length){
+    body.innerHTML=`<div style="text-align:center;padding:28px;color:var(--mut);font-size:.84rem">No ${status} orders</div>`;
+    return;
+  }
+
+  body.innerHTML=orders.map(o=>`
+    <div style="background:var(--sur);border:1.5px solid ${o.status==='pending'?'rgba(239,68,68,.3)':o.status==='confirmed'?'rgba(34,197,94,.25)':'var(--bor)'};border-radius:var(--r);padding:14px;margin-bottom:10px" id="order-${o.id}">
+
+      <!-- Order header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-size:.88rem;font-weight:700;color:var(--wht)">Order #${o.orderId}</div>
+          <div style="font-size:.7rem;color:var(--mut);margin-top:2px">⏰ ${o.time}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;color:var(--gold)">₹${o.total}</div>
+          <div style="font-size:.68rem;color:${o.status==='pending'?'var(--rose)':o.status==='confirmed'?'var(--grn)':'var(--mut)'};font-weight:700;text-transform:uppercase">
+            ${o.status==='pending'?'🔴 Pending':o.status==='confirmed'?'✅ Confirmed':'❌ Rejected'}
+          </div>
+        </div>
+      </div>
+
+      <!-- Items -->
+      <div style="background:rgba(255,255,255,.04);border-radius:var(--rs);padding:10px;margin-bottom:10px">
+        ${(o.items||[]).map(i=>`
+          <div style="display:flex;justify-content:space-between;font-size:.8rem;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+            <span style="color:var(--txt)">${i.name} <span style="color:var(--mut)">×${i.qty}</span></span>
+            <span style="color:var(--gold);font-weight:700">₹${i.price*i.qty}</span>
+          </div>`).join('')}
+        <div style="display:flex;justify-content:space-between;font-size:.84rem;font-weight:800;color:var(--wht);padding:8px 0 0;margin-top:4px;border-top:1px solid rgba(255,255,255,.08)">
+          <span>Total</span><span style="color:var(--gold)">₹${o.total}</span>
+        </div>
+      </div>
+
+      <!-- Customer info -->
+      <div style="font-size:.78rem;color:var(--mut);line-height:1.7;margin-bottom:10px">
+        👤 <strong style="color:var(--txt)">${o.custName}</strong> · 📞 +91 ${o.custPhone}<br/>
+        ${o.isDelivery?`📍 ${o.addr}`:'📦 Pickup'}<br/>
+        💳 ${(o.payMethod||'').toUpperCase()}
+      </div>
+
+      ${o.status==='pending'?`
+        <!-- OTP Confirmation Panel -->
+        <div style="background:rgba(245,197,24,.06);border:1.5px solid rgba(245,197,24,.2);border-radius:var(--rs);padding:12px">
+          <div style="font-size:.76rem;font-weight:700;color:var(--gold);margin-bottom:8px;text-align:center">
+            🔐 Ask customer for OTP → Enter below → Confirm
+          </div>
+          <div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px">
+            ${['a1','a2','a3','a4','a5','a6'].map((sid,i,arr)=>{
+              const prev=i>0?arr[i-1]:null;
+              const next=i<5?arr[i+1]:null;
+              return`<input type="tel" id="oi${o.id}_${sid}" maxlength="1" inputmode="numeric"
+                style="width:40px;height:48px;border:2px solid var(--bor);border-radius:9px;text-align:center;font-size:1.3rem;font-weight:800;color:var(--wht);background:var(--bg);outline:none;transition:.15s"
+                oninput="orderOtpN(this,'${o.id}','${next||''}')"
+                onkeydown="orderOtpB(event,this,'${prev||''}')" />`;
+            }).join('')}
+          </div>
+          <div id="oerr_${o.id}" style="display:none;text-align:center;color:var(--rose);font-size:.74rem;margin-bottom:7px">❌ Wrong OTP</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <button onclick="confirmOrder('${o.id}')" style="padding:11px;background:var(--grn);color:#fff;border:none;border-radius:var(--rs);font-size:.84rem;font-weight:800;cursor:pointer;font-family:'DM Sans',sans-serif">✅ Confirm</button>
+            <button onclick="rejectOrder('${o.id}')" style="padding:11px;background:rgba(239,68,68,.1);border:1.5px solid rgba(239,68,68,.25);color:var(--rose);border-radius:var(--rs);font-size:.84rem;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">❌ Reject</button>
+          </div>
+          <div style="text-align:center;margin-top:7px">
+            <a href="tel:${o.custPhone}" style="font-size:.72rem;color:var(--mut);text-decoration:none">📞 Call customer: +91 ${o.custPhone}</a>
+          </div>
+        </div>`
+      : o.status==='confirmed'
+        ?`<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:var(--rs);padding:10px;text-align:center;font-size:.78rem;color:var(--grn)">✅ Confirmed at ${o.confirmedAt||'—'}</div>`
+        :`<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:var(--rs);padding:10px;text-align:center;font-size:.78rem;color:var(--rose)">❌ Rejected</div>`
+      }
+    </div>`).join('');
+}
+
+function orderOtpN(el, orderId, nextId){
+  el.value=el.value.replace(/\D/g,'').slice(-1);
+  el.style.borderColor=el.value?'var(--gold)':'var(--bor)';
+  if(el.value&&nextId)document.getElementById(`oi${orderId}_${nextId}`)?.focus();
+  // Auto-confirm when 6 filled
+  const entered=['a1','a2','a3','a4','a5','a6'].map(s=>document.getElementById(`oi${orderId}_${s}`)?.value||'').join('');
+  if(entered.length===6)setTimeout(()=>confirmOrder(orderId),300);
+}
+function orderOtpB(e,el,prevId){
+  if(e.key==='Backspace'){el.style.borderColor='var(--bor)';if(!el.value&&prevId)document.getElementById(prevId)?.focus();}
+}
+
+function confirmOrder(orderId){
+  const orders=getOrders();
+  const o=orders.find(x=>x.id===orderId);
+  if(!o){showToast('Order not found');return;}
+
+  const entered=['a1','a2','a3','a4','a5','a6'].map(s=>document.getElementById(`oi${orderId}_${s}`)?.value||'').join('');
+
+  if(entered!==o.otp){
+    const errEl=document.getElementById(`oerr_${orderId}`);
+    if(errEl)errEl.style.display='block';
+    ['a1','a2','a3','a4','a5','a6'].forEach(s=>{
+      const el=document.getElementById(`oi${orderId}_${s}`);
+      if(el){el.value='';el.style.borderColor='var(--rose)';}
+    });
+    setTimeout(()=>{
+      const errEl=document.getElementById(`oerr_${orderId}`);
+      if(errEl)errEl.style.display='none';
+      ['a1','a2','a3','a4','a5','a6'].forEach(s=>{
+        const el=document.getElementById(`oi${orderId}_${s}`);
+        if(el)el.style.borderColor='var(--bor)';
+      });
+    },2000);
+    document.getElementById(`oi${orderId}_a1`)?.focus();
+    showToast('❌ Wrong OTP — ask customer to check WhatsApp');
+    return;
+  }
+
+  // ✅ Correct OTP — confirm order
+  o.status='confirmed';
+  o.confirmedAt=new Date().toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'});
+  saveOrders(orders);
+
+  // Send confirmation to customer WhatsApp
+  const confMsg=
+    `✅ *Order Confirmed — ${o.shopName}*\n`+
+    `━━━━━━━━━━━━━━━━━━━━\n`+
+    `🧾 Order: #${o.orderId}\n`+
+    `💰 Total: ₹${o.total}\n`+
+    `🔐 OTP Verified ✅\n`+
+    `━━━━━━━━━━━━━━━━━━━━\n`+
+    `${o.isDelivery?`📍 Delivering to: ${o.addr}`:'📦 Please collect from shop'}\n`+
+    `━━━━━━━━━━━━━━━━━━━━\n`+
+    `Thank you for your order! 🙏`;
+
+  setTimeout(()=>window.open(`https://wa.me/91${o.custPhone}?text=${encodeURIComponent(confMsg)}`,'_blank'),300);
+
+  showToast('✅ Order confirmed!');
+  renderOrdersView();
+}
+
+function rejectOrder(orderId){
+  if(!confirm('Reject this order?'))return;
+  const orders=getOrders();
+  const o=orders.find(x=>x.id===orderId);
+  if(!o)return;
+  o.status='rejected';
+  saveOrders(orders);
+
+  const rejMsg=
+    `❌ *Order Update — ${o.shopName}*\n`+
+    `Order #${o.orderId} could not be confirmed.\n`+
+    `Please contact the shop for assistance.\n`+
+    `📞 ${o.shopPhone||''}`;
+  setTimeout(()=>window.open(`https://wa.me/91${o.custPhone}?text=${encodeURIComponent(rejMsg)}`,'_blank'),300);
+
+  showToast('Order rejected');
+  renderOrdersView();
+}
+
 async function deleteShop(id){
   if(!confirm('Delete this listing?'))return;
   const shop=myShops.find(s=>s.id===id);
@@ -4170,6 +4454,135 @@ async function deleteShop(id){
 // ═══ GROW SUITE — WEBSITE BUILDER ═══
 let gbPlan='website',gbAmt=399,gbStep=0,gbSelTheme='dark',gbPayMethod='upi';
 let gbProdCount=0,gbBuiltShop=null;
+
+function renderGrow(){
+  // Make sure we're on plans view
+  const gp=document.getElementById('growPlans');
+  const gb=document.getElementById('growBuilder');
+  if(gp)gp.style.display='block';
+  if(gb)gb.style.display='none';
+
+  // Find the existing shops section or create it
+  let existingEl=document.getElementById('growExistingShops');
+  if(!existingEl){
+    // Insert before the "How it works" steps in growPlans
+    const plansWrap=document.querySelector('#growPlans > div');
+    if(!plansWrap)return;
+    existingEl=document.createElement('div');
+    existingEl.id='growExistingShops';
+    // Insert at top of plans wrap
+    plansWrap.insertBefore(existingEl,plansWrap.firstChild);
+  }
+
+  if(!myShops.length){
+    existingEl.innerHTML='';
+    return;
+  }
+
+  // Show registered shops with activate/manage buttons
+  existingEl.innerHTML=`
+    <div style="background:rgba(31,217,122,.06);border:1.5px solid rgba(31,217,122,.2);border-radius:var(--r);padding:16px;margin-bottom:20px">
+      <div style="font-family:'Syne',sans-serif;font-size:.88rem;font-weight:700;color:var(--grn);margin-bottom:12px">
+        ✅ Your Registered Businesses
+      </div>
+      ${myShops.map(s=>{
+        const slug=(s.name||'').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+        const webUrl=s.websiteUrl||`https://waseem-2007.github.io/deckscrab/?shop=${slug}`;
+        const hasWebsite=!!(s.websiteUrl||s.websiteEnabled);
+        return`<div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:12px">
+          <div style="font-size:1.8rem;flex-shrink:0">${s.e||s.sectorEmoji||'🏪'}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.88rem;font-weight:700;color:var(--wht);margin-bottom:2px">${s.name}</div>
+            <div style="font-size:.72rem;color:var(--mut)">📍 ${s.city||''} · 📞 ${s.phone||'—'}</div>
+            ${hasWebsite
+              ?`<div style="font-size:.68rem;color:var(--teal);margin-top:3px;word-break:break-all">${webUrl}</div>`
+              :''
+            }
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+            ${hasWebsite
+              ?`<button onclick="activateExistingShop('${s.id}','view')" style="background:var(--teal);color:#fff;border:none;border-radius:var(--rs);padding:6px 12px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap">🌐 Open</button>
+                <button onclick="activateExistingShop('${s.id}','qr')" style="background:rgba(20,184,166,.1);border:1px solid rgba(20,184,166,.25);color:var(--teal);border-radius:var(--rs);padding:6px 12px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap">📱 QR</button>`
+              :`<button onclick="activateExistingShop('${s.id}','activate')" style="background:var(--gold);color:var(--bg);border:none;border-radius:var(--rs);padding:6px 12px;font-size:.72rem;font-weight:800;cursor:pointer;white-space:nowrap">🚀 Activate</button>`
+            }
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function activateExistingShop(shopId, action){
+  const s=myShops.find(x=>x.id===shopId);
+  if(!s)return;
+
+  const slug=(s.name||'').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  const webUrl=s.websiteUrl||`https://waseem-2007.github.io/deckscrab/?shop=${slug}`;
+
+  if(action==='view'){
+    window.open(webUrl,'_blank');
+    return;
+  }
+
+  if(action==='qr'){
+    // Show QR modal
+    const qrSrc=`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(webUrl)}&bgcolor=ffffff&color=1a1a1a&margin=10`;
+    // Create overlay
+    let ov=document.getElementById('qrOverlay');
+    if(!ov){ov=document.createElement('div');ov.id='qrOverlay';document.body.appendChild(ov);}
+    ov.style.cssText='position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(10px)';
+    ov.innerHTML=`
+      <div style="background:#fff;border-radius:20px;padding:24px;text-align:center;max-width:300px;width:100%">
+        <div style="font-size:.7rem;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">📱 QR Code — ${s.name}</div>
+        <img src="${qrSrc}" width="200" height="200" style="border-radius:10px;border:3px solid #f0f0f0;display:block;margin:0 auto 12px"/>
+        <div style="font-size:.74rem;color:#888;line-height:1.6;margin-bottom:14px">Print & paste in your shop!<br/>Customers scan → order instantly</div>
+        <div style="background:#f5f5f5;border-radius:8px;padding:8px 10px;font-size:.68rem;color:#555;word-break:break-all;margin-bottom:12px;text-align:left">${webUrl}</div>
+        <div style="display:flex;gap:8px">
+          <button onclick="window.open('https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(webUrl)}&bgcolor=ffffff&color=1a1a1a&margin=15','_blank')" style="flex:1;padding:10px;background:#1a1a1a;color:#fff;border:none;border-radius:10px;font-size:.8rem;font-weight:700;cursor:pointer">⬇️ Download</button>
+          <button onclick="navigator.clipboard?.writeText('${webUrl}').then(()=>showToast('✅ Copied!'))" style="flex:1;padding:10px;background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;border-radius:10px;font-size:.8rem;font-weight:700;cursor:pointer">📋 Copy</button>
+        </div>
+        <button onclick="document.getElementById('qrOverlay').style.display='none'" style="width:100%;padding:10px;margin-top:8px;background:none;border:1px solid #e0e0e0;border-radius:10px;font-size:.8rem;color:#888;cursor:pointer">Close</button>
+      </div>`;
+    ov.onclick=function(e){if(e.target===ov)ov.style.display='none';};
+    return;
+  }
+
+  if(action==='activate'){
+    // Open builder pre-filled with this shop's data
+    gbBuiltShop=null;
+    // Pre-fill all fields from existing shop
+    setTimeout(()=>{
+      const setVal=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val||'';};
+      setVal('gb-name',s.name);
+      setVal('gb-tagline',s.desc||s.description||'');
+      setVal('gb-phone',s.wa||s.phone||'');
+      setVal('gb-city',s.city||'');
+      setVal('gb-addr',s.addr||s.address||'');
+      setVal('gb-open',s.oh||'9:00 AM');
+      setVal('gb-close',s.oc||'9:00 PM');
+      // Set category
+      const catEl=document.getElementById('gb-cat');
+      if(catEl&&s.e)catEl.value=s.e;
+      // Pre-fill products
+      const pl=document.getElementById('gbProdList');
+      if(pl)pl.innerHTML='';
+      const prods=s.prods||s.products||[];
+      if(prods.length){
+        prods.forEach(p=>addGbProd(p.n||p.name||'',p.p||p.price||'',p.emoji||'🍽️',p.img||''));
+      }else{addGbProd();addGbProd();addGbProd();}
+      // Set theme
+      gbSelTheme=s.theme||'dark';
+      document.querySelectorAll('.gbtheme').forEach(c=>c.style.border='2px solid transparent');
+      const themeEl=document.querySelector('.gbtheme[data-t="'+gbSelTheme+'"]');
+      if(themeEl)themeEl.style.border='2px solid var(--gold)';
+    },100);
+
+    openGrowBuilder('website',399);
+    // After opening, skip to step 4 (preview) since data is pre-filled
+    setTimeout(()=>{
+      showToast('✅ Pre-filled with '+s.name+' — review & go live!');
+    },300);
+  }
+}
 
 function openGrowBuilder(plan,amt){
   gbPlan=plan;gbAmt=amt;gbStep=0;gbProdCount=0;gbBuiltShop=null;
