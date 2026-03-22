@@ -1370,8 +1370,13 @@ function renderShopSite(shop){
         var price=parseFloat(item.p||item.price)||0;
         var emo=item.emoji||item.e||'🍽️';
         var desc=item.desc||item.description||'';
+        var img=item.img||item.image||'';
         var veg=item.veg!==false;
         var qty=swCart[id]||0;
+        // Image: real photo if available, else emoji
+        var imgHtml=img
+          ?'<div class="ps-img" style="background:#f5f5f5;padding:0;overflow:hidden"><img src="'+img+'" style="width:100%;height:100%;object-fit:cover" alt="'+name+'" loading="lazy"/></div>'
+          :'<div class="ps-img">'+emo+'</div>';
         html+='<div class="ps-item">'+
           '<div class="ps-item-left">'+
           '<div class="ps-dot '+(veg?'veg':'nv')+'"></div>'+
@@ -1380,7 +1385,7 @@ function renderShopSite(shop){
           '<div class="ps-iprice">₹'+price+'</div>'+
           '</div>'+
           '<div class="ps-item-right">'+
-          '<div class="ps-img">'+emo+'</div>'+
+          imgHtml+
           (qty===0
             ?'<button class="ps-add" onclick="psAdd(\''+id+'\','+price+',\''+name.replace(/'/g,"\\'")+'\')" >ADD</button>'
             :'<div class="ps-qty"><button class="ps-qb" onclick="psChg(\''+id+'\','+price+',-1)">−</button><span class="ps-qn">'+qty+'</span><button class="ps-qb" onclick="psChg(\''+id+'\','+price+',1)">+</button></div>'
@@ -1406,8 +1411,12 @@ function renderShopSite(shop){
         var price=parseFloat(item.p||item.price)||0;
         var emo=item.emoji||item.e||'🔧';
         var desc=item.desc||item.description||'';
-        html+='<div class="ps-svc-card" onclick="psEnquireService(\''+name+'\','+price+')">'+
-          '<div class="ps-svc-ico">'+emo+'</div>'+
+        var img=item.img||item.image||'';
+        var icoHtml=img
+          ?'<div style="width:100%;height:80px;border-radius:10px 10px 0 0;overflow:hidden;margin:-14px -14px 8px;"><img src="'+img+'" style="width:100%;height:100%;object-fit:cover" loading="lazy"/></div>'
+          :'<div class="ps-svc-ico">'+emo+'</div>';
+        html+='<div class="ps-svc-card" onclick="psEnquireService(\''+name+'\','+price+')" style="overflow:hidden">'+
+          icoHtml+
           '<div class="ps-svc-name">'+name+'</div>'+
           (desc?'<div class="ps-svc-desc">'+desc+'</div>':'')+
           (price?'<div class="ps-svc-price">₹'+price+'</div>':'<div class="ps-svc-price" style="color:#888">Call for price</div>')+
@@ -1482,8 +1491,12 @@ function renderShopSite(shop){
         var price=parseFloat(item.p||item.price)||0;
         var emo=item.emoji||item.e||'📦';
         var desc=item.desc||item.description||'';
+        var img=item.img||item.image||'';
+        var icoHtml=img
+          ?'<div style="width:56px;height:56px;border-radius:10px;overflow:hidden;flex-shrink:0;border:1px solid #f0f0f0"><img src="'+img+'" style="width:100%;height:100%;object-fit:cover" loading="lazy"/></div>'
+          :'<div class="ps-enq-ico">'+emo+'</div>';
         html+='<div class="ps-enq-card" onclick="psEnquireService(\''+name+'\','+price+')">'+
-          '<div class="ps-enq-ico">'+emo+'</div>'+
+          icoHtml+
           '<div><div class="ps-enq-name">'+name+'</div>'+
           (desc?'<div class="ps-enq-desc">'+desc+'</div>':'')+
           (price?'<div style="font-size:.85rem;font-weight:800;color:'+acc+';margin-top:4px">₹'+price+'</div>':'<div style="font-size:.78rem;color:#888;margin-top:4px">Enquire for price</div>')+
@@ -1701,38 +1714,119 @@ function renderShopSite(shop){
     swCustName=n;swCustPhone=p;swAddr=a;swGrand=total;
     swOrderId='DS'+Date.now().toString().slice(-6);
     swOtp=String(Math.floor(100000+Math.random()*900000));
-    psOpenSheet('🧾 Bill & OTP',buildBillOtpHtml(total,sub,gst));
+    var swOtpUsed=false; // one-time use flag
+
+    // ─── STEP 1: Send OTP to CUSTOMER WhatsApp ───
+    var custMsg=
+      '🛒 *Order Placed — '+shopName+'*\n\n'+
+      '📦 *Your Items:*\n'+
+      psGetItems().map(function(i){return'• '+i.name+' ×'+i.qty+' = ₹'+(i.price*i.qty);}).join('\n')+'\n\n'+
+      '💰 *Total: ₹'+total+'*\n'+
+      (swIsDelivery?'📍 Delivering to: '+a:'📦 Pickup from shop')+'\n\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      '🔐 *YOUR OTP: '+swOtp+'*\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      'Share this OTP *only with the shopkeeper* when:\n'+
+      (swIsDelivery?'• Delivery person arrives at your door':'• You go to pick up your order')+'\n\n'+
+      '_Order ID: #'+swOrderId+'_\n'+
+      '_This OTP is valid for one-time use only._';
+
+    window.open('https://wa.me/91'+p+'?text='+encodeURIComponent(custMsg),'_blank');
+
+    // ─── STEP 2: Send order details to SHOPKEEPER ───
+    var shopMsg=
+      '🔔 *NEW ORDER — '+shopName+'*\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      '🧾 Order: #'+swOrderId+'\n'+
+      '⏰ '+new Date().toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'})+'\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      '*ITEMS:*\n'+
+      psGetItems().map(function(i){return'• '+i.name+' ×'+i.qty+' = ₹'+(i.price*i.qty);}).join('\n')+'\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      '*TOTAL: ₹'+total+'*\n'+
+      '💳 '+swPayMethod.toUpperCase()+'\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      '👤 Customer: '+n+'\n'+
+      '📞 Phone: '+p+'\n'+
+      (swIsDelivery?'📍 Deliver to: '+a:'📦 Pickup order')+'\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      '🔐 Ask customer for OTP when '+
+      (swIsDelivery?'delivering':'they come to pick up')+'\n'+
+      'Enter OTP on their order page to confirm.';
+
+    setTimeout(function(){
+      window.open('https://wa.me/91'+shopPhone+'?text='+encodeURIComponent(shopMsg),'_blank');
+    },800);
+
+    // ─── STEP 3: Show order confirmation screen to customer ───
+    // Customer doesn't enter OTP — SHOPKEEPER does
+    psOpenSheet('✅ Order Placed!',buildOrderPlacedHtml(total,sub,gst,swOtp,swOrderId,a,n,p,swIsDelivery));
   };
 
-  function buildBillOtpHtml(total,sub,gst){
+  function buildOrderPlacedHtml(total,sub,gst,otp,orderId,addr,custName,custPhone,isDelivery){
     var items=psGetItems();
-    return'<div class="ps-bill"><div class="ps-billhdr">'+
-      '<div style="font-size:1.8rem;margin-bottom:5px">'+emoji+'</div>'+
-      '<div class="ps-billshop">'+shopName+'</div>'+
-      '<div class="ps-billaddr">'+(shop.addr||'')+', '+(shop.city||'')+'</div>'+
-      '<div class="ps-billid">Order #'+swOrderId+' · '+new Date().toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'})+'</div>'+
+    return'<div style="text-align:center;padding:12px 0 8px">'+
+      '<div style="font-size:3.5rem;margin-bottom:10px;animation:pspop .4s cubic-bezier(.34,1.56,.64,1)">🎉</div>'+
+      '<div style="font-family:\'DM Sans\',sans-serif;font-size:1.2rem;font-weight:900;color:#15803d;margin-bottom:6px">Order Placed!</div>'+
+      '<div style="font-size:.82rem;color:#666;line-height:1.7;margin-bottom:16px">'+
+        'Your OTP has been sent to <strong>'+custPhone+'</strong> on WhatsApp.<br/>'+
+        (isDelivery
+          ? 'Share it with the <strong>delivery person</strong> when they arrive.'
+          : 'Show it to the <strong>shopkeeper</strong> when you go to pick up.')+
       '</div>'+
-      items.map(function(i){return'<div class="ps-billrow"><span>'+i.name+' ×'+i.qty+'</span><span style="font-weight:700">₹'+(i.price*i.qty)+'</span></div>';}).join('')+
-      '<div class="ps-billrow"><span style="color:#aaa">GST (5%)</span><span style="color:#aaa">₹'+gst+'</span></div>'+
-      '<div class="ps-billrow"><span style="color:#aaa">Delivery</span><span style="color:#22c55e;font-weight:700">FREE</span></div>'+
-      '<div class="ps-billtot"><span>Grand Total</span><span style="color:'+acc+'">₹'+total+'</span></div>'+
-      '<div class="ps-billfoot">👤 '+swCustName+' · 📞 '+swCustPhone+'<br/>'+(swIsDelivery?'📍 '+swAddr:'📦 Pickup')+'<br/>💳 '+swPayMethod.toUpperCase()+'</div>'+
+
+      // Bill summary
+      '<div style="background:#fff;border:1px solid #e8e8e8;border-radius:14px;padding:14px;text-align:left;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)">'+
+        '<div style="font-size:.7rem;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Your Bill</div>'+
+        items.map(function(i){return'<div style="display:flex;justify-content:space-between;font-size:.84rem;padding:5px 0;border-bottom:1px solid #f5f5f5"><span>'+i.name+' ×'+i.qty+'</span><span style="font-weight:700">₹'+(i.price*i.qty)+'</span></div>';}).join('')+
+        '<div style="display:flex;justify-content:space-between;font-size:.82rem;padding:5px 0;color:#aaa"><span>GST 5%</span><span>₹'+gst+'</span></div>'+
+        '<div style="display:flex;justify-content:space-between;font-size:.98rem;font-weight:900;padding:10px 0 0;margin-top:6px;border-top:2px solid #e8e8e8"><span>Total</span><span style="color:'+acc+'">₹'+total+'</span></div>'+
+        '<div style="font-size:.72rem;color:#888;margin-top:8px;padding-top:8px;border-top:1px solid #f0f0f0;line-height:1.65">'+
+          '👤 '+custName+' · 📞 '+custPhone+'<br/>'+
+          (isDelivery?'📍 '+addr:'📦 Pickup')+
+        '</div>'+
       '</div>'+
-      '<div class="ps-otpbox">'+
-      '<div class="ps-otptitle">🔐 Confirm Payment with OTP</div>'+
-      '<div class="ps-otpcode">'+swOtp+'</div>'+
-      '<div class="ps-otpsub">Enter this OTP below to confirm ₹'+total+' payment.<br/>Bill will be sent to <strong>'+shopName+'</strong> on WhatsApp automatically.</div>'+
-      '<div class="ps-otpdigs">'+
-      ['z1','z2','z3','z4','z5','z6'].map(function(id,i,arr){
-        var prev=i>0?arr[i-1]:null,next=i<5?arr[i+1]:null;
-        return'<input type="tel" class="ps-otpd" id="'+id+'" maxlength="1" inputmode="numeric" oninput="psON(this,'+(next?'\''+next+'\'':'null')+')" onkeydown="psOB(event,this,'+(prev?'\''+prev+'\'':'null')+')" />';
-      }).join('')+
+
+      // OTP card - styled like Rapido
+      '<div style="background:linear-gradient(135deg,#1a1a2e,#374151);border-radius:16px;padding:18px;margin-bottom:14px;text-align:center">'+
+        '<div style="font-size:.7rem;font-weight:800;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">🔐 Your OTP</div>'+
+        '<div style="display:flex;gap:8px;justify-content:center;margin-bottom:10px">'+
+          otp.split('').map(function(d){
+            return'<div style="width:42px;height:52px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:900;color:#fff;font-family:monospace">'+d+'</div>';
+          }).join('')+
+        '</div>'+
+        '<div style="font-size:.74rem;color:rgba(255,255,255,.55);line-height:1.6">'+
+          (isDelivery
+            ? 'Tell this OTP to the delivery person<br/>when your order arrives at your door'
+            : 'Show this OTP to the shopkeeper<br/>when you go to collect your order')+
+        '</div>'+
+        '<div style="margin-top:10px;background:rgba(239,68,68,.15);border-radius:8px;padding:7px 12px;font-size:.7rem;color:#fca5a5">'+
+          '⚠️ One-time use only · Do not share with anyone else'+
+        '</div>'+
       '</div>'+
-      '<div class="ps-otperr" id="psOtpErr">❌ Wrong OTP. Try again.</div>'+
-      '<button class="ps-otpverify" onclick="psVerify('+total+','+sub+','+gst+')">✅ Verify & Confirm Order</button>'+
-      '</div>';
+
+      // What happens next
+      '<div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:13px;margin-bottom:14px;text-align:left">'+
+        '<div style="font-size:.78rem;font-weight:800;color:#15803d;margin-bottom:8px">📋 What happens next?</div>'+
+        '<div style="font-size:.76rem;color:#16a34a;line-height:1.8">'+
+          (isDelivery
+            ? '1. Shop prepares your order<br/>2. Delivery person comes to your address<br/>3. Tell them your OTP <strong>'+otp+'</strong><br/>4. Order completed ✅'
+            : '1. Shop prepares your order<br/>2. Go to the shop<br/>3. Show OTP <strong>'+otp+'</strong> to shopkeeper<br/>4. Collect your order ✅')+
+        '</div>'+
+      '</div>'+
+
+      '<button class="ps-done" onclick="psCloseSheet();psBuildContent()" style="margin-bottom:8px">🏪 Back to Menu</button>'+
+      '<button class="ps-share" onclick="psShareOrder(\''+orderId+'\','+total+')">💬 Share Order on WhatsApp</button>'+
+    '</div>';
   }
 
+  window.psShareOrder=function(orderId,total){
+    var msg='🛒 I just ordered from *'+shopName+'*!\n\nOrder #'+orderId+' · ₹'+total+'\n\nOrder here: '+window.location.href;
+    window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+  };
+
+  // ─── SHOPKEEPER OTP ENTRY (for delivery confirmation) ───
+  // This is exposed so shopkeeper can open shop page and enter OTP
   window.psON=function(el,nid){
     el.value=el.value.replace(/\D/g,'').slice(-1);
     if(el.value&&nid)document.getElementById(nid)?.focus();
@@ -1740,6 +1834,8 @@ function renderShopSite(shop){
     if(all.length===6)setTimeout(function(){psVerify(swGrand,0,0);},350);
   };
   window.psOB=function(e,el,pid){if(e.key==='Backspace'&&!el.value&&pid)document.getElementById(pid)?.focus();};
+
+  // OTP verify kept for legacy WA bot flow
   window.psVerify=function(total){
     var entered=['z1','z2','z3','z4','z5','z6'].map(function(id){var e=document.getElementById(id);return e?e.value:'';}).join('');
     if(entered!==swOtp){
@@ -1747,29 +1843,27 @@ function renderShopSite(shop){
       ['z1','z2','z3','z4','z5','z6'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
       document.getElementById('z1')?.focus();return;
     }
-    // ✅ Send bill to shopkeeper WhatsApp
     var items=psGetItems();
-    var billMsg='🔔 *NEW ORDER — '+shopName+'*\n━━━━━━━━━━━━━━━━━━━━\n🧾 Order: #'+swOrderId+'\n⏰ '+new Date().toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'})+'\n━━━━━━━━━━━━━━━━━━━━\n'+
+    var billMsg='🔔 *ORDER CONFIRMED — '+shopName+'*\n━━━━━━━━━━━━━━━━━━━━\n🧾 #'+swOrderId+'\n'+
       items.map(function(i){return'• '+i.name+' ×'+i.qty+' = ₹'+(i.price*i.qty);}).join('\n')+
-      '\n━━━━━━━━━━━━━━━━━━━━\n*TOTAL: ₹'+total+'*\n💳 '+swPayMethod.toUpperCase()+' — ✅ OTP VERIFIED\n━━━━━━━━━━━━━━━━━━━━\n📍 '+swAddr+'\n👤 '+swCustName+'\n📞 '+swCustPhone+'\n━━━━━━━━━━━━━━━━━━━━\nPlease prepare and deliver. Customer has paid.';
+      '\n*TOTAL: ₹'+total+'*\n💳 OTP VERIFIED ✅\n📍 '+swAddr+'\n👤 '+swCustName+' · 📞 '+swCustPhone;
     setTimeout(function(){window.open('https://wa.me/91'+shopPhone+'?text='+encodeURIComponent(billMsg),'_blank');},500);
     swCart={};psUpdateCart();
-    psOpenSheet('✅ Order Placed!',buildSuccessHtml(total,items));
+    psOpenSheet('✅ Order Confirmed!',buildSuccessHtml(total,items));
   };
 
   function buildSuccessHtml(total,items){
     return'<div class="ps-succ">'+
       '<div class="ps-succ-ico">🎉</div>'+
       '<div class="ps-succ-title">Order Confirmed!</div>'+
-      '<div class="ps-succ-sub">Payment verified! Bill sent to<br/><strong>'+shopName+'</strong> on WhatsApp automatically.</div>'+
+      '<div class="ps-succ-sub">Bill sent to <strong>'+shopName+'</strong> on WhatsApp.</div>'+
       '<div class="ps-succ-card">'+
       '<div class="ps-succ-row"><span class="ps-succ-lbl">Order</span><span style="font-family:monospace;color:'+acc+'">#'+swOrderId+'</span></div>'+
       '<div class="ps-succ-row"><span class="ps-succ-lbl">Items</span><span>'+items.map(function(i){return i.name;}).join(', ')+'</span></div>'+
       '<div class="ps-succ-row"><span class="ps-succ-lbl">Total</span><span style="font-weight:800;color:'+acc+'">₹'+total+'</span></div>'+
-      '<div class="ps-succ-row"><span class="ps-succ-lbl">Status</span><span style="color:#15803d;font-weight:700">✅ Bill sent to shop</span></div>'+
+      '<div class="ps-succ-row"><span class="ps-succ-lbl">Status</span><span style="color:#15803d;font-weight:700">✅ Confirmed</span></div>'+
       '</div>'+
-      '<button class="ps-done" onclick="psCloseSheet();psBuildContent()">✅ Done — Back to Menu</button>'+
-      '<button class="ps-share" onclick="window.open(\'https://wa.me/?text=\'+encodeURIComponent(\'✅ I ordered from '+shopName+'! Order #'+swOrderId+' · ₹'+total+'\'),\'_blank\')">💬 Share on WhatsApp</button>'+
+      '<button class="ps-done" onclick="psCloseSheet();psBuildContent()">✅ Done</button>'+
       '</div>';
   }
 
@@ -3467,7 +3561,11 @@ function processWaMsg(msg){
         </div>
       </div>`;
 
-    addWaMsg('bot',`📍 Address saved: *${addr}*\n\n🧾 *Your Bill:*\n${waCart.map(c=>`• ${c.name} — ₹${c.price}`).join('\n')}\nGST (5%): ₹${gst}\n\n💰 *Grand Total: ₹${grand}*\n\n🔐 *Your OTP: ${otp}*\nEnter this OTP below to confirm payment.\n_Do not share OTP with anyone_`);
+    addWaMsg('bot',`📍 Address saved: *${addr}*\n\n🧾 *Your Bill:*\n${waCart.map(c=>`• ${c.name} — ₹${c.price}`).join('\n')}\nGST (5%): ₹${gst}\n\n💰 *Grand Total: ₹${grand}*\n\n🔐 Your OTP is being sent to your WhatsApp.\nEnter it below to confirm payment.`);
+
+    // Send OTP via real WhatsApp to customer
+    const otpWaMsg=`🔐 *Your Deckscrab OTP*\n\nOrder: #${orderId}\nShop: ${waShop.name}\n\nYour OTP:\n\n*${otp}*\n\nEnter this on the app to confirm ₹${grand} payment.\n_Do not share with anyone._`;
+    setTimeout(()=>window.open(`https://wa.me/91${waShop.wa||waShop.phone}?text=${encodeURIComponent(otpWaMsg)}`,'_blank'),400);
 
     // Show OTP input
     setTimeout(()=>{
@@ -3664,15 +3762,67 @@ let pCnt=0;
 function addProd(){
   pCnt++;const id='pr'+pCnt;
   const row=document.createElement('div');row.className='prod-row';row.id=id;
-  row.innerHTML=`<input class="fi" placeholder="Product/Service name" style="font-size:.8rem;padding:8px"/>
-    <input class="fi" placeholder="₹ Price" type="number" style="font-size:.8rem;padding:8px"/>
-    <button onclick="document.getElementById('${id}').remove()" style="background:rgba(255,61,90,.1);border:1px solid rgba(255,61,90,.2);border-radius:6px;width:26px;height:36px;color:var(--rose);font-size:.78rem">✕</button>`;
+  row.style.cssText='background:var(--sur);border:1.5px solid var(--bor);border-radius:var(--rs);padding:10px;margin-bottom:8px';
+  row.innerHTML=`
+    <div style="display:flex;gap:10px;align-items:flex-start">
+      <!-- Product image slot -->
+      <div id="pimg${id}" onclick="triggerProdImg('${id}')" style="width:64px;height:64px;border-radius:var(--rs);background:var(--bg);border:2px dashed var(--bor);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;overflow:hidden;position:relative">
+        <span style="font-size:1.4rem">📷</span>
+        <span style="font-size:.52rem;color:var(--mut);font-weight:700;margin-top:2px">Photo</span>
+      </div>
+      <input type="file" id="pimginp${id}" accept="image/*" style="display:none" onchange="handleProdImg('${id}',this)"/>
+      <!-- Fields -->
+      <div style="flex:1;display:grid;gap:6px">
+        <input class="fi" placeholder="Product / Service name *" style="font-size:.83rem;padding:8px"/>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <input class="fi" placeholder="₹ Price" type="number" style="font-size:.83rem;padding:8px"/>
+          <input class="fi" placeholder="Category (optional)" style="font-size:.83rem;padding:8px"/>
+        </div>
+        <input class="fi" placeholder="Description (optional)" style="font-size:.78rem;padding:7px"/>
+      </div>
+      <button onclick="document.getElementById('${id}').remove()" style="background:rgba(255,61,90,.1);border:1px solid rgba(255,61,90,.2);border-radius:6px;width:26px;height:26px;color:var(--rose);font-size:.78rem;flex-shrink:0;cursor:pointer">✕</button>
+    </div>`;
   document.getElementById('prodList').appendChild(row);
 }
+
+function triggerProdImg(rowId){
+  document.getElementById('pimginp'+rowId)?.click();
+}
+function handleProdImg(rowId,input){
+  const file=input.files[0];if(!file)return;
+  if(file.size>4*1024*1024){showToast('⚠️ Image too large — max 4MB');return;}
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const slot=document.getElementById('pimg'+rowId);
+    if(slot){
+      slot.innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:calc(var(--rs) - 2px)" alt="Product"/><div onclick="clearProdImg(event,'${rowId}')" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:.6rem;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2">✕</div>`;
+      slot.dataset.img=e.target.result;
+      slot.style.border='2px solid var(--grn)';
+    }
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+}
+function clearProdImg(e,rowId){
+  e.stopPropagation();
+  const slot=document.getElementById('pimg'+rowId);
+  if(slot){
+    slot.innerHTML='<span style="font-size:1.4rem">📷</span><span style="font-size:.52rem;color:var(--mut);font-weight:700;margin-top:2px">Photo</span>';
+    slot.dataset.img='';
+    slot.style.border='2px dashed var(--bor)';
+  }
+}
+
 function getProds(){
   return[...document.querySelectorAll('.prod-row')].map(r=>{
-    const ins=r.querySelectorAll('input');const n=ins[0]?.value.trim();const p=parseFloat(ins[1]?.value);
-    return n&&!isNaN(p)&&p>0?{n,p}:null;
+    const ins=r.querySelectorAll('input[type=text],input:not([type]),input[type=number]');
+    const n=ins[0]?.value.trim();
+    const p=parseFloat(ins[1]?.value);
+    const cat=ins[2]?.value.trim()||'Menu';
+    const desc=ins[3]?.value.trim()||'';
+    const imgSlot=r.querySelector('[id^="pimg"]');
+    const img=imgSlot?.dataset?.img||'';
+    return n&&!isNaN(p)&&p>0?{n,p,cat,desc,img}:null;
   }).filter(Boolean);
 }
 function buildReviewSummary(){
@@ -4002,25 +4152,79 @@ function nextGbStep(from){
 }
 function prevGbStep(from){gotoGbStep(from-1);}
 
-function addGbProd(name='',price='',emoji='🍽️'){
+function addGbProd(name='',price='',emoji='🍽️',img=''){
   gbProdCount++;const id='gbpr'+gbProdCount;
   const row=document.createElement('div');row.id=id;
-  row.style.cssText='background:#0a0f1a;border:1.5px solid rgba(255,255,255,.06);border-radius:var(--rs);padding:11px;margin-bottom:8px';
-  row.innerHTML=`<div style="display:grid;grid-template-columns:40px 1fr 90px 24px;gap:7px;align-items:center">
-    <input class="fi" value="${emoji}" placeholder="Emoji" style="font-size:1.1rem;text-align:center;padding:7px"/>
-    <input class="fi" value="${name}" placeholder="Item / product name *"/>
-    <input class="fi" value="${price}" placeholder="₹ Price" type="number"/>
-    <button onclick="document.getElementById('${id}').remove()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:6px;width:26px;height:36px;color:var(--rose);font-size:.78rem;cursor:pointer">✕</button>
-  </div>`;
+  row.style.cssText='background:#0a0f1a;border:1.5px solid rgba(255,255,255,.08);border-radius:var(--rs);padding:10px;margin-bottom:8px';
+  row.innerHTML=`
+    <div style="display:flex;gap:10px;align-items:flex-start">
+      <!-- Image slot -->
+      <div id="gbpi${id}" onclick="triggerGbProdImg('${id}')" data-img="${img}" style="width:68px;height:68px;border-radius:var(--rs);background:rgba(255,255,255,.04);border:2px dashed rgba(255,255,255,.15);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;overflow:hidden;position:relative;transition:.15s">
+        ${img?`<img src="${img}" style="width:100%;height:100%;object-fit:cover" alt=""/><div onclick="clearGbProdImg(event,'${id}')" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:.6rem;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2">✕</div>`:
+        `<span style="font-size:1.5rem">📷</span><span style="font-size:.55rem;color:var(--mut);font-weight:700;margin-top:2px">Add Photo</span>`}
+      </div>
+      <input type="file" id="gbpiinp${id}" accept="image/*" style="display:none" onchange="handleGbProdImg('${id}',this)"/>
+      <!-- Fields -->
+      <div style="flex:1;display:grid;gap:6px">
+        <div style="display:grid;grid-template-columns:36px 1fr;gap:6px">
+          <input class="fi" value="${emoji}" placeholder="🍽️" style="font-size:1.1rem;text-align:center;padding:6px"/>
+          <input class="fi" value="${name}" placeholder="Item / product name *" style="font-size:.84rem"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <input class="fi" value="${price}" placeholder="₹ Price *" type="number" style="font-size:.84rem"/>
+          <input class="fi" placeholder="Category" style="font-size:.84rem"/>
+        </div>
+        <input class="fi" placeholder="Description (shown to customers)" style="font-size:.78rem;padding:7px"/>
+      </div>
+      <button onclick="document.getElementById('${id}').remove()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:6px;width:26px;height:26px;color:var(--rose);font-size:.78rem;cursor:pointer;flex-shrink:0">✕</button>
+    </div>`;
   document.getElementById('gbProdList').appendChild(row);
+  // If img passed, mark border green
+  if(img){const slot=document.getElementById('gbpi'+id);if(slot)slot.style.border='2px solid var(--grn)';}
 }
+
+function triggerGbProdImg(rowId){
+  document.getElementById('gbpiinp'+rowId)?.click();
+}
+function handleGbProdImg(rowId,input){
+  const file=input.files[0];if(!file)return;
+  if(file.size>4*1024*1024){showToast('⚠️ Image too large — max 4MB');return;}
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const slot=document.getElementById('gbpi'+rowId);
+    if(slot){
+      slot.innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover" alt=""/><div onclick="clearGbProdImg(event,'${rowId}')" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:.6rem;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2">✕</div>`;
+      slot.dataset.img=e.target.result;
+      slot.style.border='2px solid var(--grn)';
+    }
+    // Refresh preview if on step 3
+    if(gbStep===3)buildGbPreview();
+    showToast('✅ Photo added!');
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+}
+function clearGbProdImg(e,rowId){
+  e.stopPropagation();
+  const slot=document.getElementById('gbpi'+rowId);
+  if(slot){
+    slot.innerHTML='<span style="font-size:1.5rem">📷</span><span style="font-size:.55rem;color:var(--mut);font-weight:700;margin-top:2px">Add Photo</span>';
+    slot.dataset.img='';
+    slot.style.border='2px dashed rgba(255,255,255,.15)';
+  }
+}
+
 function getGbProds(){
   return[...document.querySelectorAll('#gbProdList > div')].map(r=>{
-    const ins=r.querySelectorAll('input');
+    const ins=r.querySelectorAll('input:not([type=file])');
     const emoji=ins[0]?.value.trim()||'🍽️';
     const name=ins[1]?.value.trim();
     const price=parseFloat(ins[2]?.value);
-    return name&&!isNaN(price)&&price>0?{emoji,n:name,p:price,cat:'Menu'}:null;
+    const cat=ins[3]?.value.trim()||'Menu';
+    const desc=ins[4]?.value.trim()||'';
+    const imgSlot=r.querySelector('[id^="gbpi"]');
+    const img=imgSlot?.dataset?.img||'';
+    return name&&!isNaN(price)&&price>0?{emoji,n:name,p:price,cat,desc,img}:null;
   }).filter(Boolean);
 }
 function pickGbTheme(el,t){
