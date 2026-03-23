@@ -4230,6 +4230,9 @@ async function submitShop(){
   myShops.unshift(shop);
   localStorage.setItem('ds_myshops',JSON.stringify(myShops));
   LOCAL.add(shop);
+  // Set this phone as the owner identity
+  const ownerPhone=(shop.phone||shop.whatsapp||'').replace(/\D/g,'').slice(-10);
+  if(ownerPhone)setOwnerPhone(ownerPhone);
 
   // ALWAYS try Railway — wake it if needed
   let savedToServer=false;
@@ -4348,7 +4351,15 @@ function resetAddShop(){
 
 // ═══ PROFILE ═══
 function renderProfile(){
-  const shops=myShops;const first=shops[0];const has=!!first;
+  const ownerPhone=getOwnerPhone();
+  // Only show shops belonging to this device's owner
+  const myOwnShops=ownerPhone
+    ?myShops.filter(s=>{
+        const p=(s.wa||s.phone||s.whatsapp||'').replace(/\D/g,'').slice(-10);
+        return p===ownerPhone||!p;
+      })
+    :myShops;
+  const shops=myOwnShops;const first=shops[0];const has=!!first;
   const sec=has?SECTORS.find(s=>s.n===first?.sector)||{e:'🏪'}:{e:'👤'};
   const pending=pendingOrderCount();
   document.getElementById('profileHero').innerHTML=`
@@ -4362,6 +4373,20 @@ function renderProfile(){
       </div>
     </div>`;
   document.getElementById('profileBody').innerHTML=`
+    ${!ownerPhone?`
+    <div style="background:rgba(245,197,24,.08);border:1.5px solid rgba(245,197,24,.2);border-radius:var(--r);padding:14px;margin-bottom:12px">
+      <div style="font-size:.84rem;font-weight:700;color:var(--gold);margin-bottom:6px">📱 Set Your Business Phone</div>
+      <div style="font-size:.75rem;color:var(--mut);margin-bottom:10px">Enter your shop phone number to see your orders and shops across all devices</div>
+      <div style="display:flex;gap:8px">
+        <input id="ownerPhoneInp" class="fi" placeholder="Your phone number" type="tel" style="flex:1;padding:9px"/>
+        <button onclick="saveOwnerPhone()" style="background:var(--gold);color:var(--bg);border:none;border-radius:var(--rs);padding:9px 14px;font-size:.8rem;font-weight:800;cursor:pointer">Save</button>
+      </div>
+    </div>`:`
+    <div style="background:rgba(20,184,166,.06);border:1px solid rgba(20,184,166,.15);border-radius:var(--rs);padding:9px 12px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:1rem">📱</span>
+      <div style="flex:1;font-size:.76rem;color:var(--mut)">Logged in as <strong style="color:var(--teal)">+91 ${ownerPhone}</strong></div>
+      <button onclick="switchOwnerAccount()" style="background:none;border:1px solid var(--bor);color:var(--mut);border-radius:var(--rs);padding:4px 10px;font-size:.68rem;cursor:pointer">Switch</button>
+    </div>`}
     ${has?`
     <div class="prof-stats">
       <div class="prof-stat"><div class="prof-stat-n" style="color:var(--teal)">${first.views||1}</div><div class="prof-stat-l">Views</div></div>
@@ -4397,11 +4422,15 @@ function renderProfile(){
 }
 function renderMyShopsView(){
   const el=document.getElementById('myShopsSection');if(!el)return;
-  if(!myShops.length){
+  const ownerPhone=getOwnerPhone();
+  const ownShops=ownerPhone
+    ?myShops.filter(s=>{const p=(s.wa||s.phone||'').replace(/\D/g,'').slice(-10);return p===ownerPhone||!p;})
+    :myShops;
+  if(!ownShops.length){
     el.innerHTML=`<div class="no-shops"><div class="no-shops-ico">🏪</div><div class="no-shops-title">No businesses yet</div><div class="no-shops-sub">Register your first business — free, instant, permanent.</div><button onclick="goTo('addshop')" style="background:var(--gold);color:var(--bg);border:none;border-radius:999px;padding:10px 22px;font-size:.84rem;font-weight:700">+ Register Business</button></div>`;
     return;
   }
-  el.innerHTML=`<div style="font-family:'Syne',sans-serif;font-size:.98rem;font-weight:700;color:var(--wht);margin:16px 0 12px">🏪 My Listed Shops</div>`+myShops.map(s=>{
+  el.innerHTML=`<div style="font-family:'Syne',sans-serif;font-size:.98rem;font-weight:700;color:var(--wht);margin:16px 0 12px">🏪 My Listed Shops</div>`+ownShops.map(s=>{
     const sec=SECTORS.find(x=>x.n===s.sector)||{e:'🏪'};
     const slug=(s.name||'').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
     const webUrl=s.websiteUrl||`https://waseem-2007.github.io/deckscrab/?shop=${slug}`;
@@ -4456,81 +4485,44 @@ function saveOrders(orders){
   try{localStorage.setItem(ORDERS_KEY,JSON.stringify(orders));}catch(e){}
 }
 function pendingOrderCount(){
-  // Count pending orders for any of my shops
-  const myPhones=myShops.map(s=>(s.wa||s.phone||'').replace(/\D/g,''));
-  const myNames=myShops.map(s=>(s.name||'').toLowerCase().trim());
+  const ownerPhone=getOwnerPhone();
   return getOrders().filter(o=>{
     if(o.status!=='pending')return false;
-    const ph=(o.shopPhone||'').replace(/\D/g,'');
-    const nm=(o.shopName||'').toLowerCase().trim();
-    return myPhones.includes(ph)||myNames.includes(nm);
+    if(!ownerPhone)return true;
+    return (o.shopPhone||'').replace(/\D/g,'').slice(-10)===ownerPhone;
   }).length;
 }
 
 async function renderOrdersView(){
   const el=document.getElementById('myShopsSection');if(!el)return;
+  const ownerPhone=getOwnerPhone();
 
-  // Show local orders instantly if any
-  const localOrders=getOrders();
-  if(localOrders.length){
-    renderOrdersDisplay(localOrders);
-  } else {
-    el.innerHTML=`
-      <div style="text-align:center;padding:24px 16px">
-        <div style="font-size:2rem;margin-bottom:8px">📡</div>
-        <div style="font-size:.86rem;font-weight:700;color:var(--wht);margin-bottom:4px">Fetching Orders…</div>
-        <div style="font-size:.75rem;color:var(--mut);margin-bottom:14px">Connecting to server — may take 10 seconds</div>
-        <div style="height:4px;background:var(--bor);border-radius:2px;overflow:hidden">
-          <div id="ordLoadBar" style="height:100%;width:0%;background:var(--vio);border-radius:2px;transition:width 8s linear"></div>
-        </div>
-      </div>`;
-    setTimeout(()=>{const b=document.getElementById('ordLoadBar');if(b)b.style.width='90%';},100);
+  function isOwnerOrder(o){
+    if(!ownerPhone)return true;
+    const sp=(o.shopPhone||'').replace(/\D/g,'').slice(-10);
+    return sp===ownerPhone;
   }
 
-  // Wake server first if needed
-  if(!apiOnline){
-    try{
-      const w=await fetch(`${API_BASE}/health`,{signal:AbortSignal.timeout(12000)});
-      if(w.ok)apiOnline=true;
-    }catch(e){}
-  }
+  // Show local orders immediately
+  const localOrders=getOrders().filter(isOwnerOrder);
+  renderOrdersDisplay(localOrders);
 
-  // Fetch orders from server
+  // Fetch from server in background
   try{
-    const r=await fetch(`${API_BASE}/api/orders?limit=200`,{signal:AbortSignal.timeout(12000)});
+    const r=await fetch(`${API_BASE}/api/orders?limit=200`,{signal:AbortSignal.timeout(10000)});
     if(r.ok){
       const d=await r.json();
-      const serverOrders=d.orders||[];
-
-      // Merge server + local, deduplicate
+      const serverOrders=(d.orders||[]).filter(isOwnerOrder);
       const seen=new Set();
       const allOrders=[...serverOrders,...localOrders].filter(o=>{
         if(!o.orderId||seen.has(o.orderId))return false;
-        seen.add(o.orderId);
-        return true;
+        seen.add(o.orderId);return true;
       }).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-
-      saveOrders(allOrders.slice(0,200));
+      const others=getOrders().filter(o=>!isOwnerOrder(o));
+      saveOrders([...allOrders,...others].slice(0,200));
       renderOrdersDisplay(allOrders);
-      return;
     }
   }catch(e){}
-
-  // Server failed
-  if(localOrders.length){
-    renderOrdersDisplay(localOrders); // already showing, just leave it
-  } else {
-    el.innerHTML=`
-      <div style="text-align:center;padding:32px 16px">
-        <div style="font-size:2.5rem;margin-bottom:10px">📦</div>
-        <div style="font-family:'Syne',sans-serif;font-size:.95rem;font-weight:700;color:var(--wht);margin-bottom:6px">No Orders Yet</div>
-        <div style="font-size:.78rem;color:var(--mut);line-height:1.7;margin-bottom:16px">
-          When customers order from your website,<br/>orders appear here automatically.
-        </div>
-        <button onclick="renderOrdersView()" style="background:var(--vio);color:#fff;border:none;border-radius:999px;padding:10px 22px;font-size:.82rem;font-weight:700;cursor:pointer;margin-bottom:8px">🔄 Refresh</button>
-        <div style="font-size:.72rem;color:var(--mut)">Server may be starting up — try again in 10 seconds</div>
-      </div>`;
-  }
 }
 
 function renderOrdersDisplay(orders){
@@ -4755,6 +4747,28 @@ function rejectOrder(orderId){
 
 function refreshOrders(){showToast('🔄 Refreshing orders…');renderOrdersView();}
 
+function saveOwnerPhone(){
+  const inp=document.getElementById('ownerPhoneInp');
+  if(!inp)return;
+  const phone=inp.value.trim();
+  const saved=setOwnerPhone(phone);
+  if(saved){
+    showToast('✅ Phone saved — '+saved);
+    renderProfile();
+    // Pull orders from server for this phone
+    renderOrdersView();
+  }else{
+    showToast('⚠️ Enter a valid 10-digit phone number');
+  }
+}
+
+function switchOwnerAccount(){
+  if(!confirm('Switch account? Your local shop data will stay on this device.'))return;
+  localStorage.removeItem(OWNER_KEY);
+  renderProfile();
+  showToast('Account switched — enter your new phone number');
+}
+
 // Auto-sync local shops to server silently on startup
 async function autoSyncLocalShops(){
   if(!myShops.length)return;
@@ -4802,18 +4816,23 @@ function renderGrow(){
     plansWrap.insertBefore(existingEl,plansWrap.firstChild);
   }
 
-  if(!myShops.length){
+  const ownerPhone=getOwnerPhone();
+  const ownShops=ownerPhone
+    ?myShops.filter(s=>{const p=(s.wa||s.phone||'').replace(/\D/g,'').slice(-10);return p===ownerPhone||!p;})
+    :myShops;
+
+  if(!ownShops.length){
     existingEl.innerHTML='';
     return;
   }
 
-  // Show registered shops with activate/manage buttons
+  // Show only owner's shops with activate/manage buttons
   existingEl.innerHTML=`
     <div style="background:rgba(31,217,122,.06);border:1.5px solid rgba(31,217,122,.2);border-radius:var(--r);padding:16px;margin-bottom:20px">
       <div style="font-family:'Syne',sans-serif;font-size:.88rem;font-weight:700;color:var(--grn);margin-bottom:12px">
         ✅ Your Registered Businesses
       </div>
-      ${myShops.map(s=>{
+      ${ownShops.map(s=>{
         const slug=(s.name||'').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
         const webUrl=s.websiteUrl||`https://waseem-2007.github.io/deckscrab/?shop=${slug}`;
         const hasWebsite=!!(s.websiteUrl||s.websiteEnabled);
@@ -5417,25 +5436,62 @@ function showToast(msg){
 }
 
 // ═══ INIT — only runs when NOT in ?shop= mode ═══
+// ═══ PHONE IDENTITY SYSTEM ═══
+// The shopkeeper's phone is their identity
+// Stored in localStorage as ds_owner_phone
+// Orders/shops only visible to matching phone
+
+const OWNER_KEY='ds_owner_phone';
+
+function getOwnerPhone(){
+  return localStorage.getItem(OWNER_KEY)||'';
+}
+function setOwnerPhone(phone){
+  const clean=phone.replace(/\D/g,'').slice(-10); // last 10 digits
+  if(clean.length===10){
+    localStorage.setItem(OWNER_KEY,clean);
+    return clean;
+  }
+  return '';
+}
+function isMyShop(shop){
+  const owner=getOwnerPhone();
+  if(!owner)return true; // no identity set yet — show all (first time)
+  const shopPhone=(shop.wa||shop.phone||shop.whatsapp||'').replace(/\D/g,'').slice(-10);
+  return shopPhone===owner||!shopPhone;
+}
+function isMyOrder(order){
+  const owner=getOwnerPhone();
+  if(!owner)return true;
+  const shopPhone=(order.shopPhone||'').replace(/\D/g,'').slice(-10);
+  return shopPhone===owner||shopPhone.includes(owner)||owner.includes(shopPhone);
+}
+
+// Ask for phone if not set and user has shops
+function ensureOwnerIdentity(){
+  if(getOwnerPhone())return Promise.resolve(getOwnerPhone());
+  if(!myShops.length)return Promise.resolve('');
+  // Get from first shop
+  const phone=(myShops[0].wa||myShops[0].phone||'').replace(/\D/g,'').slice(-10);
+  if(phone){setOwnerPhone(phone);return Promise.resolve(phone);}
+  return Promise.resolve('');
+}
+
 window.addEventListener('DOMContentLoaded',async()=>{
   // If shop website mode, don't init main app at all
   if(new URLSearchParams(window.location.search).get('shop'))return;
-  // Safe init — elements guaranteed to exist
+  // Set owner identity from registered shops
+  ensureOwnerIdentity();
+  // Safe init
   if(el('secGrid'))buildSectors('');
   if(el('prodList')){addProd();addProd();}
-  // Wake Railway and sync local shops that haven't been saved to server
+  // Wake Railway and auto-sync
   setDot('waking');
   wakeServer().then(ok=>{
-    if(ok){
-      renderHome();
-      // Auto-sync any local shops not yet on server
-      autoSyncLocalShops();
-    }
+    if(ok){renderHome();autoSyncLocalShops();}
   });
-  // Start local render immediately with cached data
   await renderHome();
   renderSupply();
-  // Keep server awake while app is open
   startKeepAlive();
 });
 // ═══════════════════════════════════════
