@@ -1990,12 +1990,12 @@ function renderShopSite(shop){
 
     // Sync with localStorage orders
     try{
-      var orders=JSON.parse(localStorage.getItem('ds_orders')||'[]');
+      var orders=JSON.parse(localStorage.getItem('ds_orders_v2')||'[]');
       var ord=orders.find(function(o){return o.orderId===swOrderId;});
       if(ord){
         ord.status='confirmed';
         ord.confirmedAt=new Date().toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'});
-        localStorage.setItem('ds_orders',JSON.stringify(orders));
+        localStorage.setItem('ds_orders_v2',JSON.stringify(orders));
       }
     }catch(e){}
 
