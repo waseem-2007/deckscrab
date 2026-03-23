@@ -935,67 +935,98 @@ textarea.sw-fi{resize:vertical;min-height:68px}
 
     function slugify(name){
       return(name||'').toLowerCase()
-        .replace(/copy$/i,'')         // remove "Copy" added by clipboard
+        .replace(/copy$/i,'')
         .replace(/\s+/g,'-')
         .replace(/[^a-z0-9-]/g,'')
-        .replace(/-+/g,'-')           // collapse multiple dashes
-        .replace(/^-|-$/g,'');        // trim dashes
+        .replace(/-+/g,'-')
+        .replace(/^-|-$/g,'');
     }
-
-    // Also try loose matching (ignore dashes/spaces differences)
     function loosify(name){
       return(name||'').toLowerCase().replace(/[^a-z0-9]/g,'');
     }
 
-    // 1. Try localStorage first (fastest)
+    // Helper — normalize a raw business record from Railway
+    function normalizeBiz(found){
+      return {
+        name:found.name||'Shop',
+        e:found.sectorEmoji||found.emoji||found.e||'🏪',
+        desc:found.description||found.desc||'',
+        phone:(found.phone||found.phoneNumber||found.contact||'').toString(),
+        wa:(found.whatsapp||found.wa||found.whatsappNumber||found.phone||found.phoneNumber||'').toString(),
+        addr:found.address||found.addr||found.streetAddress||'',
+        city:found.city||found.town||'',
+        oh:found.hours?.Monday?.open||found.oh||'9:00 AM',
+        oc:found.hours?.Monday?.close||found.oc||'9:00 PM',
+        delivery:found.delivery!==false,
+        theme:found.theme||'dark',
+        sector:found.sectorName||found.sector||found.sectorEmoji||'',
+        photos:found.photos||[],
+        prods:(found.products||found.prods||[]).map(function(p){return{
+          n:p.name||p.n||'Item',
+          p:parseFloat(p.price||p.p)||0,
+          emoji:p.emoji||p.sectorEmoji||'🍽️',
+          cat:p.cat||p.category||'Menu',
+          desc:p.description||p.desc||'',
+          img:p.img||p.image||p.photo||'',
+        };}).filter(function(p){return p.n&&p.n!=='Item'||p.p>0;}),
+      };
+    }
+
+    // 1. Try localStorage first (same device — instant)
     let shop=null;
     try{
       const local=JSON.parse(localStorage.getItem('ds_myshops')||'[]');
-      // Exact slug match first
-      shop=local.find(s=>slugify(s.name)===shopSlug);
-      // Fuzzy match if not found
-      if(!shop)shop=local.find(s=>loosify(s.name)===loosify(shopSlug));
-      // Stored slug match
-      if(!shop)shop=local.find(s=>s.websiteSlug===shopSlug||slugify(s.websiteSlug||'')===shopSlug);
+      shop=local.find(function(s){return slugify(s.name)===shopSlug;});
+      if(!shop)shop=local.find(function(s){return loosify(s.name)===loosify(shopSlug);});
     }catch(e){}
 
-    // 2. Try Railway server (works on ALL devices)
-    if(!shop){
-      try{
-        const r=await fetch('https://deckscrab-backend-production.up.railway.app/api/businesses?limit=500');
-        const d=await r.json();
-        if(d&&d.businesses){
-          let found=d.businesses.find(b=>slugify(b.name)===shopSlug);
-          if(!found)found=d.businesses.find(b=>loosify(b.name)===loosify(shopSlug));
-          if(found){
-            shop={
-              name:found.name,
-              e:found.sectorEmoji||found.emoji||found.e||'🏪',
-              desc:found.description||found.desc||'',
-              phone:found.phone||found.phoneNumber||found.contact||'',
-              wa:found.whatsapp||found.wa||found.whatsappNumber||found.phone||found.phoneNumber||'',
-              addr:found.address||found.addr||found.streetAddress||'',
-              city:found.city||found.town||'',
-              oh:found.hours?.Monday?.open||found.oh||found.openTime||'9:00 AM',
-              oc:found.hours?.Monday?.close||found.oc||found.closeTime||'9:00 PM',
-              delivery:found.delivery!==false,
-              theme:found.theme||'dark',
-              sector:found.sectorName||found.sector||'',
-              prods:(found.products||found.prods||[]).map(p=>({
-                n:p.name||p.n||'Item',
-                p:parseFloat(p.price||p.p)||0,
-                emoji:p.emoji||'🍽️',
-                cat:p.cat||p.category||'Menu',
-                desc:p.description||p.desc||'',
-                img:p.img||p.image||p.photo||'',
-              })),
-            };
+    // 2. Try Railway — wake it up first if needed, then fetch
+    if(!shop||!(shop.prods||shop.products||[]).length){
+      // Show what we have while loading from server
+      if(shop){
+        document.body.innerHTML='';
+        document.body.className='sw-body';
+        renderShopSite(shop);
+      }
+
+      // Try fetching from Railway (up to 3 attempts to handle sleep)
+      for(let attempt=0;attempt<3;attempt++){
+        try{
+          const controller=new AbortController();
+          const timer=setTimeout(function(){controller.abort();},12000);
+          const r=await fetch('https://deckscrab-backend-production.up.railway.app/api/businesses?limit=500',{signal:controller.signal});
+          clearTimeout(timer);
+          if(r.ok){
+            const d=await r.json();
+            if(d&&d.businesses&&d.businesses.length){
+              let found=d.businesses.find(function(b){return slugify(b.name)===shopSlug;});
+              if(!found)found=d.businesses.find(function(b){return loosify(b.name)===loosify(shopSlug);});
+              if(found){
+                const serverShop=normalizeBiz(found);
+                // Merge: prefer server data but keep local products if server has none
+                if(shop&&(shop.prods||[]).length&&!(serverShop.prods||[]).length){
+                  serverShop.prods=shop.prods;
+                }
+                shop=serverShop;
+                // Save to localStorage for future offline use
+                try{
+                  const local=JSON.parse(localStorage.getItem('ds_myshops')||'[]');
+                  const idx=local.findIndex(function(s){return slugify(s.name)===shopSlug;});
+                  if(idx>=0)local[idx]={...local[idx],...serverShop};
+                  else local.unshift(serverShop);
+                  localStorage.setItem('ds_myshops',JSON.stringify(local));
+                }catch(e){}
+                break; // success
+              }
+            }
           }
+        }catch(e){
+          if(attempt<2)await new Promise(function(r){setTimeout(r,3000);}); // wait 3s then retry
         }
-      }catch(e){}
+      }
     }
 
-    // 3. Not found
+    // 3. Final render
     document.body.innerHTML='';
     document.body.className='sw-body';
     if(!shop){
@@ -3274,7 +3305,14 @@ async function fetchServerShops(q='',cat='',rad=100){
       rc:parseInt(b.reviewCount)||0,
       views:parseInt(b.views)||1,
       verified:!!b.verified,
-      prods:(b.products||[]).map(p=>({n:p.name||p.n||'',p:parseFloat(p.price||p.p)||0})),
+      prods:(b.products||b.prods||[]).map(p=>({
+        n:p.name||p.n||'',
+        p:parseFloat(p.price||p.p)||0,
+        emoji:p.emoji||p.sectorEmoji||'🍽️',
+        cat:p.category||p.cat||'Menu',
+        desc:p.description||p.desc||'',
+        img:p.img||p.image||p.photo||'',
+      })),
       revs:[],
       reg:b.registeredAt||0,
       bizId:b.bizId||b.id,
@@ -4432,30 +4470,39 @@ function pendingOrderCount(){
 async function renderOrdersView(){
   const el=document.getElementById('myShopsSection');if(!el)return;
 
-  // Show local orders IMMEDIATELY — no waiting
+  // Show local orders instantly if any
   const localOrders=getOrders();
   if(localOrders.length){
     renderOrdersDisplay(localOrders);
   } else {
-    el.innerHTML=`<div style="text-align:center;padding:20px;color:var(--mut);font-size:.82rem">⏳ Loading orders…</div>`;
+    el.innerHTML=`
+      <div style="text-align:center;padding:24px 16px">
+        <div style="font-size:2rem;margin-bottom:8px">📡</div>
+        <div style="font-size:.86rem;font-weight:700;color:var(--wht);margin-bottom:4px">Fetching Orders…</div>
+        <div style="font-size:.75rem;color:var(--mut);margin-bottom:14px">Connecting to server — may take 10 seconds</div>
+        <div style="height:4px;background:var(--bor);border-radius:2px;overflow:hidden">
+          <div id="ordLoadBar" style="height:100%;width:0%;background:var(--vio);border-radius:2px;transition:width 8s linear"></div>
+        </div>
+      </div>`;
+    setTimeout(()=>{const b=document.getElementById('ordLoadBar');if(b)b.style.width='90%';},100);
   }
 
-  // Then fetch from server in background and update
-  const myPhones=myShops.map(s=>(s.wa||s.phone||'').replace(/\D/g,''));
-  const myNames=myShops.map(s=>(s.name||'').toLowerCase().trim());
+  // Wake server first if needed
+  if(!apiOnline){
+    try{
+      const w=await fetch(`${API_BASE}/health`,{signal:AbortSignal.timeout(12000)});
+      if(w.ok)apiOnline=true;
+    }catch(e){}
+  }
 
+  // Fetch orders from server
   try{
-    const r=await fetch(`${API_BASE}/api/orders?limit=200`,{signal:AbortSignal.timeout(8000)});
+    const r=await fetch(`${API_BASE}/api/orders?limit=200`,{signal:AbortSignal.timeout(12000)});
     if(r.ok){
       const d=await r.json();
-      const serverOrders=(d.orders||[]).filter(o=>{
-        if(!myPhones.length&&!myNames.length)return true; // no shops registered — show all
-        const ph=(o.shopPhone||'').replace(/\D/g,'');
-        const nm=(o.shopName||'').toLowerCase().trim();
-        return myPhones.some(p=>p&&ph.includes(p))||myNames.some(n=>n&&nm.includes(n))||true;
-      });
+      const serverOrders=d.orders||[];
 
-      // Merge local + server, deduplicate by orderId
+      // Merge server + local, deduplicate
       const seen=new Set();
       const allOrders=[...serverOrders,...localOrders].filter(o=>{
         if(!o.orderId||seen.has(o.orderId))return false;
@@ -4465,16 +4512,24 @@ async function renderOrdersView(){
 
       saveOrders(allOrders.slice(0,200));
       renderOrdersDisplay(allOrders);
+      return;
     }
-  }catch(e){
-    // Server failed — already showing local orders above
-    if(!localOrders.length){
-      el.innerHTML=`<div style="text-align:center;padding:28px;color:var(--mut);font-size:.82rem">
-        <div style="font-size:2rem;margin-bottom:8px">📦</div>
-        No orders yet<br/>
-        <button onclick="renderOrdersView()" style="margin-top:12px;background:var(--vio);color:#fff;border:none;border-radius:999px;padding:8px 18px;font-size:.78rem;cursor:pointer">🔄 Retry</button>
+  }catch(e){}
+
+  // Server failed
+  if(localOrders.length){
+    renderOrdersDisplay(localOrders); // already showing, just leave it
+  } else {
+    el.innerHTML=`
+      <div style="text-align:center;padding:32px 16px">
+        <div style="font-size:2.5rem;margin-bottom:10px">📦</div>
+        <div style="font-family:'Syne',sans-serif;font-size:.95rem;font-weight:700;color:var(--wht);margin-bottom:6px">No Orders Yet</div>
+        <div style="font-size:.78rem;color:var(--mut);line-height:1.7;margin-bottom:16px">
+          When customers order from your website,<br/>orders appear here automatically.
+        </div>
+        <button onclick="renderOrdersView()" style="background:var(--vio);color:#fff;border:none;border-radius:999px;padding:10px 22px;font-size:.82rem;font-weight:700;cursor:pointer;margin-bottom:8px">🔄 Refresh</button>
+        <div style="font-size:.72rem;color:var(--mut)">Server may be starting up — try again in 10 seconds</div>
       </div>`;
-    }
   }
 }
 
@@ -4699,6 +4754,16 @@ function rejectOrder(orderId){
 }
 
 function refreshOrders(){showToast('🔄 Refreshing orders…');renderOrdersView();}
+
+// Auto-sync local shops to server silently on startup
+async function autoSyncLocalShops(){
+  if(!myShops.length)return;
+  for(const shop of myShops){
+    try{
+      await apiPost('/api/businesses',shop);
+    }catch(e){}
+  }
+}
 
 async function deleteShop(id){
   if(!confirm('Delete this listing?'))return;
@@ -5358,11 +5423,13 @@ window.addEventListener('DOMContentLoaded',async()=>{
   // Safe init — elements guaranteed to exist
   if(el('secGrid'))buildSectors('');
   if(el('prodList')){addProd();addProd();}
-  // Wake Railway (may be sleeping — tries 3 times silently)
+  // Wake Railway and sync local shops that haven't been saved to server
   setDot('waking');
   wakeServer().then(ok=>{
     if(ok){
-      renderHome(); // Reload with server data once online
+      renderHome();
+      // Auto-sync any local shops not yet on server
+      autoSyncLocalShops();
     }
   });
   // Start local render immediately with cached data
