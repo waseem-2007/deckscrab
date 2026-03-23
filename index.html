@@ -4431,49 +4431,51 @@ function pendingOrderCount(){
 
 async function renderOrdersView(){
   const el=document.getElementById('myShopsSection');if(!el)return;
-  el.innerHTML=`<div style="text-align:center;padding:20px;color:var(--mut);font-size:.82rem">⏳ Loading orders…</div>`;
 
-  // Get orders for this shopkeeper's shops
+  // Show local orders IMMEDIATELY — no waiting
+  const localOrders=getOrders();
+  if(localOrders.length){
+    renderOrdersDisplay(localOrders);
+  } else {
+    el.innerHTML=`<div style="text-align:center;padding:20px;color:var(--mut);font-size:.82rem">⏳ Loading orders…</div>`;
+  }
+
+  // Then fetch from server in background and update
   const myPhones=myShops.map(s=>(s.wa||s.phone||'').replace(/\D/g,''));
   const myNames=myShops.map(s=>(s.name||'').toLowerCase().trim());
 
-  // Try Railway API first
-  let serverOrders=[];
   try{
-    const r=await fetch(`${API_BASE}/api/orders?limit=200`,{signal:AbortSignal.timeout(6000)});
+    const r=await fetch(`${API_BASE}/api/orders?limit=200`,{signal:AbortSignal.timeout(8000)});
     if(r.ok){
       const d=await r.json();
-      serverOrders=(d.orders||d||[]).filter(o=>{
+      const serverOrders=(d.orders||[]).filter(o=>{
+        if(!myPhones.length&&!myNames.length)return true; // no shops registered — show all
         const ph=(o.shopPhone||'').replace(/\D/g,'');
         const nm=(o.shopName||'').toLowerCase().trim();
-        return myPhones.includes(ph)||myNames.includes(nm);
+        return myPhones.some(p=>p&&ph.includes(p))||myNames.some(n=>n&&nm.includes(n))||true;
       });
+
+      // Merge local + server, deduplicate by orderId
+      const seen=new Set();
+      const allOrders=[...serverOrders,...localOrders].filter(o=>{
+        if(!o.orderId||seen.has(o.orderId))return false;
+        seen.add(o.orderId);
+        return true;
+      }).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+
+      saveOrders(allOrders.slice(0,200));
+      renderOrdersDisplay(allOrders);
     }
-  }catch(e){}
-
-  // Merge with localStorage (dedup by orderId)
-  const localOrders=getOrders().filter(o=>{
-    const ph=(o.shopPhone||'').replace(/\D/g,'');
-    const nm=(o.shopName||'').toLowerCase().trim();
-    return myPhones.includes(ph)||myNames.includes(nm);
-  });
-
-  const seen=new Set();
-  const allOrders=[...serverOrders,...localOrders].filter(o=>{
-    if(seen.has(o.orderId))return false;
-    seen.add(o.orderId);
-    return true;
-  }).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-
-  // Merge back to localStorage
-  const existingOthers=getOrders().filter(o=>{
-    const ph=(o.shopPhone||'').replace(/\D/g,'');
-    const nm=(o.shopName||'').toLowerCase().trim();
-    return !myPhones.includes(ph)&&!myNames.includes(nm);
-  });
-  saveOrders([...allOrders,...existingOthers].slice(0,200));
-
-  renderOrdersDisplay(allOrders);
+  }catch(e){
+    // Server failed — already showing local orders above
+    if(!localOrders.length){
+      el.innerHTML=`<div style="text-align:center;padding:28px;color:var(--mut);font-size:.82rem">
+        <div style="font-size:2rem;margin-bottom:8px">📦</div>
+        No orders yet<br/>
+        <button onclick="renderOrdersView()" style="margin-top:12px;background:var(--vio);color:#fff;border:none;border-radius:999px;padding:8px 18px;font-size:.78rem;cursor:pointer">🔄 Retry</button>
+      </div>`;
+    }
+  }
 }
 
 function renderOrdersDisplay(orders){
