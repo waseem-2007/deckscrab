@@ -4226,10 +4226,17 @@ async function submitShop(){
     photos:shopPhotos.filter(Boolean),
   };
 
-  // Save locally FIRST (instant)
-  myShops.unshift(shop);
+  // Save locally FIRST — prevent duplicates by name
+  const existingIdx=myShops.findIndex(s=>
+    (s.name||'').toLowerCase().trim()===(shop.name||'').toLowerCase().trim()
+  );
+  if(existingIdx>=0){
+    myShops[existingIdx]={...myShops[existingIdx],...shop}; // update existing
+  }else{
+    myShops.unshift(shop); // add new
+  }
   localStorage.setItem('ds_myshops',JSON.stringify(myShops));
-  LOCAL.add(shop);
+  LOCAL.save(myShops);
   // Set this phone as the owner identity
   const ownerPhone=(shop.phone||shop.whatsapp||'').replace(/\D/g,'').slice(-10);
   if(ownerPhone)setOwnerPhone(ownerPhone);
@@ -4409,6 +4416,7 @@ function renderProfile(){
         {i:'📦',l:'Orders Received',f:`renderOrdersView()`,badge:pendingOrderCount()},
         {i:'📋',l:'My Listed Shops',f:`renderMyShopsView()`},
         {i:'☁️',l:'Sync to Server',f:`syncShopsToServer()`},
+        {i:'🧹',l:'Remove Duplicates',f:`cleanDuplicateShops()`},
         {i:'➕',l:'Add New Business',f:`goTo('addshop')`},
         {i:'📍',l:'Set My Location',f:`openLocModal()`},
         {i:'⚙️',l:'Settings',f:`showToast('Coming soon!')`}
@@ -4747,6 +4755,26 @@ function rejectOrder(orderId){
 
 function refreshOrders(){showToast('🔄 Refreshing orders…');renderOrdersView();}
 
+function cleanDuplicateShops(){
+  const before=myShops.length;
+  // Keep only unique shops by name (case-insensitive)
+  const seen=new Set();
+  myShops=myShops.filter(s=>{
+    const key=(s.name||'').toLowerCase().trim();
+    if(seen.has(key))return false;
+    seen.add(key);
+    return true;
+  });
+  const removed=before-myShops.length;
+  localStorage.setItem('ds_myshops',JSON.stringify(myShops));
+  if(removed>0){
+    showToast(`🧹 Removed ${removed} duplicate${removed>1?'s':''}!`);
+    renderProfile();
+  }else{
+    showToast('✅ No duplicates found');
+  }
+}
+
 function saveOwnerPhone(){
   const inp=document.getElementById('ownerPhoneInp');
   if(!inp)return;
@@ -4769,12 +4797,21 @@ function switchOwnerAccount(){
   showToast('Account switched — enter your new phone number');
 }
 
-// Auto-sync local shops to server silently on startup
+// Auto-sync local shops to server silently on startup — no duplicates
 async function autoSyncLocalShops(){
   if(!myShops.length)return;
+  const synced=localStorage.getItem('ds_synced_ids')||'';
   for(const shop of myShops){
+    const key=shop.bizId||shop.id||'';
+    if(key&&synced.includes(key))continue; // already synced
     try{
-      await apiPost('/api/businesses',shop);
+      const result=await apiPost('/api/businesses',shop);
+      if(result&&result.ok){
+        // Mark as synced
+        const ids=(localStorage.getItem('ds_synced_ids')||'').split(',').filter(Boolean);
+        ids.push(key);
+        localStorage.setItem('ds_synced_ids',ids.slice(-50).join(','));
+      }
     }catch(e){}
   }
 }
