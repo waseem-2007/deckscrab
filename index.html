@@ -4411,22 +4411,33 @@ function renderProfile(){
       <div style="flex:1"><div class="uc-title">Grow Your Business</div><div class="uc-sub">Get your own website, WhatsApp bot, run ads. Customers order 24/7.</div></div>
       <button class="uc-btn" onclick="goTo('grow')">Upgrade</button>
     </div>
-    <div class="prof-menu">
-      ${[
-        {i:'📦',l:'Orders Received',f:`renderOrdersView()`,badge:pendingOrderCount()},
-        {i:'📋',l:'My Listed Shops',f:`renderMyShopsView()`},
-        {i:'☁️',l:'Sync to Server',f:`syncShopsToServer()`},
-        {i:'🧹',l:'Remove Duplicates',f:`cleanDuplicateShops()`},
-        {i:'➕',l:'Add New Business',f:`goTo('addshop')`},
-        {i:'📍',l:'Set My Location',f:`openLocModal()`},
-        {i:'⚙️',l:'Settings',f:`showToast('Coming soon!')`}
-      ].map(item=>`<div class="prof-menu-item" onclick="${item.f}">
+    <div class="prof-menu" id="profMenu"></div>
+    <div id="myShopsSection"></div>`;
+  // Build menu items separately to avoid quote-in-onclick issues
+  const menuItems=[
+    {i:'📦',l:'Orders Received',fn:()=>renderOrdersView(),badge:pendingOrderCount()},
+    {i:'📋',l:'My Listed Shops',fn:()=>renderMyShopsView()},
+    {i:'☁️',l:'Sync to Server',fn:()=>syncShopsToServer()},
+    {i:'🧹',l:'Remove Duplicates',fn:()=>cleanDuplicateShops()},
+    {i:'➕',l:'Add New Business',fn:()=>goTo('addshop')},
+    {i:'📍',l:'Set My Location',fn:()=>openLocModal()},
+    {i:'⚙️',l:'Settings',fn:()=>showToast('Coming soon!')},
+  ];
+  const menuEl=document.getElementById('profMenu');
+  if(menuEl){
+    menuEl.innerHTML='';
+    menuItems.forEach(item=>{
+      const div=document.createElement('div');
+      div.className='prof-menu-item';
+      div.style.cssText='cursor:pointer';
+      div.innerHTML=`
         <span class="pmi-lbl">${item.i} ${item.l}</span>
         ${item.badge?`<span style="background:var(--rose);color:#fff;border-radius:999px;padding:2px 8px;font-size:.68rem;font-weight:800;margin-right:4px">${item.badge}</span>`:''}
-        <span class="pmi-arrow">›</span>
-      </div>`).join('')}
-    </div>
-    <div id="myShopsSection"></div>`;
+        <span class="pmi-arrow">›</span>`;
+      div.addEventListener('click', item.fn);
+      menuEl.appendChild(div);
+    });
+  }
 }
 function renderMyShopsView(){
   const el=document.getElementById('myShopsSection');if(!el)return;
@@ -4502,13 +4513,34 @@ function pendingOrderCount(){
 }
 
 async function renderOrdersView(){
-  const el=document.getElementById('myShopsSection');if(!el)return;
+  // Migrate old key to new key
+  try{
+    const old=localStorage.getItem('ds_orders');
+    if(old){
+      const oldOrders=JSON.parse(old);
+      if(oldOrders.length){
+        const cur=JSON.parse(localStorage.getItem('ds_orders_v2')||'[]');
+        const seen=new Set(cur.map(o=>o.orderId));
+        const merged=[...cur,...oldOrders.filter(o=>!seen.has(o.orderId))];
+        localStorage.setItem('ds_orders_v2',JSON.stringify(merged));
+        localStorage.removeItem('ds_orders'); // clean up old key
+      }
+    }
+  }catch(e){}
+
+  const el=document.getElementById('myShopsSection');
+  if(!el)return;
+
+  // Scroll section into view
+  setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'start'}),100);
+
   const ownerPhone=getOwnerPhone();
 
   function isOwnerOrder(o){
-    if(!ownerPhone)return true;
+    if(!ownerPhone)return true; // no identity set — show all
     const sp=(o.shopPhone||'').replace(/\D/g,'').slice(-10);
-    return sp===ownerPhone;
+    const op=ownerPhone.slice(-10);
+    return sp===op||sp.includes(op)||op.includes(sp);
   }
 
   // Show local orders immediately
@@ -4530,26 +4562,32 @@ async function renderOrdersView(){
       saveOrders([...allOrders,...others].slice(0,200));
       renderOrdersDisplay(allOrders);
     }
-  }catch(e){}
+  }catch(e){
+    // Already showing local — that's fine
+  }
 }
 
 function renderOrdersDisplay(orders){
   const el=document.getElementById('myShopsSection');if(!el)return;
 
+  const ownerPhone=getOwnerPhone();
+  // Pre-calculate counts for tab labels
+  const pending=orders.filter(o=>o.status==='pending');
+  const confirmed=orders.filter(o=>o.status==='confirmed');
+  const rejected=orders.filter(o=>o.status==='rejected');
+
   if(!orders.length){
     el.innerHTML=`
-      <div style="text-align:center;padding:40px 20px">
-        <div style="font-size:3rem;margin-bottom:12px">📦</div>
+      <div style="text-align:center;padding:32px 16px">
+        <div style="font-size:3rem;margin-bottom:10px">📦</div>
         <div style="font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:var(--wht);margin-bottom:6px">No Orders Yet</div>
-        <div style="font-size:.82rem;color:var(--mut);line-height:1.65;margin-bottom:16px">When customers place orders from your website,<br/>they will appear here.</div>
-        <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:13px;font-size:.78rem;color:var(--mut);line-height:1.7;text-align:left">
-          💡 <strong style="color:var(--wht)">How to get orders:</strong><br/>
-          1. Build your website in Grow tab<br/>
-          2. Share your link with customers<br/>
-          3. Customer orders → OTP sent to their WhatsApp<br/>
-          4. You see order here → enter OTP → confirm
+        <div style="font-size:.8rem;color:var(--mut);line-height:1.65;margin-bottom:14px">
+          ${ownerPhone
+            ?`Orders for <strong style="color:var(--teal)">+91 ${ownerPhone}</strong> will appear here`
+            :`Set your phone number above to see your orders`}
         </div>
-        <button onclick="refreshOrders()" style="margin-top:14px;background:var(--vio);color:#fff;border:none;border-radius:999px;padding:10px 22px;font-size:.82rem;font-weight:700;cursor:pointer">🔄 Refresh Orders</button>
+        <button onclick="renderOrdersView()" style="background:var(--vio);color:#fff;border:none;border-radius:999px;padding:10px 22px;font-size:.82rem;font-weight:700;cursor:pointer">🔄 Refresh</button>
+        <div style="margin-top:12px;font-size:.72rem;color:var(--mut)">Orders from all devices sync here</div>
       </div>`;
     return;
   }
@@ -4575,7 +4613,6 @@ function renderOrdersDisplay(orders){
 }
 
 function filterOrders(status, tabEl){
-  // Update tab styles
   ['otab-pending','otab-confirmed','otab-rejected'].forEach(id=>{
     const t=document.getElementById(id);
     if(!t)return;
@@ -4586,7 +4623,14 @@ function filterOrders(status, tabEl){
     tabEl.style.color='#fff';
   }
 
-  const orders=getOrders().filter(o=>o.status===status);
+  const ownerPhone=getOwnerPhone();
+  const allOrders=getOrders().filter(o=>{
+    if(!ownerPhone)return true;
+    const sp=(o.shopPhone||'').replace(/\D/g,'').slice(-10);
+    const op=ownerPhone.slice(-10);
+    return sp===op||sp.includes(op)||op.includes(sp);
+  });
+  const orders=allOrders.filter(o=>o.status===status);
   const body=document.getElementById('ordersListBody');
   if(!body)return;
 
