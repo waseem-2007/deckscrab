@@ -4,7 +4,6 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <title>Deckscrab — Find Local Businesses Near You</title>
-<!-- Hide immediately if ?shop= detected to prevent main app flash -->
 <script>if(new URLSearchParams(window.location.search).get('shop'))document.documentElement.style.visibility='hidden';</script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
@@ -3079,6 +3078,143 @@ function renderShopSite(shop){
 //  DECKSCRAB — Production App
 //  Backend: https://deckscrab-backend-production.up.railway.app
 // ═══════════════════════════════════════
+// ═══ FIREBASE AUTH ═══
+const firebaseConfig = {
+  apiKey: "AIzaSyCFk8s4uK_Me-JLebi-TcJ1dgILESj-4L8",
+  authDomain: "deckscrab.firebaseapp.com",
+  projectId: "deckscrab",
+  storageBucket: "deckscrab.firebasestorage.app",
+  messagingSenderId: "454384111258",
+  appId: "1:454384111258:web:fc68d43d8e000240271923"
+};
+
+let _fbAuth=null,_currentUser=null;
+let _authReady=false;
+const _authCallbacks=[];
+
+function onAuthReady(cb){
+  if(_authReady)cb(_currentUser);
+  else _authCallbacks.push(cb);
+}
+
+function _firebaseReady(){
+  try{
+    if(typeof firebase==='undefined')throw new Error('SDK not loaded');
+    firebase.initializeApp(firebaseConfig);
+    _fbAuth=firebase.auth();
+    _fbAuth.onAuthStateChanged(user=>{
+      _currentUser=user;
+      if(!_authReady){
+        _authReady=true;
+        _authCallbacks.forEach(cb=>cb(user));
+        _authCallbacks.length=0;
+      }else{
+        _authCallbacks.forEach(cb=>cb(user));
+      }
+      if(user){
+        localStorage.setItem('ds_guser',JSON.stringify({
+          uid:user.uid,
+          name:user.displayName||'',
+          email:user.email||'',
+          photo:user.photoURL||'',
+        }));
+      }
+    });
+  }catch(e){
+    console.warn('Firebase init error:',e.message);
+    _authReady=true;
+    _authCallbacks.forEach(cb=>cb(null));
+    _authCallbacks.length=0;
+  }
+}
+
+// Load Firebase SDK — using cdnjs (same CDN as Leaflet, already trusted)
+function _loadFirebase(){
+  const CDNS=[
+    ['https://cdnjs.cloudflare.com/ajax/libs/firebase/12.3.0/firebase-app-compat.min.js',
+     'https://cdnjs.cloudflare.com/ajax/libs/firebase/12.3.0/firebase-auth-compat.min.js'],
+    ['https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js',
+     'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js'],
+  ];
+
+  function tryPair(i){
+    if(i>=CDNS.length){
+      console.warn('All Firebase CDNs failed');
+      _authReady=true;
+      _authCallbacks.forEach(cb=>cb(null));
+      _authCallbacks.length=0;
+      return;
+    }
+    const [appUrl,authUrl]=CDNS[i];
+    const s1=document.createElement('script');
+    s1.src=appUrl;
+    s1.onload=()=>{
+      const s2=document.createElement('script');
+      s2.src=authUrl;
+      s2.onload=()=>_firebaseReady();
+      s2.onerror=()=>tryPair(i+1);
+      document.head.appendChild(s2);
+    };
+    s1.onerror=()=>tryPair(i+1);
+    document.head.appendChild(s1);
+  }
+  tryPair(0);
+}
+_loadFirebase();
+
+function getGUser(){
+  try{return JSON.parse(localStorage.getItem('ds_guser')||'null');}catch{return null;}
+}
+function getUID(){
+  return _currentUser?.uid||getGUser()?.uid||null;
+}
+
+async function signInWithGoogle(){
+  // Wait for Firebase to load if not ready
+  if(!_fbAuth){
+    showToast('⏳ Loading Google Sign-in…');
+    await new Promise(resolve=>{
+      let tries=0;
+      const check=setInterval(()=>{
+        tries++;
+        if(_fbAuth){clearInterval(check);resolve();}
+        if(tries>20){clearInterval(check);resolve();}
+      },300);
+    });
+  }
+  if(!_fbAuth){showToast('❌ Google Sign-in unavailable — check connection');return;}
+  try{
+    const provider=new firebase.auth.GoogleAuthProvider();
+    provider.addScope('email');
+    provider.addScope('profile');
+    const result=await _fbAuth.signInWithPopup(provider);
+    _currentUser=result.user;
+    showToast('✅ Signed in as '+result.user.displayName);
+    renderProfile();
+    renderHome();
+  }catch(e){
+    if(e.code==='auth/popup-blocked'){
+      showToast('⚠️ Allow popups for this site in your browser');
+    }else if(e.code==='auth/cancelled-by-user'){
+      showToast('Sign in cancelled');
+    }else{
+      showToast('❌ Sign in failed — try again');
+      console.error('Google sign in error:',e);
+    }
+  }
+}
+
+async function signOut(){
+  if(!_fbAuth)return;
+  if(!confirm('Sign out of Deckscrab?'))return;
+  await _fbAuth.signOut();
+  _currentUser=null;
+  localStorage.removeItem('ds_guser');
+  localStorage.removeItem('ds_owner_phone');
+  showToast('👋 Signed out');
+  renderProfile();
+}
+
 const API_BASE='https://deckscrab-backend-production.up.railway.app';
 const TILE='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 const DEVICE_ID=(()=>{let id=localStorage.getItem('ds_device');if(!id){id='ds_'+Date.now()+'_'+Math.random().toString(36).slice(2);localStorage.setItem('ds_device',id);}return id;})();
@@ -4224,6 +4360,8 @@ async function submitShop(){
     oh:'09:00',oc:'21:00',rating:0,rc:0,views:1,verified:false,
     prods:getProds(),revs:[],reg:Date.now(),
     photos:shopPhotos.filter(Boolean),
+    ownerUID:getUID()||'',
+    ownerEmail:getGUser()?.email||'',
   };
 
   // Save locally FIRST — prevent duplicates by name
@@ -4358,42 +4496,94 @@ function resetAddShop(){
 
 // ═══ PROFILE ═══
 function renderProfile(){
+  const guser=getGUser();
+  const uid=getUID();
   const ownerPhone=getOwnerPhone();
-  // Only show shops belonging to this device's owner
-  const myOwnShops=ownerPhone
-    ?myShops.filter(s=>{
-        const p=(s.wa||s.phone||s.whatsapp||'').replace(/\D/g,'').slice(-10);
-        return p===ownerPhone||!p;
-      })
-    :myShops;
+
+  // If NOT signed in with Google — show login screen
+  if(!uid&&!ownerPhone){
+    document.getElementById('profileHero').innerHTML=`
+      <div class="profile-hero" style="background:linear-gradient(135deg,#1a1a2e,#2d1f5e)">
+        <div class="profile-hero-bg" style="opacity:.15">🔐</div>
+        <div class="profile-hero-ov"></div>
+        <div class="profile-hero-cnt">
+          <div class="profile-name">👤 Sign In</div>
+          <div class="profile-sub"><span>Sign in to manage your shops & orders</span></div>
+        </div>
+      </div>`;
+    document.getElementById('profileBody').innerHTML=`
+      <div style="text-align:center;padding:32px 16px">
+        <div style="font-size:3rem;margin-bottom:14px">🔐</div>
+        <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;color:var(--wht);margin-bottom:8px">Sign in to Deckscrab</div>
+        <div style="font-size:.82rem;color:var(--mut);line-height:1.7;margin-bottom:24px;max-width:280px;margin-left:auto;margin-right:auto">
+          Sign in with Google to register your shop, manage orders, and access your business dashboard from any device.
+        </div>
+        <!-- Google Sign In Button -->
+        <button onclick="signInWithGoogle()" style="display:inline-flex;align-items:center;gap:12px;background:#fff;color:#1a1a1a;border:none;border-radius:12px;padding:13px 24px;font-size:.9rem;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.3);font-family:'DM Sans',sans-serif;margin-bottom:12px">
+          <img src="https://www.google.com/favicon.ico" width="20" height="20" style="border-radius:4px"/>
+          Continue with Google
+        </button>
+        <div style="font-size:.72rem;color:var(--mut);margin-bottom:24px">Safe · No password · One tap</div>
+        <!-- Or use phone fallback -->
+        <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:16px;text-align:left">
+          <div style="font-size:.78rem;font-weight:700;color:var(--wht);margin-bottom:4px">📱 Or use phone number</div>
+          <div style="font-size:.73rem;color:var(--mut);margin-bottom:10px">If you already registered a shop with a phone number</div>
+          <div style="display:flex;gap:8px">
+            <input id="ownerPhoneInp" class="fi" placeholder="Your shop phone number" type="tel" style="flex:1;padding:9px"/>
+            <button onclick="saveOwnerPhone()" style="background:var(--gold);color:var(--bg);border:none;border-radius:var(--rs);padding:9px 14px;font-size:.8rem;font-weight:800;cursor:pointer">Go</button>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // SIGNED IN — show profile
+  // Filter shops by Google UID or phone
+  const myOwnShops=myShops.filter(s=>{
+    if(uid&&s.ownerUID)return s.ownerUID===uid;
+    if(ownerPhone){
+      const p=(s.wa||s.phone||s.whatsapp||'').replace(/\D/g,'').slice(-10);
+      return p===ownerPhone||!p;
+    }
+    return true;
+  });
+
   const shops=myOwnShops;const first=shops[0];const has=!!first;
   const sec=has?SECTORS.find(s=>s.n===first?.sector)||{e:'🏪'}:{e:'👤'};
   const pending=pendingOrderCount();
+
+  // Hero with Google photo if available
+  const heroName=guser?.name||ownerPhone||'Your Profile';
+  const heroPhoto=guser?.photo||'';
+  const heroEmail=guser?.email||'';
+
   document.getElementById('profileHero').innerHTML=`
     <div class="profile-hero">
       <div class="profile-hero-bg">${has?sec.e:'👤'}</div>
       <div class="profile-hero-ov"></div>
       <div class="profile-hero-cnt">
-        <div class="profile-name">${has?sec.e:'👤'} ${has?first.name:'Your Profile'} ${has?'<span class="live-badge">✅ Live</span>':''}</div>
-        <div class="profile-sub">${has?`<span>📍 ${first.city}</span><span>📞 ${first.phone}</span>`:'<span>Register a business to get started</span>'}</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          ${heroPhoto?`<img src="${heroPhoto}" width="40" height="40" style="border-radius:50%;border:2px solid rgba(255,255,255,.3);flex-shrink:0" referrerpolicy="no-referrer"/>`:''}
+          <div>
+            <div class="profile-name" style="font-size:1.1rem">${has?sec.e+' '+first.name:heroName} ${has?'<span class="live-badge">✅ Live</span>':''}</div>
+            ${heroEmail?`<div style="font-size:.7rem;color:rgba(255,255,255,.5)">${heroEmail}</div>`:''}
+          </div>
+        </div>
+        <div class="profile-sub">${has?`<span>📍 ${first.city}</span><span>📞 ${first.phone}</span>`:'<span>Register your business below</span>'}</div>
         ${pending?`<div style="margin-top:6px;display:inline-flex;align-items:center;gap:6px;background:rgba(239,68,68,.2);border-radius:999px;padding:4px 12px;font-size:.72rem;font-weight:700;color:#fca5a5">📦 ${pending} new order${pending>1?'s':''} waiting</div>`:''}
       </div>
     </div>`;
+
   document.getElementById('profileBody').innerHTML=`
-    ${!ownerPhone?`
-    <div style="background:rgba(245,197,24,.08);border:1.5px solid rgba(245,197,24,.2);border-radius:var(--r);padding:14px;margin-bottom:12px">
-      <div style="font-size:.84rem;font-weight:700;color:var(--gold);margin-bottom:6px">📱 Set Your Business Phone</div>
-      <div style="font-size:.75rem;color:var(--mut);margin-bottom:10px">Enter your shop phone number to see your orders and shops across all devices</div>
-      <div style="display:flex;gap:8px">
-        <input id="ownerPhoneInp" class="fi" placeholder="Your phone number" type="tel" style="flex:1;padding:9px"/>
-        <button onclick="saveOwnerPhone()" style="background:var(--gold);color:var(--bg);border:none;border-radius:var(--rs);padding:9px 14px;font-size:.8rem;font-weight:800;cursor:pointer">Save</button>
+    <!-- Account info bar -->
+    <div style="background:rgba(66,133,244,.08);border:1px solid rgba(66,133,244,.2);border-radius:var(--rs);padding:9px 12px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+      ${heroPhoto?`<img src="${heroPhoto}" width="28" height="28" style="border-radius:50%;flex-shrink:0" referrerpolicy="no-referrer"/>`:'<span style="font-size:1.1rem">👤</span>'}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.78rem;font-weight:700;color:var(--wht);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${heroName}</div>
+        ${heroEmail?`<div style="font-size:.68rem;color:var(--mut)">${heroEmail}</div>`:''}
       </div>
-    </div>`:`
-    <div style="background:rgba(20,184,166,.06);border:1px solid rgba(20,184,166,.15);border-radius:var(--rs);padding:9px 12px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-      <span style="font-size:1rem">📱</span>
-      <div style="flex:1;font-size:.76rem;color:var(--mut)">Logged in as <strong style="color:var(--teal)">+91 ${ownerPhone}</strong></div>
-      <button onclick="switchOwnerAccount()" style="background:none;border:1px solid var(--bor);color:var(--mut);border-radius:var(--rs);padding:4px 10px;font-size:.68rem;cursor:pointer">Switch</button>
-    </div>`}
+      <button onclick="signOut()" style="background:none;border:1px solid var(--bor);color:var(--mut);border-radius:var(--rs);padding:4px 10px;font-size:.68rem;cursor:pointer;white-space:nowrap;flex-shrink:0">Sign Out</button>
+    </div>
     ${has?`
     <div class="prof-stats">
       <div class="prof-stat"><div class="prof-stat-n" style="color:var(--teal)">${first.views||1}</div><div class="prof-stat-l">Views</div></div>
@@ -4413,15 +4603,15 @@ function renderProfile(){
     </div>
     <div class="prof-menu" id="profMenu"></div>
     <div id="myShopsSection"></div>`;
-  // Build menu items separately to avoid quote-in-onclick issues
+
+  // Build menu
   const menuItems=[
     {i:'📦',l:'Orders Received',fn:()=>renderOrdersView(),badge:pendingOrderCount()},
     {i:'📋',l:'My Listed Shops',fn:()=>renderMyShopsView()},
     {i:'☁️',l:'Sync to Server',fn:()=>syncShopsToServer()},
-    {i:'🧹',l:'Remove Duplicates',fn:()=>cleanDuplicateShops()},
     {i:'➕',l:'Add New Business',fn:()=>goTo('addshop')},
     {i:'📍',l:'Set My Location',fn:()=>openLocModal()},
-    {i:'⚙️',l:'Settings',fn:()=>showToast('Coming soon!')},
+    {i:'⚙️',l:'Settings',fn:()=>showAdminPanel()},
   ];
   const menuEl=document.getElementById('profMenu');
   if(menuEl){
@@ -4434,17 +4624,20 @@ function renderProfile(){
         <span class="pmi-lbl">${item.i} ${item.l}</span>
         ${item.badge?`<span style="background:var(--rose);color:#fff;border-radius:999px;padding:2px 8px;font-size:.68rem;font-weight:800;margin-right:4px">${item.badge}</span>`:''}
         <span class="pmi-arrow">›</span>`;
-      div.addEventListener('click', item.fn);
+      div.addEventListener('click',item.fn);
       menuEl.appendChild(div);
     });
   }
 }
 function renderMyShopsView(){
   const el=document.getElementById('myShopsSection');if(!el)return;
+  const uid=getUID();
   const ownerPhone=getOwnerPhone();
-  const ownShops=ownerPhone
-    ?myShops.filter(s=>{const p=(s.wa||s.phone||'').replace(/\D/g,'').slice(-10);return p===ownerPhone||!p;})
-    :myShops;
+  const ownShops=myShops.filter(s=>{
+    if(uid&&s.ownerUID)return s.ownerUID===uid;
+    if(ownerPhone){const p=(s.wa||s.phone||'').replace(/\D/g,'').slice(-10);return p===ownerPhone||!p;}
+    return true;
+  });
   if(!ownShops.length){
     el.innerHTML=`<div class="no-shops"><div class="no-shops-ico">🏪</div><div class="no-shops-title">No businesses yet</div><div class="no-shops-sub">Register your first business — free, instant, permanent.</div><button onclick="goTo('addshop')" style="background:var(--gold);color:var(--bg);border:none;border-radius:999px;padding:10px 22px;font-size:.84rem;font-weight:700">+ Register Business</button></div>`;
     return;
@@ -4799,6 +4992,124 @@ function rejectOrder(orderId){
 
 function refreshOrders(){showToast('🔄 Refreshing orders…');renderOrdersView();}
 
+async function clearServerDuplicates(){
+  if(!confirm('This will delete ALL duplicate shops from the server, keeping only unique ones by name. Continue?'))return;
+  showToast('🔄 Fetching all shops from server…');
+
+  try{
+    // 1. Get all businesses from Railway
+    const r=await fetch(`${API_BASE}/api/businesses?limit=500`,{signal:AbortSignal.timeout(15000)});
+    if(!r.ok){showToast('❌ Could not reach server');return;}
+    const d=await r.json();
+    const all=d.businesses||[];
+
+    if(!all.length){showToast('No shops on server');return;}
+
+    // 2. Find duplicates by name (case-insensitive)
+    const seen=new Map(); // name → first shop
+    const toDelete=[];
+    for(const shop of all){
+      const key=(shop.name||'').toLowerCase().trim();
+      if(!key)continue;
+      if(seen.has(key)){
+        toDelete.push(shop); // duplicate — delete it
+      }else{
+        seen.set(key,shop); // first occurrence — keep it
+      }
+    }
+
+    if(!toDelete.length){
+      showToast('✅ No duplicates found on server!');
+      return;
+    }
+
+    showToast(`🗑️ Deleting ${toDelete.length} duplicates…`);
+
+    // 3. Delete each duplicate
+    let deleted=0;
+    for(const shop of toDelete){
+      const id=shop.bizId||shop.id||shop._id;
+      if(!id)continue;
+      try{
+        await fetch(`${API_BASE}/api/businesses/${id}`,{method:'DELETE',signal:AbortSignal.timeout(8000)});
+        deleted++;
+      }catch(e){}
+    }
+
+    // 4. Also clean local myShops duplicates
+    const beforeLocal=myShops.length;
+    const seenLocal=new Set();
+    myShops=myShops.filter(s=>{
+      const k=(s.name||'').toLowerCase().trim();
+      if(seenLocal.has(k))return false;
+      seenLocal.add(k);return true;
+    });
+    localStorage.setItem('ds_myshops',JSON.stringify(myShops));
+
+    showToast(`✅ Deleted ${deleted} server duplicates + ${beforeLocal-myShops.length} local!`);
+    // Reload home to show clean list
+    setTimeout(()=>{renderHome();renderProfile();},1000);
+
+  }catch(e){
+    showToast('❌ Error — try again');
+  }
+}
+
+function showAdminPanel(){
+  // Secret code — only you know this
+  const code=prompt('Enter admin code:');
+  if(!code)return;
+  if(code.trim()!=='DS9384'){
+    showToast('❌ Wrong code');
+    return;
+  }
+  // Show admin options
+  const section=document.getElementById('myShopsSection');
+  if(!section)return;
+  section.innerHTML=`
+    <div style="background:rgba(245,197,24,.06);border:1.5px solid rgba(245,197,24,.2);border-radius:var(--r);padding:16px;margin-top:12px">
+      <div style="font-family:'Syne',sans-serif;font-size:.9rem;font-weight:700;color:var(--gold);margin-bottom:14px">⚙️ Admin Panel</div>
+
+      <button onclick="clearServerDuplicates()" style="width:100%;padding:11px;background:rgba(239,68,68,.1);border:1.5px solid rgba(239,68,68,.3);color:var(--rose);border-radius:var(--rs);font-size:.83rem;font-weight:700;cursor:pointer;margin-bottom:8px;text-align:left">
+        🗑️ Clear Server Duplicates — Delete duplicate shops from MongoDB
+      </button>
+
+      <button onclick="cleanDuplicateShops()" style="width:100%;padding:11px;background:rgba(124,92,255,.1);border:1.5px solid rgba(124,92,255,.3);color:var(--vio);border-radius:var(--rs);font-size:.83rem;font-weight:700;cursor:pointer;margin-bottom:8px;text-align:left">
+        🧹 Remove Local Duplicates — Clean this device's saved shops
+      </button>
+
+      <button onclick="nukeAllServerShops()" style="width:100%;padding:11px;background:rgba(239,68,68,.15);border:1.5px solid rgba(239,68,68,.4);color:var(--rose);border-radius:var(--rs);font-size:.83rem;font-weight:700;cursor:pointer;margin-bottom:8px;text-align:left">
+        ☢️ Delete ALL Server Shops — Nuclear option (use carefully!)
+      </button>
+
+      <button onclick="syncShopsToServer()" style="width:100%;padding:11px;background:rgba(31,217,122,.08);border:1.5px solid rgba(31,217,122,.25);color:var(--grn);border-radius:var(--rs);font-size:.83rem;font-weight:700;cursor:pointer;margin-bottom:8px;text-align:left">
+        ☁️ Force Sync My Shops to Server
+      </button>
+
+      <div style="font-size:.7rem;color:var(--mut);margin-top:6px;text-align:center">Admin code: DS9384 · Keep this private</div>
+    </div>`;
+  section.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+async function nukeAllServerShops(){
+  if(!confirm('⚠️ DELETE ALL shops from server? This cannot be undone!'))return;
+  if(!confirm('Are you absolutely sure? Type OK to confirm.'))return;
+  showToast('🔄 Deleting all server shops…');
+  try{
+    const r=await fetch(`${API_BASE}/api/businesses?limit=500`);
+    const d=await r.json();
+    const all=d.businesses||[];
+    let deleted=0;
+    for(const shop of all){
+      const id=shop.bizId||shop.id;
+      if(!id)continue;
+      try{await fetch(`${API_BASE}/api/businesses/${id}`,{method:'DELETE'});deleted++;}catch(e){}
+    }
+    showToast(`☢️ Deleted ${deleted} shops from server`);
+    setTimeout(()=>renderHome(),1000);
+  }catch(e){showToast('❌ Failed — try again');}
+}
+
 function cleanDuplicateShops(){
   const before=myShops.length;
   // Keep only unique shops by name (case-insensitive)
@@ -4843,21 +5154,9 @@ function switchOwnerAccount(){
 
 // Auto-sync local shops to server silently on startup — no duplicates
 async function autoSyncLocalShops(){
-  if(!myShops.length)return;
-  const synced=localStorage.getItem('ds_synced_ids')||'';
-  for(const shop of myShops){
-    const key=shop.bizId||shop.id||'';
-    if(key&&synced.includes(key))continue; // already synced
-    try{
-      const result=await apiPost('/api/businesses',shop);
-      if(result&&result.ok){
-        // Mark as synced
-        const ids=(localStorage.getItem('ds_synced_ids')||'').split(',').filter(Boolean);
-        ids.push(key);
-        localStorage.setItem('ds_synced_ids',ids.slice(-50).join(','));
-      }
-    }catch(e){}
-  }
+  // Disabled — was causing duplicate shops on server
+  // Use Profile → ☁️ Sync to Server button instead (manual, controlled)
+  return;
 }
 
 async function deleteShop(id){
