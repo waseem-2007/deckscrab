@@ -2071,6 +2071,51 @@ function renderShopSite(shop){
 </head>
 <body>
 
+<!-- ════ LOGIN GATE — shown until Google sign-in ════ -->
+<div id="loginGate" style="
+  position:fixed;inset:0;z-index:99999;
+  background:#06080E;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:32px 24px;text-align:center;
+">
+  <!-- Logo -->
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+    <div style="width:12px;height:12px;border-radius:50%;background:#F5C518"></div>
+    <span style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:#fff">Deckscrab</span>
+  </div>
+  <div style="font-size:.78rem;color:rgba(255,255,255,.4);margin-bottom:40px;letter-spacing:.05em">LOCAL BUSINESS FINDER</div>
+
+  <!-- Illustration -->
+  <div style="font-size:4rem;margin-bottom:20px">🏪</div>
+
+  <div style="font-family:'Syne',sans-serif;font-size:1.25rem;font-weight:700;color:#fff;margin-bottom:8px">
+    Welcome to Deckscrab
+  </div>
+  <div style="font-size:.82rem;color:rgba(255,255,255,.5);line-height:1.7;max-width:280px;margin-bottom:32px">
+    Discover and register local businesses in your area. Sign in to get started.
+  </div>
+
+  <!-- Google Button -->
+  <button id="gateGoogleBtn" onclick="gateSignIn()" style="
+    display:flex;align-items:center;gap:12px;
+    background:#fff;color:#1a1a1a;
+    border:none;border-radius:14px;
+    padding:14px 28px;
+    font-size:.95rem;font-weight:700;
+    cursor:pointer;
+    box-shadow:0 4px 24px rgba(0,0,0,.4);
+    font-family:'DM Sans',sans-serif;
+    width:100%;max-width:300px;
+    justify-content:center;
+    margin-bottom:12px;
+  ">
+    <img src="https://www.google.com/favicon.ico" width="22" height="22" style="border-radius:4px"/>
+    Continue with Google
+  </button>
+
+  <div id="gateStatus" style="font-size:.72rem;color:rgba(255,255,255,.35);min-height:20px;margin-top:4px"></div>
+</div>
+
 <!-- TOP NAV -->
 <nav class="topnav">
   <div class="logo" onclick="goTo('home')"><div class="logo-dot"></div>Deckscrab</div>
@@ -5857,19 +5902,111 @@ function ensureOwnerIdentity(){
   return Promise.resolve('');
 }
 
-window.addEventListener('DOMContentLoaded',async()=>{
-  // If shop website mode, don't init main app at all
-  if(new URLSearchParams(window.location.search).get('shop'))return;
-  // Set owner identity from registered shops
+// ═══ LOGIN GATE ═══
+function showGate(){
+  const g=document.getElementById('loginGate');
+  if(g)g.style.display='flex';
+}
+function hideGate(){
+  const g=document.getElementById('loginGate');
+  if(g){g.style.opacity='0';g.style.transition='opacity .4s';setTimeout(()=>{g.style.display='none';_initApp();},400);}
+}
+async function _initApp(){
   ensureOwnerIdentity();
-  // Safe init
   if(el('secGrid'))buildSectors('');
   if(el('prodList')){addProd();addProd();}
-  // Wake Railway and auto-sync
   setDot('waking');
-  wakeServer().then(ok=>{
-    if(ok){renderHome();autoSyncLocalShops();}
-  });
+  wakeServer().then(ok=>{if(ok)renderHome();});
+  await renderHome();
+  renderProfile();
+  renderSupply();
+  startKeepAlive();
+}
+function setGateStatus(msg){
+  const s=document.getElementById('gateStatus');
+  if(s)s.textContent=msg;
+}
+async function gateSignIn(){
+  const btn=document.getElementById('gateGoogleBtn');
+  if(btn){btn.disabled=true;btn.textContent='Signing in...';}
+  setGateStatus('Loading Google Sign-in…');
+
+  // Wait for Firebase up to 6 seconds
+  let waited=0;
+  while(!_fbAuth&&waited<6000){
+    await new Promise(r=>setTimeout(r,300));
+    waited+=300;
+  }
+  if(!_fbAuth){
+    setGateStatus('❌ Could not load Google Sign-in. Check your connection.');
+    if(btn){btn.disabled=false;btn.innerHTML='<img src="https://www.google.com/favicon.ico" width="22" height="22" style="border-radius:4px"/> Continue with Google';}
+    return;
+  }
+  try{
+    const provider=new firebase.auth.GoogleAuthProvider();
+    provider.addScope('email');
+    provider.addScope('profile');
+    const result=await _fbAuth.signInWithPopup(provider);
+    _currentUser=result.user;
+    localStorage.setItem('ds_guser',JSON.stringify({
+      uid:result.user.uid,
+      name:result.user.displayName||'',
+      email:result.user.email||'',
+      photo:result.user.photoURL||'',
+    }));
+    setGateStatus('✅ Welcome, '+result.user.displayName+'!');
+    setTimeout(()=>hideGate(),600);
+    renderProfile();
+  }catch(e){
+    if(btn){btn.disabled=false;btn.innerHTML='<img src="https://www.google.com/favicon.ico" width="22" height="22" style="border-radius:4px"/> Continue with Google';}
+    if(e.code==='auth/popup-blocked'){
+      setGateStatus('⚠️ Allow popups in your browser settings');
+    }else if(e.code==='auth/cancelled-by-user'){
+      setGateStatus('Cancelled — tap to try again');
+    }else{
+      setGateStatus('❌ Sign in failed — try again');
+      console.error(e);
+    }
+  }
+}
+
+window.addEventListener('DOMContentLoaded',async()=>{
+  // If shop website mode, skip gate and main app init
+  if(new URLSearchParams(window.location.search).get('shop'))return;
+
+  // Check if already signed in
+  const guser=getGUser();
+  if(guser&&guser.uid){
+    // Already logged in — hide gate immediately
+    hideGate();
+  }else{
+    // Show gate — wait for Firebase to restore session
+    showGate();
+    setGateStatus('Checking sign-in…');
+    // Give Firebase up to 3s to restore previous session
+    await new Promise(resolve=>{
+      let waited=0;
+      const check=setInterval(()=>{
+        waited+=300;
+        if(_authReady||waited>=3000){clearInterval(check);resolve();}
+      },300);
+    });
+    if(_currentUser){
+      // Firebase restored session
+      setGateStatus('✅ Welcome back, '+(_currentUser.displayName||'')+'!');
+      setTimeout(()=>hideGate(),600);
+    }else{
+      setGateStatus('');
+      return; // Stop here — gate stays up until they sign in
+    }
+  }
+
+  // ── App init (only runs after login) ──
+  ensureOwnerIdentity();
+  if(el('secGrid'))buildSectors('');
+  if(el('prodList')){addProd();addProd();}
+  setDot('waking');
+  wakeServer().then(ok=>{if(ok)renderHome();});
   await renderHome();
   renderSupply();
   startKeepAlive();
