@@ -1933,57 +1933,86 @@ function renderShopSite(shop){
   var shopName=shop.name||'Shop';
   var shopPhone=shop.wa||shop.phone||'';
   var sectorRaw=(shop.sector||shop.sectorName||shop.g||'').toLowerCase();
+  var shopEmoji=shop.e||shop.sectorEmoji||'🏪';
   var shopDesc=shop.description||shop.desc||'';
   var shopCity=shop.city||'';
   var shopAddr=shop.address||shop.addr||'';
-  var shopEmoji=shop.e||shop.sectorEmoji||'🏪';
 
-  // ── TEMPLATE DETECTION ──
-  // 1. Check explicit template field set by owner in Grow builder
-  var FOOD_SECTORS=['restaurant','mess','hotel','food','biryani','bakery','cafe','sweets','tiffin','juice','snacks','dhaba','meals','catering'];
-  var GROCERY_SECTORS=['grocery','kirana','supermarket','fruits','dairy','vegetable','provision','department store'];
-  var SERVICE_SECTORS=['welder','fabrication','plumber','electrician','carpenter','mechanic','ac repair','mobile repair','courier','painter','cleaning','tailor','laundry'];
-  var BOOKING_SECTORS=['salon','saloon','spa','gym','fitness','doctor','dentist','hospital','lab','tuition','school','yoga','physiotherapy'];
-
-  var sectorType;
-
-  // Explicit template choice wins
-  if(shop.websiteTemplate){
-    sectorType=shop.websiteTemplate; // 'restaurant' or 'grocery'
-  } else {
-    // Auto-detect from sector name
-    sectorType='restaurant';
-    if(GROCERY_SECTORS.some(function(s){return sectorRaw.includes(s);})) sectorType='grocery';
-    if(SERVICE_SECTORS.some(function(s){return sectorRaw.includes(s);})) sectorType='service';
-    if(BOOKING_SECTORS.some(function(s){return sectorRaw.includes(s);})) sectorType='booking';
+  // ── 1. If owner pasted custom HTML → serve it directly ──
+  if(shop.customHtml&&shop.customHtml.trim().length>100){
+    document.open();
+    document.write(shop.customHtml);
+    document.close();
+    return;
   }
 
-  // Map Deckscrab products to template menu format
-  var mappedProds = prods.map(function(p,i){
-    return {
-      id: p.id||i+100,
-      name: p.name||p.n||'Item',
-      desc: p.description||p.desc||p.d||'Freshly prepared',
-      price: parseInt(p.price||p.p)||0,
-      mrp: parseInt(p.mrp||p.originalPrice||p.price||p.p)||0,
-      cat: p.category||p.cat||p.c||'Menu',
-      emoji: p.emoji||p.e||'🍽️',
-      veg: p.veg||false,
-      popular: p.popular||false,
-      inStock: p.inStock!==false
-    };
-  }).filter(function(p){return p.name && p.price>0;});
+  // ── 2. Explicit template chosen by owner in Grow page ──
+  var tmpl=shop.websiteTemplate||'';
 
-  // ── RENDER BASED ON SECTOR ──
-  if(sectorType==='restaurant' || sectorType==='food'){
-    renderRestaurantSite(shop, shopName, shopPhone, shopDesc, shopCity, shopEmoji, mappedProds);
-  } else if(sectorType==='grocery'){
-    renderGrocerySite(shop, shopName, shopPhone, shopDesc, shopCity, shopEmoji, mappedProds);
+  // ── 3. Auto-detect only for restaurant / grocery ──
+  if(!tmpl){
+    var FOOD=['restaurant','mess','hotel','food','biryani','bakery','cafe','sweets','tiffin','juice','snacks','dhaba','meals','catering','cakeshop','icecream'];
+    var GROC=['grocery','kirana','supermarket','fruits','dairy','vegetable','provision','general store'];
+    if(FOOD.some(function(s){return sectorRaw.includes(s);})) tmpl='restaurant';
+    else if(GROC.some(function(s){return sectorRaw.includes(s);})) tmpl='grocery';
+    // All other sectors: no auto-assign → show paste screen
+  }
+
+  // Map products
+  var mappedProds=prods.map(function(p,i){
+    return{
+      id:p.id||i+100,
+      name:p.name||p.n||'Item',
+      desc:p.description||p.desc||p.d||'',
+      price:parseInt(p.price||p.p)||0,
+      mrp:parseInt(p.mrp||p.originalPrice||p.price||p.p)||0,
+      cat:p.category||p.cat||p.c||'Menu',
+      emoji:p.emoji||p.e||'🍽️',
+      veg:p.veg||false,popular:p.popular||false,inStock:p.inStock!==false
+    };
+  }).filter(function(p){return p.name&&p.price>0;});
+
+  if(tmpl==='restaurant'){
+    renderRestaurantSite(shop,shopName,shopPhone,shopDesc,shopCity,shopEmoji,mappedProds);
+  } else if(tmpl==='grocery'){
+    renderGrocerySite(shop,shopName,shopPhone,shopDesc,shopCity,shopEmoji,mappedProds);
   } else {
-    // For service/booking/other — use restaurant template with adjusted labels
-    renderRestaurantSite(shop, shopName, shopPhone, shopDesc, shopCity, shopEmoji, mappedProds);
+    // ── No template yet → show "coming soon / paste HTML" screen ──
+    renderNoTemplateSite(shop,shopName,shopPhone,shopEmoji,shopCity,shopDesc);
   }
 }
+
+function renderNoTemplateSite(shop,shopName,shopPhone,shopEmoji,shopCity,shopDesc){
+  document.title=shopName+' — Deckscrab';
+  var slug=(shopName||'shop').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  var wa='https://wa.me/91'+shopPhone+'?text='+encodeURIComponent('Hi '+shopName+'! I want to enquire about your services.');
+  var deckWa='https://wa.me/919384707706?text='+encodeURIComponent('Hi Deckscrab! I want a custom website for my shop: '+shopName+' ('+shopCity+')');
+  document.head.innerHTML+='<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:\'DM Sans\',sans-serif;background:#f5f3ee;color:#0d0d0d;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}</style>';
+  document.body.innerHTML=
+    '<div style="max-width:400px;width:100%">'+
+    '<div style="font-size:5rem;margin-bottom:16px">'+shopEmoji+'</div>'+
+    '<div style="font-family:serif;font-size:1.6rem;font-weight:700;margin-bottom:6px">'+shopName+'</div>'+
+    (shopCity?'<div style="font-size:.85rem;color:#888;margin-bottom:6px">📍 '+shopCity+'</div>':'')+
+    (shopDesc?'<div style="font-size:.85rem;color:#555;line-height:1.6;margin-bottom:20px">'+shopDesc+'</div>':'<div style="height:20px"></div>')+
+    (shopPhone?
+      '<a href="'+wa+'" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;background:#25D366;color:#fff;border-radius:14px;font-size:.95rem;font-weight:700;text-decoration:none;margin-bottom:10px">'+
+        '💬 WhatsApp Us'+
+      '</a>'+
+      '<a href="tel:+91'+shopPhone+'" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;background:#fff;color:#0d0d0d;border:1.5px solid rgba(0,0,0,.12);border-radius:14px;font-size:.9rem;font-weight:600;text-decoration:none;margin-bottom:20px">'+
+        '📞 Call: +91 '+shopPhone+
+      '</a>'
+    :'')+
+    '<div style="background:#fff;border-radius:16px;border:1px solid rgba(0,0,0,.08);padding:18px;margin-bottom:16px">'+
+      '<div style="font-size:.72rem;font-weight:700;color:#E8521A;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Want a full ordering website?</div>'+
+      '<div style="font-size:.82rem;color:#555;line-height:1.65;margin-bottom:12px">Get a premium website with online ordering, menu, cart & payment — built specifically for your business type.</div>'+
+      '<a href="'+deckWa+'" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:#E8521A;color:#fff;padding:10px 20px;border-radius:999px;font-size:.82rem;font-weight:700;text-decoration:none">'+
+        '🚀 Get My Website — Free'+
+      '</a>'+
+    '</div>'+
+    '<div style="font-size:.72rem;color:#aaa">Powered by <a href="https://waseem-2007.github.io/deckscrab/" style="color:#E8521A;text-decoration:none;font-weight:700">Deckscrab</a></div>'+
+    '</div>';
+}
+
 
 // ════════════════════════════════════════
 // RESTAURANT / FOOD TEMPLATE
@@ -3230,6 +3259,34 @@ updateCartUI();
             </div>
             <div style="margin-top:10px;background:rgba(232,82,26,.06);border:1px solid rgba(232,82,26,.15);border-radius:var(--rs);padding:9px 12px;font-size:.72rem;color:var(--ink2);line-height:1.6">
               💡 More designs coming: <strong style="color:var(--gold)">Pharmacy · Clinic · Auto Workshop · School</strong> — upload them when ready and they'll appear here automatically.
+            </div>
+          </div>
+        </div>
+
+        <!-- PASTE CUSTOM HTML OPTION -->
+        <div style="background:var(--sur);border:1.5px solid var(--bor);border-radius:var(--r);overflow:hidden;margin-bottom:14px">
+          <div style="padding:14px 16px 10px;border-bottom:1px solid var(--bor);display:flex;align-items:center;gap:10px">
+            <div style="width:34px;height:34px;background:rgba(26,62,82,.1);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">📋</div>
+            <div>
+              <div style="font-family:'Syne',sans-serif;font-size:.96rem;font-weight:700;color:var(--ink);margin-bottom:1px">Already have a custom website?</div>
+              <div style="font-size:.72rem;color:var(--ink3)">Paste your HTML below — we'll serve it when customers visit your link</div>
+            </div>
+          </div>
+          <div style="padding:14px 16px">
+            <div style="font-size:.75rem;color:var(--ink3);margin-bottom:8px;line-height:1.6">
+              Built offline for welding shops, salons, clinics, or any other business? Paste the complete HTML here and it will load for your customers.
+            </div>
+            <textarea id="gb-custom-html"
+              placeholder="Paste your complete HTML here (the entire file starting from <!DOCTYPE html>)..."
+              style="width:100%;height:120px;background:var(--bg);border:1.5px solid var(--bor2);border-radius:10px;padding:11px 13px;font-size:.76rem;font-family:'DM Sans',sans-serif;color:var(--ink);resize:vertical;outline:none;line-height:1.5"
+              onfocus="this.style.borderColor='var(--gold)'"
+              onblur="this.style.borderColor='var(--bor2)'"
+              oninput="previewCustomHtml(this.value)"></textarea>
+            <div id="customHtmlPreview" style="display:none;margin-top:8px;background:var(--bg);border:1px solid var(--bor2);border-radius:8px;padding:9px 12px;font-size:.73rem;color:var(--grn)">
+              ✅ HTML detected — will serve this for your customers
+            </div>
+            <div style="margin-top:8px;font-size:.7rem;color:var(--ink4);line-height:1.6">
+              ⚠️ Using this overrides any template above. Your HTML is stored securely and only served to customers at your shop link.
             </div>
           </div>
         </div>
@@ -6582,6 +6639,12 @@ function activateExistingShop(shopId, action){
       document.querySelectorAll('.gbtemplate').forEach(c=>c.style.border='2.5px solid transparent');
       const tmplEl=document.querySelector('.gbtemplate[data-tmpl="'+gbSelTemplate+'"]');
       if(tmplEl)tmplEl.style.border='2.5px solid var(--gold)';
+      // Restore custom HTML if any
+      const customHtmlEl=document.getElementById('gb-custom-html');
+      if(customHtmlEl&&s.customHtml){
+        customHtmlEl.value=s.customHtml;
+        previewCustomHtml(s.customHtml);
+      }
     },100);
 
     openGrowBuilder('website',399);
@@ -6764,7 +6827,23 @@ function pickGbTemplate(el,tmpl){
   gbSelTemplate=tmpl;
   document.querySelectorAll('.gbtemplate').forEach(c=>c.style.border='2.5px solid transparent');
   el.style.border='2.5px solid var(--gold)';
+  // Clear custom HTML if a template is chosen
+  const ta=document.getElementById('gb-custom-html');
+  if(ta){ta.value='';ta.style.borderColor='var(--bor2)';}
+  document.getElementById('customHtmlPreview')?.style&&(document.getElementById('customHtmlPreview').style.display='none');
   showToast(tmpl==='restaurant'?'🍛 Restaurant template selected':'🛒 Grocery template selected');
+}
+
+function previewCustomHtml(val){
+  const preview=document.getElementById('customHtmlPreview');
+  if(!preview)return;
+  const isValid=val&&val.trim().length>100;
+  preview.style.display=isValid?'block':'none';
+  if(isValid){
+    // Deselect all template cards since custom HTML overrides
+    document.querySelectorAll('.gbtemplate').forEach(c=>c.style.border='2.5px solid transparent');
+    gbSelTemplate='custom';
+  }
 }
 function buildGbPreview(){
   const name=document.getElementById('gb-name').value||'Your Shop';
@@ -7000,7 +7079,9 @@ async function processGbPayment(){
     phone,wa:phone,city,addr,
     oh:document.getElementById('gb-open')?.value||'9:00 AM',
     oc:document.getElementById('gb-close')?.value||'9:00 PM',
-    prods,theme:gbSelTheme,websiteTemplate:gbSelTemplate,websiteEnabled:true,websiteUrl,botLink,
+    prods,theme:gbSelTheme,websiteTemplate:gbSelTemplate==='custom'?'':gbSelTemplate,
+    customHtml:(document.getElementById('gb-custom-html')?.value?.trim()||''),
+    websiteEnabled:true,websiteUrl,botLink,
     plan:gbPlan,bizId,reg:Date.now(),delivery:true,
     sector:'Business',priceLevel:'2',verified:false,
   };
