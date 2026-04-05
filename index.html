@@ -125,10 +125,10 @@ button,input,select,textarea{font-family:'DM Sans',sans-serif;cursor:pointer;out
 .bni.fab .bni-lbl{color:var(--gold)}
 
 /* ══ PAGES ══ */
-.page{display:none;position:relative;z-index:1}
-.page.on{display:block;min-height:calc(100vh - var(--nav) - var(--bnav));
+.page{display:none !important}
+.page.on{display:block !important;min-height:calc(100vh - var(--nav) - var(--bnav));
   overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
-  animation:pageIn .22s ease}
+  opacity:1 !important;visibility:visible !important}
 @keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
 /* ══ HOME ══ */
@@ -752,10 +752,10 @@ button,input,select,textarea{font-family:'DM Sans',sans-serif;cursor:pointer;out
 .bni.fab .bni-lbl{color:var(--gold)}
 
 /* ══ PAGES ══ */
-.page{display:none;position:relative;z-index:1}
-.page.on{display:block;min-height:calc(100vh - var(--nav) - var(--bnav));
+.page{display:none !important}
+.page.on{display:block !important;min-height:calc(100vh - var(--nav) - var(--bnav));
   overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
-  animation:pageIn .22s ease}
+  opacity:1 !important;visibility:visible !important}
 @keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
 /* ══ HOME ══ */
@@ -1274,7 +1274,7 @@ select.fi{appearance:none;cursor:pointer}
 .live-link-url{color:var(--teal);font-weight:600;word-break:break-all}
 
 /* ══ PROFILE ══ */
-.profile-wrap{max-width:600px;margin:0 auto}
+.profile-wrap{max-width:600px;margin:0 auto;min-height:calc(100vh - var(--nav) - var(--bnav))}
 .profile-hero{height:190px;background:linear-gradient(135deg,#162030,#2a1a4a);
   position:relative;display:flex;align-items:flex-end;padding:14px 16px;overflow:hidden}
 .profile-hero-bg{position:absolute;inset:0;display:flex;align-items:center;
@@ -2118,7 +2118,7 @@ function renderGrocerySite(shop,shopName,shopPhone,shopDesc,shopCity,shopEmoji,m
 <div id="loginGate" style="
   position:fixed;inset:0;z-index:99999;
   background:#f5f3ee;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  display:none;flex-direction:column;align-items:center;justify-content:center;
   padding:32px 24px;text-align:center;overflow-y:auto;
 ">
   <div style="max-width:320px;width:100%">
@@ -2421,6 +2421,8 @@ function renderGrocerySite(shop,shopName,shopPhone,shopDesc,shopCity,shopEmoji,m
     else{setTimeout(attachSwipe,100);}
   })();
   </script>
+
+</div><!-- end page-discover -->
 
 <!-- ════ ADD SHOP ════ -->
 <div id="page-addshop" class="page">
@@ -3938,55 +3940,44 @@ function allShops(){
 
 // ═══ NAVIGATION ═══
 function goTo(pg){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
-  document.getElementById('page-'+pg)?.classList.add('on');
-  document.querySelectorAll('.bni').forEach(b=>b.classList.remove('on'));
-  document.getElementById('bni-'+pg)?.classList.add('on');
+  // Hide all pages
+  document.querySelectorAll('.page').forEach(function(p){
+    p.classList.remove('on');
+  });
+  // Show target page
+  var pg_el = document.getElementById('page-'+pg);
+  if(pg_el) pg_el.classList.add('on');
+  // Update bottom nav
+  document.querySelectorAll('.bni').forEach(function(b){b.classList.remove('on');});
+  var bni_el = document.getElementById('bni-'+pg);
+  if(bni_el) bni_el.classList.add('on');
+  // Call render function for the page
   if(pg==='discover'){
-    setTimeout(()=>{
+    setTimeout(function(){
       initDiscMap();
       renderDisc();
-      if(discMap)[100,300,600].forEach(t=>setTimeout(()=>discMap.invalidateSize(),t));
-      // Auto-request GPS silently when Discover opens
+      if(discMap){[100,300,600].forEach(function(t){setTimeout(function(){discMap.invalidateSize();},t);});}
       if(!uLat&&navigator.geolocation){
-        navigator.geolocation.getCurrentPosition(pos=>{
-          const{latitude:lat,longitude:lng}=pos.coords;
+        navigator.geolocation.getCurrentPosition(function(pos){
+          var lat=pos.coords.latitude,lng=pos.coords.longitude;
           fetch('https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lng+'&format=json&zoom=16')
-            .then(r=>r.json()).then(d=>{
-              const a=d.address||{};
-              const name=a.suburb||a.neighbourhood||a.village||a.town||a.city||'Your Location';
+            .then(function(r){return r.json();}).then(function(d){
+              var a=d.address||{};
+              var name=a.suburb||a.neighbourhood||a.village||a.town||a.city||'Your Location';
               setLoc(lat,lng,name);
-            }).catch(()=>setLoc(lat,lng,'Your Location'));
-        },()=>{},
-        {enableHighAccuracy:true,timeout:10000,maximumAge:60000});
-      }
-      // Start live watch if not already watching
-      if(!gpsWatch&&navigator.geolocation){
-        gpsWatch=navigator.geolocation.watchPosition(pos=>{
-          const{latitude:lat,longitude:lng}=pos.coords;
-          if(Math.abs(lat-(uLat||0))>0.00005||Math.abs(lng-(uLng||0))>0.00005){
-            uLat=lat;uLng=lng;
-            // Update user marker silently without full re-render
-            if(discMap){
-              if(uMarker){try{discMap.removeLayer(uMarker);}catch(e){}}
-              uMarker=L.marker([lat,lng],{icon:makeYouIcon(),zIndexOffset:1000})
-                .addTo(discMap)
-                .bindPopup('<div style="font-family:\'DM Sans\',sans-serif;font-size:.86rem;font-weight:800;color:#E8521A;padding:4px">📍 You are here</div>');
-              dMarkers=dMarkers.filter(m=>m!==uMarker);
-              dMarkers.push(uMarker);
-            }
-          }
-        },()=>{},{enableHighAccuracy:true,maximumAge:5000,timeout:15000});
+            }).catch(function(){setLoc(lat,lng,'Your Location');});
+        },function(){},{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
       }
     },80);
   }
-  if(pg==='profile')renderProfile();
-  if(pg==='home')renderHome();
-  if(pg==='addshop')resetAddShop();
-  if(pg==='supply')renderSupply();
-  if(pg==='grow')renderGrow();
+  if(pg==='profile') try{renderProfile();}catch(e){console.error(e);}
+  if(pg==='home') try{renderHome();}catch(e){console.error(e);}
+  if(pg==='addshop') try{resetAddShop();}catch(e){console.error(e);}
+  if(pg==='supply') try{renderSupply();}catch(e){console.error(e);}
+  if(pg==='grow') try{renderGrow();}catch(e){console.error(e);}
   window.scrollTo(0,0);
 }
+
 
 // ═══ IS OPEN ═══
 function isOpen(s){
@@ -7259,17 +7250,23 @@ function hideGate(){
   if(g){g.style.opacity='0';g.style.transition='opacity .4s';setTimeout(()=>{g.style.display='none';_initApp();},400);}
 }
 async function _initApp(){
-  ensureOwnerIdentity();
-  if(el('secGrid'))buildSectors('');
-  if(el('prodList')){addProd();addProd();}
+  try{ensureOwnerIdentity();}catch(e){}
+  try{if(el('secGrid'))buildSectors('');}catch(e){}
+  try{if(el('prodList')){addProd();addProd();}}catch(e){}
   setDot('waking');
-  wakeServer().then(ok=>{if(ok)renderHome();});
-  await renderHome();
-  renderProfile();
-  renderGrow();
-  renderSupply();
-  startKeepAlive();
+  // Wake server in background - don't block rendering
+  wakeServer().then(function(ok){
+    if(ok){apiOnline=true;setDot('online');renderHome();}
+  }).catch(function(){});
+  // Render all pages immediately
+  try{renderHome();}catch(e){console.error('renderHome error:',e);}
+  try{renderProfile();}catch(e){console.error('renderProfile error:',e);}
+  try{renderGrow();}catch(e){console.error('renderGrow error:',e);}
+  try{renderSupply();}catch(e){console.error('renderSupply error:',e);}
+  try{startKeepAlive();}catch(e){}
 }
+
+
 function setGateStatus(msg){
   const s=document.getElementById('gateStatus');
   if(s)s.textContent=msg;
@@ -7340,68 +7337,41 @@ async function gateSignIn(){
   }
 }
 
-window.addEventListener('DOMContentLoaded',async()=>{
-  // If shop website mode, skip gate and main app init
-  if(new URLSearchParams(window.location.search).get('shop'))return;
+window.addEventListener('DOMContentLoaded',async function(){
+  // Shop website mode — skip main app
+  if(new URLSearchParams(window.location.search).get('shop')) return;
 
-  // Check if already signed in
-  const guser=getGUser();
-  if(guser&&guser.uid){
-    // Already logged in — hide gate immediately
-    hideGate();
-  }else{
-    // Check if there is cached user data from previous session
-    const cachedUser=localStorage.getItem('ds_guser');
-    const cachedPhone=localStorage.getItem('ds_owner_phone');
-    if(cachedUser||cachedPhone){
-      // Has previous login - show app immediately, Firebase will sync in background
-      hideGate();
-    }else{
-      // New user — show gate
-      showGate();
-      setGateStatus('Sign in to continue');
-      // Give Firebase up to 4s to restore previous session
-      await new Promise(resolve=>{
-        let waited=0;
-        const check=setInterval(()=>{
-          waited+=200;
-          if(_authReady||waited>=4000){clearInterval(check);resolve();}
-        },200);
-      });
-      if(_currentUser){
-        setGateStatus('✅ Welcome back!');
-        setTimeout(()=>hideGate(),400);
-      }else{
-        setGateStatus('');
-        return;
-      }
+  // Show app immediately for returning users, gate for new users
+  var guser = getGUser();
+  var cachedUser = localStorage.getItem('ds_guser');
+  var cachedPhone = localStorage.getItem('ds_owner_phone');
+
+  if((guser&&guser.uid) || cachedUser || cachedPhone){
+    // Returning user — show app instantly
+    var g = document.getElementById('loginGate');
+    if(g) g.style.display = 'none';
+    _initApp();
+  } else {
+    // New user — show login gate
+    var g2 = document.getElementById('loginGate');
+    if(g2) g2.style.display = 'flex';
+    // Wait for Firebase (max 4 seconds)
+    await new Promise(function(resolve){
+      var waited = 0;
+      var check = setInterval(function(){
+        waited += 200;
+        if(_authReady || waited >= 4000){ clearInterval(check); resolve(); }
+      }, 200);
+    });
+    if(_currentUser){
+      var g3 = document.getElementById('loginGate');
+      if(g3){ g3.style.opacity='0'; g3.style.transition='opacity .3s'; setTimeout(function(){g3.style.display='none'; _initApp();},300); }
     }
+    // If still not signed in, gate stays visible — user must sign in
   }
-
-  // ── App init ──
-  ensureOwnerIdentity();
-  if(el('secGrid'))buildSectors('');
-  if(el('prodList')){addProd();addProd();}
-  setDot('waking');
-  // Auto-request GPS silently on startup
-  if(navigator.geolocation&&!uLat){
-    navigator.geolocation.getCurrentPosition(function(pos){
-      var lat=pos.coords.latitude,lng=pos.coords.longitude;
-      fetch('https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lng+'&format=json&zoom=14')
-        .then(function(r){return r.json();})
-        .then(function(d){
-          var a=d.address||{};
-          var name=a.suburb||a.neighbourhood||a.village||a.town||a.city||'Your Location';
-          setLoc(lat,lng,name);
-        }).catch(function(){setLoc(lat,lng,'Your Location');});
-    },function(){},
-    {enableHighAccuracy:true,timeout:8000,maximumAge:60000});
-  }
-  wakeServer().then(ok=>{if(ok)renderHome();});
-  await renderHome();
-  renderSupply();
-  startKeepAlive();
 });
+
+
 // ═══════════════════════════════════════
 //  SUPPLY CHAIN — DIRECT MANUFACTURER DATA
 // ═══════════════════════════════════════
@@ -8118,3 +8088,4 @@ async function promptInstall(){
 </script>
 </body>
 </html>
+
