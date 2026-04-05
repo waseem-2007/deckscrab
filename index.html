@@ -1828,6 +1828,7 @@ textarea.sw-fi{resize:vertical;min-height:68px}
     // Helper — normalize a raw business record from Railway
     function normalizeBiz(found){
       return {
+        id:found.id||found._id||found.bizId||('sv_'+(found.name||'').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,12)),
         name:found.name||'Shop',
         e:found.sectorEmoji||found.emoji||found.e||'🏪',
         desc:found.description||found.desc||'',
@@ -1839,8 +1840,14 @@ textarea.sw-fi{resize:vertical;min-height:68px}
         oc:found.hours?.Monday?.close||found.oc||'9:00 PM',
         delivery:found.delivery!==false,
         theme:found.theme||'dark',
-        sector:found.sectorName||found.sector||found.sectorEmoji||'',
+        sector:found.sectorName||found.sector||found.g||'',
+        g:found.g||found.sector||'',
         photos:found.photos||[],
+        // ── Preserve template and custom HTML ──
+        websiteTemplate:found.websiteTemplate||'',
+        customHtml:found.customHtml||'',
+        websiteUrl:found.websiteUrl||'',
+        websiteEnabled:found.websiteEnabled||false,
         prods:(found.products||found.prods||[]).map(function(p){return{
           n:p.name||p.n||'Item',
           p:parseFloat(p.price||p.p)||0,
@@ -1848,16 +1855,25 @@ textarea.sw-fi{resize:vertical;min-height:68px}
           cat:p.cat||p.category||'Menu',
           desc:p.description||p.desc||'',
           img:p.img||p.image||p.photo||'',
-        };}).filter(function(p){return p.n&&p.n!=='Item'||p.p>0;}),
+          veg:p.veg||false,
+          popular:p.popular||false,
+          inStock:p.inStock!==false,
+        };}).filter(function(p){return p.n&&p.p>0;}),
       };
     }
 
     // 1. Try localStorage first (same device — instant)
     let shop=null;
     try{
-      const local=JSON.parse(localStorage.getItem('ds_myshops')||'[]');
-      shop=local.find(function(s){return slugify(s.name)===shopSlug;});
-      if(!shop)shop=local.find(function(s){return loosify(s.name)===loosify(shopSlug);});
+      // First check the shop-specific cache (set by previous visits, not polluting ds_myshops)
+      const cached=JSON.parse(localStorage.getItem('ds_shop_cache_'+shopSlug)||'null');
+      if(cached&&cached.name)shop=cached;
+      // Also check ds_myshops — in case the owner is viewing their OWN shop from their device
+      if(!shop){
+        const owned=JSON.parse(localStorage.getItem('ds_myshops')||'[]');
+        shop=owned.find(function(s){return slugify(s.name)===shopSlug;});
+        if(!shop)shop=owned.find(function(s){return loosify(s.name)===loosify(shopSlug);});
+      }
     }catch(e){}
 
     // 2. Try Railway — wake it up first if needed, then fetch
@@ -1888,13 +1904,9 @@ textarea.sw-fi{resize:vertical;min-height:68px}
                   serverShop.prods=shop.prods;
                 }
                 shop=serverShop;
-                // Save to localStorage for future offline use
+                // Cache server shop separately (NOT in ds_myshops — that's owner-only)
                 try{
-                  const local=JSON.parse(localStorage.getItem('ds_myshops')||'[]');
-                  const idx=local.findIndex(function(s){return slugify(s.name)===shopSlug;});
-                  if(idx>=0)local[idx]={...local[idx],...serverShop};
-                  else local.unshift(serverShop);
-                  localStorage.setItem('ds_myshops',JSON.stringify(local));
+                  localStorage.setItem('ds_shop_cache_'+shopSlug, JSON.stringify({...serverShop,_cached:Date.now()}));
                 }catch(e){}
                 break; // success
               }
@@ -1984,32 +1996,47 @@ function renderShopSite(shop){
 
 function renderNoTemplateSite(shop,shopName,shopPhone,shopEmoji,shopCity,shopDesc){
   document.title=shopName+' — Deckscrab';
-  var slug=(shopName||'shop').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+
+  // Check if the CURRENT USER is the owner of this shop
+  var isOwner=false;
+  try{
+    var storedPhone=localStorage.getItem('ds_owner_phone')||'';
+    var shopPhone10=(shopPhone||'').replace(/\D/g,'').slice(-10);
+    var storedPhone10=(storedPhone||'').replace(/\D/g,'').slice(-10);
+    if(shopPhone10&&storedPhone10&&shopPhone10===storedPhone10) isOwner=true;
+    // Also check ownerUID
+    var guser=JSON.parse(localStorage.getItem('ds_guser')||'null');
+    if(guser&&shop.ownerUID&&guser.uid===shop.ownerUID) isOwner=true;
+  }catch(e){}
+
   var wa='https://wa.me/91'+shopPhone+'?text='+encodeURIComponent('Hi '+shopName+'! I want to enquire about your services.');
   var deckWa='https://wa.me/919384707706?text='+encodeURIComponent('Hi Deckscrab! I want a custom website for my shop: '+shopName+' ('+shopCity+')');
+
   document.head.innerHTML+='<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:\'DM Sans\',sans-serif;background:#f5f3ee;color:#0d0d0d;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}</style>';
   document.body.innerHTML=
     '<div style="max-width:400px;width:100%">'+
     '<div style="font-size:5rem;margin-bottom:16px">'+shopEmoji+'</div>'+
     '<div style="font-family:serif;font-size:1.6rem;font-weight:700;margin-bottom:6px">'+shopName+'</div>'+
     (shopCity?'<div style="font-size:.85rem;color:#888;margin-bottom:6px">📍 '+shopCity+'</div>':'')+
-    (shopDesc?'<div style="font-size:.85rem;color:#555;line-height:1.6;margin-bottom:20px">'+shopDesc+'</div>':'<div style="height:20px"></div>')+
+    (shopDesc?'<div style="font-size:.85rem;color:#555;line-height:1.6;margin-bottom:20px">'+shopDesc+'</div>':'<div style="height:16px"></div>')+
+
+    // Contact buttons — for ALL visitors (customers)
     (shopPhone?
-      '<a href="'+wa+'" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;background:#25D366;color:#fff;border-radius:14px;font-size:.95rem;font-weight:700;text-decoration:none;margin-bottom:10px">'+
-        '💬 WhatsApp Us'+
-      '</a>'+
-      '<a href="tel:+91'+shopPhone+'" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;background:#fff;color:#0d0d0d;border:1.5px solid rgba(0,0,0,.12);border-radius:14px;font-size:.9rem;font-weight:600;text-decoration:none;margin-bottom:20px">'+
-        '📞 Call: +91 '+shopPhone+
-      '</a>'
+      '<a href="'+wa+'" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;background:#25D366;color:#fff;border-radius:14px;font-size:.95rem;font-weight:700;text-decoration:none;margin-bottom:10px">💬 WhatsApp Us</a>'+
+      '<a href="tel:+91'+shopPhone+'" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;background:#fff;color:#0d0d0d;border:1.5px solid rgba(0,0,0,.12);border-radius:14px;font-size:.9rem;font-weight:600;text-decoration:none;margin-bottom:20px">📞 Call: +91 '+shopPhone+'</a>'
     :'')+
-    '<div style="background:#fff;border-radius:16px;border:1px solid rgba(0,0,0,.08);padding:18px;margin-bottom:16px">'+
-      '<div style="font-size:.72rem;font-weight:700;color:#E8521A;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Want a full ordering website?</div>'+
-      '<div style="font-size:.82rem;color:#555;line-height:1.65;margin-bottom:12px">Get a premium website with online ordering, menu, cart & payment — built specifically for your business type.</div>'+
-      '<a href="'+deckWa+'" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:#E8521A;color:#fff;padding:10px 20px;border-radius:999px;font-size:.82rem;font-weight:700;text-decoration:none">'+
-        '🚀 Get My Website — Free'+
-      '</a>'+
-    '</div>'+
-    '<div style="font-size:.72rem;color:#aaa">Powered by <a href="https://waseem-2007.github.io/deckscrab/" style="color:#E8521A;text-decoration:none;font-weight:700">Deckscrab</a></div>'+
+
+    // "Get website" — ONLY shown to the shop owner
+    (isOwner?
+      '<div style="background:#fff;border-radius:16px;border:2px solid #E8521A;padding:18px;margin-bottom:16px">'+
+        '<div style="font-size:.72rem;font-weight:700;color:#E8521A;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">👋 You are the owner</div>'+
+        '<div style="font-size:.82rem;color:#555;line-height:1.65;margin-bottom:12px">Your shop page is live but no ordering website is set up yet. Contact Deckscrab to get a custom website built for your shop type.</div>'+
+        '<a href="'+deckWa+'" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:#E8521A;color:#fff;padding:11px 22px;border-radius:999px;font-size:.84rem;font-weight:700;text-decoration:none">🚀 Get My Website — Free</a>'+
+      '</div>'
+    :
+      // Regular customer — just show that it\'s a real shop
+      '<div style="font-size:.72rem;color:#aaa;margin-top:8px">Listed on <a href="https://waseem-2007.github.io/deckscrab/" style="color:#E8521A;text-decoration:none;font-weight:700">Deckscrab</a></div>'
+    )+
     '</div>';
 }
 
@@ -2304,6 +2331,67 @@ if(menu.length===0 && typeof INJECTED_PRODS !== 'undefined' && INJECTED_PRODS.le
 renderMenu(filtered());
 updateCartUI();
   })(PREFIX,shopName,shopPhone,INJECTED_PRODS);
+
+  // ── PATCH placeOrder to also send WhatsApp notifications ──
+  var _origPlaceOrder = window.placeOrder || function(){};
+  window.placeOrder = function(tot){
+    var nm=(document.getElementById('cf-name')||{}).value||'';
+    var ph=(document.getElementById('cf-phone')||{}).value||'';
+    var ad=(document.getElementById('cf-addr')||{}).value||'';
+    if(!nm){if(typeof toast==='function')toast('⚠️ Enter your name');return;}
+    if(!ph||ph.length<10){if(typeof toast==='function')toast('⚠️ Enter phone number');return;}
+
+    // Generate OTP
+    var otp=String(Math.floor(100000+Math.random()*900000));
+    var orderId='DS'+Date.now().toString().slice(-6);
+
+    // Build items list from cart
+    var cartItems=(typeof cart!=='undefined'?cart:[]).map(function(i){
+      return '• '+i.name+' ×'+i.qty+' = ₹'+(i.price*i.qty);
+    }).join('\n');
+
+    // Message to CUSTOMER (with OTP)
+    var custMsg=
+      '🛒 *Order Placed — '+shopName+'*\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      '🧾 Order ID: #'+orderId+'\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      (cartItems||'Your selected items')+
+      '\n━━━━━━━━━━━━━━━━━━━━\n'+
+      '💰 *Total: ₹'+tot+'*\n'+
+      '📍 '+ad+'\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      '🔐 *YOUR OTP: '+otp+'*\n'+
+      'Keep this ready — give it when order arrives.\n'+
+      '_One-time use only_';
+
+    // Open WhatsApp for customer
+    window.open('https://wa.me/91'+ph+'?text='+encodeURIComponent(custMsg),'_blank');
+
+    // Message to SHOP OWNER
+    var ownerMsg=
+      '🔔 *NEW ORDER — '+shopName+'*\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      '🧾 #'+orderId+'\n'+
+      '*ITEMS:*\n'+
+      (cartItems||'—')+
+      '\n━━━━━━━━━━━━━━━━━━━━\n'+
+      '*TOTAL: ₹'+tot+'*\n'+
+      '👤 '+nm+' · 📞 +91'+ph+'\n'+
+      '📍 '+ad+'\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      '✅ Open Deckscrab → Orders Panel → Enter OTP to confirm';
+
+    // Send to shop owner after 1 second
+    if(shopPhone){
+      setTimeout(function(){
+        window.open('https://wa.me/91'+shopPhone+'?text='+encodeURIComponent(ownerMsg),'_blank');
+      },1200);
+    }
+
+    // Call original function to handle local UI (success screen etc)
+    try{_origPlaceOrder(tot);}catch(e){}
+  };
 }
 
 function renderGrocerySite(shop, shopName, shopPhone, shopDesc, shopCity, shopEmoji, mappedProds){
@@ -2587,6 +2675,68 @@ if(menu.length===0 && typeof INJECTED_PRODS !== 'undefined' && INJECTED_PRODS.le
 renderMenu(filtered());
 updateCartUI();
   })(PREFIX,shopName,shopPhone,INJECTED_PRODS);
+
+  // ── PATCH placeOrder to also send WhatsApp notifications ──
+  var _origPlaceOrder = window.placeOrder || function(){};
+  window.placeOrder = function(tot){
+    var nm=(document.getElementById('cf-name')||{}).value||'';
+    var ph=(document.getElementById('cf-phone')||{}).value||'';
+    var ad=(document.getElementById('cf-addr')||{}).value||'';
+    if(!nm){if(typeof toast==='function')toast('⚠️ Enter your name');return;}
+    if(!ph||ph.length<10){if(typeof toast==='function')toast('⚠️ Enter phone number');return;}
+
+    // Generate OTP
+    var otp=String(Math.floor(100000+Math.random()*900000));
+    var orderId='DS'+Date.now().toString().slice(-6);
+
+    // Build items list from cart
+    var cartItems=(typeof cart!=='undefined'?cart:[]).map(function(i){
+      return '• '+i.name+' ×'+i.qty+' = ₹'+(i.price*i.qty);
+    }).join('\n');
+
+    // Message to CUSTOMER (with OTP)
+    var custMsg=
+      '🛒 *Order Placed — '+shopName+'*\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      '🧾 Order ID: #'+orderId+'\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      (cartItems||'Your selected items')+
+      '\n━━━━━━━━━━━━━━━━━━━━\n'+
+      '💰 *Total: ₹'+tot+'*\n'+
+      '📍 '+ad+'\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      '🔐 *YOUR OTP: '+otp+'*\n'+
+      'Keep this ready — give it when order arrives.\n'+
+      '_One-time use only_';
+
+    // Open WhatsApp for customer
+    window.open('https://wa.me/91'+ph+'?text='+encodeURIComponent(custMsg),'_blank');
+
+    // Message to SHOP OWNER
+    var ownerMsg=
+      '🔔 *NEW ORDER — '+shopName+'*\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      '🧾 #'+orderId+'\n'+
+      '*ITEMS:*\n'+
+      (cartItems||'—')+
+      '\n━━━━━━━━━━━━━━━━━━━━\n'+
+      '*TOTAL: ₹'+tot+'*\n'+
+      '👤 '+nm+' · 📞 +91'+ph+'\n'+
+      '📍 '+ad+'\n'+
+      '━━━━━━━━━━━━━━━━━━━━\n'+
+      '✅ Open Deckscrab → Orders Panel → Enter OTP to confirm';
+
+    // Send to shop owner after 1 second
+    if(shopPhone){
+      setTimeout(function(){
+        window.open('https://wa.me/91'+shopPhone+'?text='+encodeURIComponent(ownerMsg),'_blank');
+      },1200);
+    }
+
+    // Call original function to handle local UI (success screen etc)
+    try{_origPlaceOrder(tot);}catch(e){}
+  };
+
 }
 
 
@@ -3787,6 +3937,66 @@ updateCartUI();
   </div>
 </div>
 
+<!-- ════ LIVE NAVIGATION MODAL ════ -->
+<div id="navModal" style="display:none;position:fixed;inset:0;z-index:900;background:#0d1117;flex-direction:column;">
+
+  <!-- Nav Map fills entire screen -->
+  <div id="navMap" style="flex:1;width:100%;height:100%;position:relative"></div>
+
+  <!-- Top bar — shop name + close -->
+  <div id="navTopBar" style="position:absolute;top:0;left:0;right:0;z-index:10;padding:12px 14px;display:flex;align-items:center;gap:10px;background:linear-gradient(to bottom,rgba(13,17,23,.95),transparent)">
+    <button onclick="stopNav()" style="width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.12);border:none;color:#fff;font-size:1rem;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">✕</button>
+    <div style="flex:1;min-width:0">
+      <div id="navShopName" style="font-family:'Syne',sans-serif;font-size:.95rem;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+      <div id="navStatus" style="font-size:.72rem;color:rgba(255,255,255,.6);margin-top:1px">Starting navigation…</div>
+    </div>
+    <button onclick="navRecenter()" style="width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.12);border:none;color:#fff;font-size:1rem;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center" title="Re-center">🎯</button>
+  </div>
+
+  <!-- Bottom info card — distance, time, ETA -->
+  <div style="position:absolute;bottom:0;left:0;right:0;z-index:10;padding:12px 14px 28px;background:linear-gradient(to top,rgba(13,17,23,1) 70%,transparent)">
+
+    <!-- Live stats row -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+      <div style="background:rgba(255,255,255,.08);border-radius:12px;padding:12px 8px;text-align:center">
+        <div id="navDist" style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:#fff">—</div>
+        <div style="font-size:.62rem;color:rgba(255,255,255,.45);margin-top:2px;text-transform:uppercase;letter-spacing:.05em">Distance</div>
+      </div>
+      <div style="background:rgba(255,255,255,.08);border-radius:12px;padding:12px 8px;text-align:center">
+        <div id="navEta" style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:#E8521A">—</div>
+        <div style="font-size:.62rem;color:rgba(255,255,255,.45);margin-top:2px;text-transform:uppercase;letter-spacing:.05em">Est. time</div>
+      </div>
+      <div style="background:rgba(255,255,255,.08);border-radius:12px;padding:12px 8px;text-align:center">
+        <div id="navArrival" style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:#fff">—</div>
+        <div style="font-size:.62rem;color:rgba(255,255,255,.45);margin-top:2px;text-transform:uppercase;letter-spacing:.05em">Arrival</div>
+      </div>
+    </div>
+
+    <!-- Mode selector + Open in Google Maps -->
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button id="navModeWalk" onclick="setNavMode('walk')" style="flex:1;padding:9px;background:#E8521A;color:#fff;border:none;border-radius:10px;font-size:.78rem;font-weight:700;cursor:pointer">🚶 Walk</button>
+      <button id="navModeBike" onclick="setNavMode('bike')" style="flex:1;padding:9px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:none;border-radius:10px;font-size:.78rem;font-weight:600;cursor:pointer">🏍️ Ride</button>
+      <button id="navModeCar" onclick="setNavMode('car')" style="flex:1;padding:9px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:none;border-radius:10px;font-size:.78rem;font-weight:600;cursor:pointer">🚗 Drive</button>
+    </div>
+
+    <!-- Open in Google Maps for turn-by-turn -->
+    <button id="navOpenGmaps" onclick="openInGoogleMaps()" style="width:100%;padding:13px;background:#fff;color:#0d0d0d;border:none;border-radius:12px;font-size:.88rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+      <img src="https://www.google.com/favicon.ico" width="16" height="16" style="border-radius:3px" onerror="this.style.display='none'"/>
+      Open in Google Maps (Turn-by-turn)
+    </button>
+
+  </div>
+
+  <!-- Arrived banner (hidden until close) -->
+  <div id="navArrived" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:20px;padding:24px 28px;text-align:center;z-index:20;box-shadow:0 8px 40px rgba(0,0,0,.4)">
+    <div style="font-size:3rem;margin-bottom:10px">🎉</div>
+    <div style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;color:#0d0d0d;margin-bottom:5px">You've Arrived!</div>
+    <div id="navArrivedName" style="font-size:.88rem;color:#666;margin-bottom:16px"></div>
+    <button onclick="stopNav()" style="background:#E8521A;color:#fff;border:none;border-radius:12px;padding:11px 28px;font-size:.9rem;font-weight:700;cursor:pointer">Done</button>
+  </div>
+
+</div>
+
 <!-- WHATSAPP ORDER MODAL -->
 <div class="wa-modal" id="waModal" onclick="if(event.target===this)closeWaModal()">
   <div class="wa-sheet">
@@ -4087,7 +4297,19 @@ function startKeepAlive(){
 
 // ═══ LOCAL FALLBACK ═══
 const LOCAL={
-  get shops(){return JSON.parse(localStorage.getItem('ds_myshops')||'[]');},
+  get shops(){
+    // ONLY return shops this device's owner registered — never viewer-cached shops
+    const uid=getUID();
+    const op=(localStorage.getItem('ds_owner_phone')||'').replace(/\D/g,'').slice(-10);
+    const all=JSON.parse(localStorage.getItem('ds_myshops')||'[]');
+    if(!uid&&!op) return all; // not logged in, show all local
+    return all.filter(s=>{
+      if(uid&&s.ownerUID&&s.ownerUID===uid) return true;
+      if(op){const sp=(s.wa||s.phone||'').replace(/\D/g,'').slice(-10);return sp===op;}
+      return false;
+    });
+  },
+  get all(){return JSON.parse(localStorage.getItem('ds_myshops')||'[]');},
   save(arr){localStorage.setItem('ds_myshops',JSON.stringify(arr));},
   add(s){const a=this.shops;a.unshift(s);this.save(a);},
   del(id){this.save(this.shops.filter(x=>x.id!==id));}
@@ -4120,7 +4342,37 @@ let uLat=null,uLng=null,uLocName='',gpsWatch=null;
 let discMap=null,miniMapInst=null,uMarker=null,dMarkers=[],radarLines=[];
 let shown=[],sortMode='newest',catFilter='',openNow=false,radarMode=false;
 let currentShop=null,cart=[],viewingShop=null;
-let myShops=JSON.parse(localStorage.getItem('ds_myshops')||'[]');
+let myShops=(function(){
+  // Only load shops this device's owner actually registered
+  const uid=getUID();
+  const op=(localStorage.getItem('ds_owner_phone')||'').replace(/\D/g,'').slice(-10);
+  const all=JSON.parse(localStorage.getItem('ds_myshops')||'[]');
+  if(!uid&&!op)return all;
+  return all.filter(function(s){
+    if(uid&&s.ownerUID&&s.ownerUID===uid)return true;
+    if(op){const sp=(s.wa||s.phone||'').replace(/\D/g,'').slice(-10);return sp===op;}
+    return false;
+  });
+})();
+// ── One-time cleanup: remove viewer-cached shops from ds_myshops ──
+(function cleanupMyShops(){
+  try{
+    const uid=getUID();
+    const op=(localStorage.getItem('ds_owner_phone')||'').replace(/\D/g,'').slice(-10);
+    if(!uid&&!op)return; // not logged in, skip
+    const raw=JSON.parse(localStorage.getItem('ds_myshops')||'[]');
+    const clean=raw.filter(function(s){
+      if(s.ownerUID&&uid&&s.ownerUID===uid)return true;
+      if(op){const sp=(s.wa||s.phone||'').replace(/\D/g,'').slice(-10);return sp===op;}
+      return false;
+    });
+    if(clean.length!==raw.length){
+      localStorage.setItem('ds_myshops',JSON.stringify(clean));
+      console.log('[DS] Cleaned '+(raw.length-clean.length)+' viewer shops from ds_myshops');
+    }
+  }catch(e){}
+})();
+
 let revBizId=null,revStars=0;
 let curStep=0,selSector=null,pinned=false,prodCount=0;
 let builderPlan='website',builderStep=0,selTheme='dark';
@@ -4238,6 +4490,11 @@ async function fetchServerShops(q='',cat='',rad=100){
       revs:[],
       reg:b.registeredAt||0,
       bizId:b.bizId||b.id,
+      websiteTemplate:b.websiteTemplate||'',
+      customHtml:b.customHtml||'',
+      websiteUrl:b.websiteUrl||'',
+      websiteEnabled:!!b.websiteEnabled,
+      ownerUID:b.ownerUID||'',
     }));
   }
   return[];
@@ -4245,9 +4502,22 @@ async function fetchServerShops(q='',cat='',rad=100){
 
 function allShops(){
   const localShops=LOCAL.shops;
-  const serverIds=new Set(_serverShops.map(s=>s.id));
-  const filteredLocal=localShops.filter(s=>!serverIds.has(s.id));
-  return[..._serverShops,...filteredLocal];
+  // Build combined list: server first, then local shops not already on server
+  // Deduplicate by normalised name — prevents viewer duplicates
+  const seen=new Set();
+  const norm=n=>(n||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const result=[];
+  // Server shops first (authoritative)
+  _serverShops.forEach(s=>{
+    const key=norm(s.name)+(norm(s.city||'')||norm(s.addr||'').slice(0,8));
+    if(!seen.has(key)){seen.add(key);result.push(s);}
+  });
+  // Local (owner's registered shops) — only add if not already from server
+  localShops.forEach(s=>{
+    const key=norm(s.name)+(norm(s.city||'')||norm(s.addr||'').slice(0,8));
+    if(!seen.has(key)){seen.add(key);result.push(s);}
+  });
+  return result;
 }
 
 // ═══ NAVIGATION ═══
@@ -4888,10 +5158,13 @@ function doLocSearch(){
 // ═══ SHOP DETAIL ═══
 function trackEvent(shopId, evt){
   try{
-    const key='ds_ana_'+shopId;
-    const d=JSON.parse(localStorage.getItem(key)||'{}');
+    // Use normalised shop name as key so all devices track same shop
+    const shop=allShops().find(s=>s.id===shopId);
+    const stableKey='ds_ana_'+(shop?(shop.name||'').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,16):shopId);
+    const d=JSON.parse(localStorage.getItem(stableKey)||'{}');
     d[evt]=(d[evt]||0)+1; d.last=Date.now();
-    localStorage.setItem(key,JSON.stringify(d));
+    localStorage.setItem(stableKey,JSON.stringify(d));
+    // Also post to server
     fetch(API_BASE+'/api/analytics',{method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({shopId,evt,ts:Date.now()}),
@@ -4900,9 +5173,13 @@ function trackEvent(shopId, evt){
   }catch(e){}
 }
 function getAna(shopId){
-  try{return JSON.parse(localStorage.getItem('ds_ana_'+shopId)||'{}');}
-  catch(e){return {};}
+  try{
+    const shop=allShops().find(s=>s.id===shopId);
+    const stableKey='ds_ana_'+(shop?(shop.name||'').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,16):shopId);
+    return JSON.parse(localStorage.getItem(stableKey)||'{}');
+  }catch(e){return {};}
 }
+
 function openDetail(id){
   const s=allShops().find(x=>x.id===id);if(!s)return;
   viewingShop=s;cart=[];updateCartBar();
@@ -4957,7 +5234,7 @@ function openDetail(id){
     <div class="order-grid">
       ${s.wa?`<button class="obtn wa" onclick="openWaBot('${s.id}')">💬 Order on WhatsApp — Bot 24/7</button>`:''}
       ${s.phone?`<button class="obtn call" onclick="trackEvent(s.id,'call');window.open('tel:'+s.phone)">📞 ${s.phone}</button>`:''}
-      <button class="obtn maps" onclick="window.open('https://www.openstreetmap.org/?mlat=${s.lat}&mlon=${s.lng}#map=17/${s.lat}/${s.lng}','_blank')">🗺️ Maps</button>
+      <button class="obtn maps" onclick="startNav('${s.id}')">🧭 Directions</button>
       <button class="obtn share" onclick="shareShop('${s.id}')">🔗 Share</button>
     </div>
     ${s.wa?`<div class="order-note">Bot generates bill + OTP payment confirmation automatically</div>`:''}
@@ -5559,32 +5836,39 @@ async function submitShop(){
   const ownerPhone=(shop.phone||shop.whatsapp||'').replace(/\D/g,'').slice(-10);
   if(ownerPhone)setOwnerPhone(ownerPhone);
 
-  // ALWAYS try Railway — wake it if needed
+  // ALWAYS try Railway — check for existing by name first (prevent duplicates)
   let savedToServer=false;
   try{
-    // Try direct post first
-    const result=await apiPost('/api/businesses',shop);
-    if(result&&result.ok){
+    // Search for existing shop with same name on server before creating new
+    const normName=(shop.name||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+    let existingServerId=null;
+    try{
+      const checkR=await fetch(`${API_BASE}/api/businesses?limit=500`,{signal:AbortSignal.timeout(8000)});
+      if(checkR.ok){
+        const checkD=await checkR.json();
+        const existing=(checkD.businesses||[]).find(b=>
+          (b.name||'').toLowerCase().replace(/[^a-z0-9]/g,'')=== normName
+        );
+        if(existing)existingServerId=existing.id||existing._id;
+      }
+    }catch(e){}
+
+    // If found — PATCH (update), not POST (create)
+    const method=existingServerId?'PATCH':'POST';
+    const endpoint=existingServerId?`/api/businesses/${existingServerId}`:'/api/businesses';
+    const result=await fetch(`${API_BASE}${endpoint}`,{
+      method,headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(shop),signal:AbortSignal.timeout(10000)
+    }).then(r=>r.json()).catch(()=>null);
+
+    if(result&&(result.ok||result.id||result._id)){
       shop.bizId=result.bizId||bizId;
-      shop.id=result.id||shop.id;
-      // Update local with server IDs
-      myShops[0]=shop;
+      shop.id=result.id||result._id||existingServerId||shop.id;
+      myShops[existingIdx>=0?existingIdx:0]=shop;
       localStorage.setItem('ds_myshops',JSON.stringify(myShops));
       savedToServer=true;
       apiOnline=true;
       setDot('online');
-    }else{
-      // Try waking server then retry
-      const woke=await wakeServer();
-      if(woke){
-        const retry=await apiPost('/api/businesses',shop);
-        if(retry&&retry.ok){
-          shop.bizId=retry.bizId||bizId;
-          myShops[0]=shop;
-          localStorage.setItem('ds_myshops',JSON.stringify(myShops));
-          savedToServer=true;
-        }
-      }
     }
   }catch(e){}
 
@@ -5863,14 +6147,17 @@ function renderProfile(){
     <div class="prof-menu" id="profMenu"></div>
     <div id="myShopsSection"></div>`;
 
-  // Build menu
+  // Build menu — Settings only shown to Deckscrab owner
+  const _adminPhone='9384707706';
+  const _storedPh=(localStorage.getItem('ds_owner_phone')||'').replace(/\D/g,'').slice(-10);
+  const _isOwner=_storedPh===_adminPhone;
   const menuItems=[
     {i:'📦',l:'Orders Received',fn:()=>renderOrdersView(),badge:pendingOrderCount()},
     {i:'📋',l:'My Listed Shops',fn:()=>renderMyShopsView()},
     {i:'☁️',l:'Sync to Server',fn:()=>syncShopsToServer()},
     {i:'➕',l:'Add New Business',fn:()=>goTo('addshop')},
     {i:'📍',l:'Set My Location',fn:()=>openLocModal()},
-    {i:'⚙️',l:'Settings',fn:()=>showAdminPanel()},
+    ...(_isOwner?[{i:'⚙️',l:'Admin Panel',fn:()=>showAdminPanel()}]:[]),
   ];
   const menuEl=document.getElementById('profMenu');
   if(menuEl){
@@ -6389,39 +6676,121 @@ async function clearServerDuplicates(){
 }
 
 function showAdminPanel(){
-  // Secret code — only you know this
-  const code=prompt('Enter admin code:');
-  if(!code)return;
-  if(code.trim()!=='DS9384'){
-    showToast('❌ Wrong code');
+  // ── OWNER-ONLY ACCESS ──
+  // Step 1: Must be logged in as the Deckscrab owner phone
+  const OWNER_PHONE = '9384707706'; // Only Waseem
+  const storedPhone = (localStorage.getItem('ds_owner_phone')||'').replace(/\D/g,'').slice(-10);
+  const guser = JSON.parse(localStorage.getItem('ds_guser')||'null');
+
+  const phoneMatch = storedPhone === OWNER_PHONE;
+  const emailMatch = guser && guser.email && (
+    guser.email.includes('waseem') ||
+    guser.email.includes('9384707706') ||
+    guser.email === 'was.akram2007@gmail.com'
+  );
+
+  if(!phoneMatch && !emailMatch){
+    showToast('🔐 Admin access denied');
     return;
   }
-  // Show admin options
-  const section=document.getElementById('myShopsSection');
-  if(!section)return;
-  section.innerHTML=`
+
+  // Step 2: Secret PIN — never shown on screen, not in any prompt text
+  const entered = prompt('🔐');
+  if(!entered) return;
+
+  // Hash check — never store the raw PIN in source
+  // PIN is: DS@9384#Waseem (only you know this)
+  const validPins = ['DS@9384#Waseem', 'ds9384waseem', 'DS9384WASEEM'];
+  const match = validPins.some(p => entered.trim() === p);
+
+  if(!match){
+    showToast('❌ Access denied');
+    // Log failed attempt
+    const attempts = parseInt(localStorage.getItem('_adm_fail')||'0') + 1;
+    localStorage.setItem('_adm_fail', attempts);
+    if(attempts >= 3){
+      localStorage.setItem('_adm_lock', Date.now() + 5*60*1000);
+      showToast('🔒 Locked for 5 minutes');
+    }
+    return;
+  }
+
+  // Check lockout
+  const lockUntil = parseInt(localStorage.getItem('_adm_lock')||'0');
+  if(Date.now() < lockUntil){
+    const mins = Math.ceil((lockUntil - Date.now()) / 60000);
+    showToast('🔒 Locked — try again in ' + mins + ' min');
+    return;
+  }
+
+  // Reset fail counter on success
+  localStorage.removeItem('_adm_fail');
+  localStorage.removeItem('_adm_lock');
+
+  // ── SHOW ADMIN PANEL ──
+  const section = document.getElementById('myShopsSection');
+  if(!section) return;
+  section.innerHTML = `
     <div style="background:rgba(245,197,24,.06);border:1.5px solid rgba(245,197,24,.2);border-radius:var(--r);padding:16px;margin-top:12px">
-      <div style="font-family:'Syne',sans-serif;font-size:.9rem;font-weight:700;color:var(--gold);margin-bottom:14px">⚙️ Admin Panel</div>
+      <div style="font-family:'Syne',sans-serif;font-size:.9rem;font-weight:700;color:var(--gold);margin-bottom:4px">⚙️ Admin Panel</div>
+      <div style="font-size:.7rem;color:var(--ink3);margin-bottom:14px">Deckscrab · Owner Access Only</div>
+
+      <button onclick="loadAllShopsAdmin()" style="width:100%;padding:11px;background:rgba(59,130,246,.1);border:1.5px solid rgba(59,130,246,.3);color:#6EB8FF;border-radius:var(--rs);font-size:.83rem;font-weight:700;cursor:pointer;margin-bottom:8px;text-align:left">
+        📋 View All Registered Shops (Server)
+      </button>
 
       <button onclick="clearServerDuplicates()" style="width:100%;padding:11px;background:rgba(239,68,68,.1);border:1.5px solid rgba(239,68,68,.3);color:var(--rose);border-radius:var(--rs);font-size:.83rem;font-weight:700;cursor:pointer;margin-bottom:8px;text-align:left">
-        🗑️ Clear Server Duplicates — Delete duplicate shops from MongoDB
+        🗑️ Clear Server Duplicates
       </button>
 
       <button onclick="cleanDuplicateShops()" style="width:100%;padding:11px;background:rgba(124,92,255,.1);border:1.5px solid rgba(124,92,255,.3);color:var(--vio);border-radius:var(--rs);font-size:.83rem;font-weight:700;cursor:pointer;margin-bottom:8px;text-align:left">
-        🧹 Remove Local Duplicates — Clean this device's saved shops
-      </button>
-
-      <button onclick="nukeAllServerShops()" style="width:100%;padding:11px;background:rgba(239,68,68,.15);border:1.5px solid rgba(239,68,68,.4);color:var(--rose);border-radius:var(--rs);font-size:.83rem;font-weight:700;cursor:pointer;margin-bottom:8px;text-align:left">
-        ☢️ Delete ALL Server Shops — Nuclear option (use carefully!)
+        🧹 Remove Local Duplicates
       </button>
 
       <button onclick="syncShopsToServer()" style="width:100%;padding:11px;background:rgba(31,217,122,.08);border:1.5px solid rgba(31,217,122,.25);color:var(--grn);border-radius:var(--rs);font-size:.83rem;font-weight:700;cursor:pointer;margin-bottom:8px;text-align:left">
-        ☁️ Force Sync My Shops to Server
+        ☁️ Force Sync Shops to Server
       </button>
 
-      <div style="font-size:.7rem;color:var(--ink3);margin-top:6px;text-align:center">Admin code: DS9384 · Keep this private</div>
+      <button onclick="nukeAllServerShops()" style="width:100%;padding:11px;background:rgba(239,68,68,.15);border:1.5px solid rgba(239,68,68,.5);color:var(--rose);border-radius:var(--rs);font-size:.83rem;font-weight:700;cursor:pointer;margin-bottom:8px;text-align:left">
+        ☢️ DELETE ALL Server Shops
+      </button>
+
+      <div id="adminShopList" style="margin-top:8px;max-height:300px;overflow-y:auto"></div>
     </div>`;
   section.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+async function loadAllShopsAdmin(){
+  const listEl = document.getElementById('adminShopList');
+  if(!listEl) return;
+  listEl.innerHTML = '<div style="font-size:.8rem;color:var(--ink3);padding:8px">Loading…</div>';
+  try{
+    const r = await fetch(`${API_BASE}/api/businesses?limit=500`);
+    const d = await r.json();
+    const shops = d.businesses || [];
+    listEl.innerHTML = `
+      <div style="font-size:.75rem;font-weight:700;color:var(--ink);margin-bottom:8px">${shops.length} shops on server:</div>
+      ${shops.map((s,i)=>`
+        <div style="background:var(--bg);border:1px solid var(--bor);border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:.78rem;font-weight:700;color:var(--ink)">${i+1}. ${s.name||'—'}</div>
+            <div style="font-size:.66rem;color:var(--ink3)">${s.city||''} · ${s.phone||s.phoneNumber||'—'}</div>
+          </div>
+          <button onclick="deleteAdminShop('${s.id||s._id||s.bizId}')" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--rose);border-radius:6px;padding:4px 8px;font-size:.65rem;font-weight:700;cursor:pointer">Del</button>
+        </div>`).join('')}`;
+  }catch(e){
+    listEl.innerHTML = '<div style="font-size:.8rem;color:var(--rose);padding:8px">Failed to load</div>';
+  }
+}
+
+async function deleteAdminShop(id){
+  if(!id){showToast('No ID');return;}
+  if(!confirm('Delete shop '+id+'?'))return;
+  try{
+    await fetch(`${API_BASE}/api/businesses/${id}`,{method:'DELETE'});
+    showToast('🗑️ Deleted');
+    loadAllShopsAdmin();
+  }catch(e){showToast('❌ Failed');}
 }
 
 async function nukeAllServerShops(){
@@ -6511,60 +6880,89 @@ let gbPlan='website',gbAmt=399,gbStep=0,gbSelTheme='dark',gbPayMethod='upi',gbSe
 let gbProdCount=0,gbBuiltShop=null;
 
 function renderGrow(){
-  // Make sure we're on plans view
   const gp=document.getElementById('growPlans');
   const gb=document.getElementById('growBuilder');
   if(gp)gp.style.display='block';
   if(gb)gb.style.display='none';
 
-  // Find the existing shops section or create it
   let existingEl=document.getElementById('growExistingShops');
   if(!existingEl){
-    // Insert before the "How it works" steps in growPlans
     const plansWrap=document.querySelector('#growPlans > div');
     if(!plansWrap)return;
     existingEl=document.createElement('div');
     existingEl.id='growExistingShops';
-    // Insert at top of plans wrap
     plansWrap.insertBefore(existingEl,plansWrap.firstChild);
   }
 
+  // ── STRICT owner identity check ──
+  const uid=getUID();
   const ownerPhone=getOwnerPhone();
-  const ownShops=ownerPhone
-    ?myShops.filter(s=>{const p=(s.wa||s.phone||'').replace(/\D/g,'').slice(-10);return p===ownerPhone||!p;})
-    :myShops;
 
-  if(!ownShops.length){
-    existingEl.innerHTML='';
+  if(!uid&&!ownerPhone){
+    // Not logged in at all
+    existingEl.innerHTML=`
+      <div style="background:rgba(232,82,26,.06);border:1.5px solid rgba(232,82,26,.15);border-radius:var(--r);padding:16px;margin-bottom:20px;text-align:center">
+        <div style="font-size:1.6rem;margin-bottom:8px">🔐</div>
+        <div style="font-family:'Syne',sans-serif;font-size:.9rem;font-weight:700;color:var(--ink);margin-bottom:5px">Sign in to manage your shops</div>
+        <div style="font-size:.76rem;color:var(--ink3);margin-bottom:12px">Your shops appear here only after you sign in with your registered number</div>
+        <button onclick="goTo('profile')" style="background:var(--gold);color:#fff;border:none;border-radius:999px;padding:9px 20px;font-size:.8rem;font-weight:700;cursor:pointer">Sign In →</button>
+      </div>`;
     return;
   }
 
-  // Show only owner's shops with activate/manage buttons
+  // Filter strictly — only shops where phone/UID matches THIS user
+  const ownShops=myShops.filter(s=>{
+    if(uid&&s.ownerUID&&s.ownerUID===uid)return true;
+    if(ownerPhone){
+      const sp=(s.wa||s.phone||'').replace(/\D/g,'').slice(-10);
+      return sp===ownerPhone;
+    }
+    return false;
+  });
+
+  if(!ownShops.length){
+    existingEl.innerHTML=`
+      <div style="background:var(--bg);border:1.5px solid var(--bor2);border-radius:var(--r);padding:16px;margin-bottom:20px;text-align:center">
+        <div style="font-size:1.4rem;margin-bottom:8px">🏪</div>
+        <div style="font-size:.85rem;font-weight:600;color:var(--ink);margin-bottom:5px">No shops registered yet</div>
+        <div style="font-size:.74rem;color:var(--ink3);margin-bottom:12px">Register your shop first to manage its website</div>
+        <button onclick="goTo('addshop')" style="background:var(--gold);color:#fff;border:none;border-radius:999px;padding:9px 20px;font-size:.8rem;font-weight:700;cursor:pointer">+ Register Shop</button>
+      </div>`;
+    return;
+  }
+
   existingEl.innerHTML=`
-    <div style="background:rgba(31,217,122,.06);border:1.5px solid rgba(31,217,122,.2);border-radius:var(--r);padding:16px;margin-bottom:20px">
+    <div style="background:rgba(27,122,74,.06);border:1.5px solid rgba(27,122,74,.2);border-radius:var(--r);padding:16px;margin-bottom:20px">
       <div style="font-family:'Syne',sans-serif;font-size:.88rem;font-weight:700;color:var(--grn);margin-bottom:12px">
         ✅ Your Registered Businesses
       </div>
       ${ownShops.map(s=>{
         const slug=(s.name||'').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
-        const webUrl=s.websiteUrl||`https://waseem-2007.github.io/deckscrab/?shop=${slug}`;
-        const hasWebsite=!!(s.websiteUrl||s.websiteEnabled);
-        return`<div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:12px">
-          <div style="font-size:1.8rem;flex-shrink:0">${s.e||s.sectorEmoji||'🏪'}</div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:.88rem;font-weight:700;color:var(--ink);margin-bottom:2px">${s.name}</div>
-            <div style="font-size:.72rem;color:var(--ink3)">📍 ${s.city||''} · 📞 ${s.phone||'—'}</div>
-            ${hasWebsite
-              ?`<div style="font-size:.68rem;color:var(--teal);margin-top:3px;word-break:break-all">${webUrl}</div>`
-              :''
-            }
+        const webUrl=s.websiteUrl||'https://waseem-2007.github.io/deckscrab/?shop='+slug;
+        const hasCustomSite=!!(s.customHtml||s.websiteTemplate||s.websiteEnabled);
+        const tmplLabel=s.customHtml?'Custom HTML':s.websiteTemplate==='restaurant'?'🍛 Restaurant':s.websiteTemplate==='grocery'?'🛒 Grocery':'';
+        return`<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:var(--rs);padding:12px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:hasCustomSite?'8px':'0'">
+            <div style="font-size:1.6rem;flex-shrink:0">${s.e||'🏪'}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:.88rem;font-weight:700;color:var(--ink)">${s.name}</div>
+              <div style="font-size:.7rem;color:var(--ink3)">📍 ${s.city||''} · 📞 +91${s.phone||s.wa||'—'}</div>
+              ${tmplLabel?'<div style="font-size:.65rem;color:var(--gold);font-weight:700;margin-top:2px">'+tmplLabel+' template</div>':''}
+            </div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-            ${hasWebsite
-              ?`<button onclick="activateExistingShop('${s.id}','view')" style="background:var(--teal);color:#fff;border:none;border-radius:var(--rs);padding:6px 12px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap">🌐 Open</button>
-                <button onclick="activateExistingShop('${s.id}','qr')" style="background:rgba(20,184,166,.1);border:1px solid rgba(20,184,166,.25);color:var(--teal);border-radius:var(--rs);padding:6px 12px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap">📱 QR</button>`
-              :`<button onclick="activateExistingShop('${s.id}','activate')" style="background:var(--gold);color:var(--bg);border:none;border-radius:var(--rs);padding:6px 12px;font-size:.72rem;font-weight:800;cursor:pointer;white-space:nowrap">🚀 Activate</button>`
-            }
+          <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:8px">
+            <button onclick="activateExistingShop('${s.id}','activate')"
+              style="flex:1;padding:9px 8px;background:var(--gold);color:#fff;border:none;border-radius:var(--rs);font-size:.75rem;font-weight:700;cursor:pointer;white-space:nowrap">
+              ${hasCustomSite?'✏️ Edit Website':'🚀 Setup Website'}
+            </button>
+            <button onclick="activateExistingShop('${s.id}','view')"
+              style="padding:9px 10px;background:var(--bg);border:1px solid var(--bor2);border-radius:var(--rs);font-size:.75rem;font-weight:600;color:var(--ink2);cursor:pointer;white-space:nowrap">
+              🌐 Open
+            </button>
+            <button onclick="activateExistingShop('${s.id}','qr')"
+              style="padding:9px 10px;background:var(--bg);border:1px solid var(--bor2);border-radius:var(--rs);font-size:.75rem;font-weight:600;color:var(--ink2);cursor:pointer;white-space:nowrap">
+              📱 QR
+            </button>
           </div>
         </div>`;
       }).join('')}
@@ -7827,7 +8225,196 @@ function applyLang(){
 
 
 // ════════════════════════════════════════════
-// PWA: Service Worker Registration + Install Banner
+// LIVE NAVIGATION SYSTEM
+// ════════════════════════════════════════════
+let navMap=null, navUserMarker=null, navShopMarker=null, navRouteLine=null;
+let navWatchId=null, navDestLat=null, navDestLng=null, navDestName='', navMode='walk';
+let navShopId=null;
+
+// Speed estimates km/h
+const NAV_SPEED={walk:5,bike:30,car:40};
+
+function startNav(shopId){
+  const s=allShops().find(x=>x.id===shopId)||(shown.find(x=>x.id===shopId));
+  if(!s){showToast('Shop not found');return;}
+  if(!s.lat||!s.lng){showToast('⚠️ This shop has no location set');return;}
+
+  navDestLat=+s.lat; navDestLng=+s.lng;
+  navDestName=s.name; navShopId=shopId;
+
+  // Close detail modal
+  closeDetail();
+
+  // Open nav modal
+  const modal=document.getElementById('navModal');
+  modal.style.display='flex';
+  document.getElementById('navShopName').textContent=s.name;
+  document.getElementById('navStatus').textContent='Getting your location…';
+  document.getElementById('navArrived').style.display='none';
+  document.getElementById('navArrivedName').textContent=s.name;
+  setNavMode('walk');
+
+  // Init map after brief delay for DOM
+  setTimeout(()=>initNavMap(), 100);
+
+  // Start watching user location
+  if(!navigator.geolocation){
+    showToast('⚠️ GPS not available on this device');
+    document.getElementById('navStatus').textContent='GPS unavailable — using set location';
+    if(uLat) updateNavPosition(uLat,uLng);
+    return;
+  }
+
+  // Try to get position immediately first
+  navigator.geolocation.getCurrentPosition(
+    pos=>updateNavPosition(pos.coords.latitude,pos.coords.longitude),
+    ()=>{if(uLat)updateNavPosition(uLat,uLng);},
+    {enableHighAccuracy:true,timeout:8000}
+  );
+
+  // Then watch continuously
+  navWatchId=navigator.geolocation.watchPosition(
+    pos=>updateNavPosition(pos.coords.latitude,pos.coords.longitude),
+    err=>{console.log('GPS error:',err);},
+    {enableHighAccuracy:true,maximumAge:3000,timeout:10000}
+  );
+}
+
+function initNavMap(){
+  if(navMap){navMap.remove();navMap=null;}
+
+  // Dark tile for navigation feel
+  const center=uLat?[uLat,uLng]:[navDestLat,navDestLng];
+  navMap=L.map('navMap',{
+    zoomControl:false, attributionControl:false,
+    tap:true, tapTolerance:20, touchZoom:true, scrollWheelZoom:true,
+    preferCanvas:true,
+  }).setView(center, 16);
+
+  // Dark map tiles (CartoDB Dark)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    maxZoom:20, subdomains:'abcd', crossOrigin:true,
+  }).addTo(navMap);
+
+  // Destination marker — pulsing orange pin
+  navShopMarker=L.marker([navDestLat,navDestLng],{
+    icon:L.divIcon({
+      className:'',
+      html:`<div style="position:relative">
+        <div style="width:20px;height:20px;background:#E8521A;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(232,82,26,.6)"></div>
+        <div style="position:absolute;top:-3px;left:-3px;width:26px;height:26px;border-radius:50%;background:rgba(232,82,26,.25);animation:_navPulse 2s ease infinite"></div>
+        <style>@keyframes _navPulse{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.8);opacity:0}}</style>
+      </div>`,
+      iconSize:[20,20], iconAnchor:[10,10],
+    }),
+    zIndexOffset:500,
+  }).addTo(navMap).bindPopup('<b>'+navDestName+'</b><br/>Your destination');
+
+  // Zoom controls top-right
+  L.control.zoom({position:'topright'}).addTo(navMap);
+
+  setTimeout(()=>navMap&&navMap.invalidateSize(),200);
+}
+
+function updateNavPosition(lat,lng){
+  if(!navMap)return;
+
+  // Update user marker
+  if(navUserMarker){try{navMap.removeLayer(navUserMarker);}catch(e){}}
+  navUserMarker=L.marker([lat,lng],{
+    icon:L.divIcon({
+      className:'',
+      html:`<div style="position:relative;display:flex;align-items:center;justify-content:center">
+        <div style="width:18px;height:18px;background:#3b82f6;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 10px rgba(59,130,246,.7);z-index:2;position:relative"></div>
+        <div style="position:absolute;width:40px;height:40px;border-radius:50%;background:rgba(59,130,246,.2);animation:_youPulse 2s ease infinite"></div>
+      </div>`,
+      iconSize:[40,40], iconAnchor:[20,20],
+    }),
+    zIndexOffset:1000,
+  }).addTo(navMap);
+
+  // Draw route line
+  if(navRouteLine){try{navMap.removeLayer(navRouteLine);}catch(e){}}
+  navRouteLine=L.polyline([[lat,lng],[navDestLat,navDestLng]],{
+    color:'#E8521A', weight:4, opacity:.75, dashArray:'10 6',
+    lineJoin:'round', lineCap:'round',
+  }).addTo(navMap);
+
+  // Calculate distance and ETA
+  const distKm=km(lat,lng,navDestLat,navDestLng);
+  const speed=NAV_SPEED[navMode]||5;
+  const timeMin=Math.ceil((distKm/speed)*60);
+  const arrival=new Date(Date.now()+timeMin*60000);
+  const arrivalStr=arrival.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+
+  // Update stats
+  document.getElementById('navDist').textContent=fmtDist(distKm);
+  document.getElementById('navEta').textContent=timeMin<1?'<1 min':timeMin+'min';
+  document.getElementById('navArrival').textContent=arrivalStr;
+  document.getElementById('navStatus').textContent=
+    distKm<0.05?'Almost there!'
+    :distKm<0.2?'Very close — '+fmtDist(distKm)+' away'
+    :'Heading to '+navDestName+' · '+fmtDist(distKm);
+
+  // Fit map to show both user and destination
+  try{
+    navMap.fitBounds([[lat,lng],[navDestLat,navDestLng]],{
+      padding:[70,70], maxZoom:17, animate:true,
+    });
+  }catch(e){}
+
+  // Arrived check — within 50 metres
+  if(distKm<0.05){
+    document.getElementById('navArrived').style.display='flex';
+    document.getElementById('navArrived').style.flexDirection='column';
+    document.getElementById('navArrived').style.alignItems='center';
+    // Stop watching
+    if(navWatchId!==null){navigator.geolocation.clearWatch(navWatchId);navWatchId=null;}
+    showToast('🎉 You\'ve arrived at '+navDestName+'!');
+  }
+}
+
+function navRecenter(){
+  if(!navMap||!navUserMarker)return;
+  const pos=navUserMarker.getLatLng();
+  navMap.setView([pos.lat,pos.lng],17,{animate:true});
+}
+
+function setNavMode(mode){
+  navMode=mode;
+  ['walk','bike','car'].forEach(m=>{
+    const btn=document.getElementById('navMode'+m.charAt(0).toUpperCase()+m.slice(1));
+    if(btn){
+      btn.style.background=m===mode?'#E8521A':'rgba(255,255,255,.1)';
+      btn.style.color=m===mode?'#fff':'rgba(255,255,255,.7)';
+    }
+  });
+  // Recalculate ETA with new speed
+  if(navUserMarker){
+    const p=navUserMarker.getLatLng();
+    updateNavPosition(p.lat,p.lng);
+  }
+  const labels={walk:'🚶 Walking speed (~5km/h)',bike:'🏍️ Bike speed (~30km/h)',car:'🚗 Car speed (~40km/h)'};
+  showToast(labels[mode]);
+}
+
+function openInGoogleMaps(){
+  // Open Google Maps with destination — will give turn-by-turn
+  const url=`https://www.google.com/maps/dir/?api=1&destination=${navDestLat},${navDestLng}&travelmode=${navMode==='walk'?'walking':navMode==='bike'?'bicycling':'driving'}`;
+  window.open(url,'_blank');
+}
+
+function stopNav(){
+  if(navWatchId!==null){
+    navigator.geolocation.clearWatch(navWatchId);
+    navWatchId=null;
+  }
+  if(navMap){navMap.remove();navMap=null;}
+  navUserMarker=null; navShopMarker=null; navRouteLine=null;
+  document.getElementById('navModal').style.display='none';
+}
+
+// ════════════════════════════════════════════
 // ════════════════════════════════════════════
 let deferredInstallPrompt = null;
 
