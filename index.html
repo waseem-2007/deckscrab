@@ -72,13 +72,13 @@
   --sh:0 2px 12px rgba(0,0,0,.07);--sh2:0 4px 20px rgba(0,0,0,.1);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{height:100%;overflow:hidden}
+html{scroll-behavior:smooth}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);
-  display:flex;flex-direction:column;height:100svh;height:100dvh;height:100vh;overflow:hidden;width:100%;max-width:100%}
+  min-height:100vh;overflow-x:hidden;padding-bottom:var(--bnav)}
 button,input,select,textarea{font-family:'DM Sans',sans-serif;cursor:pointer;outline:none}
 
 /* ══ TOP NAV ══ */
-.topnav{flex-shrink:0;z-index:200;height:var(--nav);
+.topnav{position:sticky;top:0;z-index:200;height:var(--nav);
   display:flex;align-items:center;justify-content:space-between;
   padding:0 16px;background:rgba(245,243,238,.96);backdrop-filter:blur(20px);
   border-bottom:1px solid var(--bor)}
@@ -105,7 +105,7 @@ button,input,select,textarea{font-family:'DM Sans',sans-serif;cursor:pointer;out
   padding:6px 14px;font-size:.76rem;font-weight:700;white-space:nowrap}
 
 /* ══ BOTTOM NAV ══ */
-.bnav{flex-shrink:0;z-index:200;height:var(--bnav);
+.bnav{position:fixed;bottom:0;left:0;right:0;z-index:200;height:var(--bnav);
   background:rgba(255,255,255,.97);backdrop-filter:blur(24px);
   border-top:1px solid var(--bor);display:grid;grid-template-columns:repeat(5,1fr);
   padding:0 0 env(safe-area-inset-bottom)}
@@ -125,11 +125,10 @@ button,input,select,textarea{font-family:'DM Sans',sans-serif;cursor:pointer;out
 .bni.fab .bni-lbl{color:var(--gold)}
 
 /* ══ PAGES ══ */
-.page{display:none}
-.page.on{display:flex;flex-direction:column;flex:1;min-height:0;width:100%;
-  overflow-y:auto;overflow-x:hidden;
-  -webkit-overflow-scrolling:touch;animation:pageIn .22s ease}
-#page-discover.on{overflow:hidden}
+.page{display:none;position:relative;z-index:1}
+.page.on{display:block;min-height:calc(100vh - var(--nav) - var(--bnav));
+  overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+  animation:pageIn .22s ease}
 @keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
 /* ══ HOME ══ */
@@ -589,7 +588,7 @@ select.fi{appearance:none;cursor:pointer}
 .plan-btn.vio{background:var(--vio);color:#fff}
 
 /* ══ PROFILE ══ */
-.profile-wrap{max-width:600px;margin:0 auto;background:var(--bg)}
+.profile-wrap{max-width:600px;margin:0 auto;background:var(--bg);min-height:100%}
 .profile-hero{height:190px;background:linear-gradient(135deg,var(--ink),var(--vio));
   position:relative;display:flex;align-items:flex-end;padding:14px 16px;overflow:hidden}
 .profile-hero-bg{position:absolute;inset:0;display:flex;align-items:center;
@@ -706,14 +705,14 @@ select.fi{appearance:none;cursor:pointer}
   transition:.28s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;pointer-events:none}
 .toast.show{transform:translateX(-50%) translateY(0)}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{height:100%;overflow:hidden}
+html{scroll-behavior:smooth}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);
-  display:flex;flex-direction:column;height:100svh;height:100dvh;height:100vh;overflow:hidden;width:100%;max-width:100%}
+  min-height:100vh;overflow-x:hidden;padding-bottom:var(--bnav)}
 body::before{display:none}
 button,input,select,textarea{font-family:'DM Sans',sans-serif;cursor:pointer;outline:none}
 
 /* ══ TOP NAV ══ */
-.topnav{flex-shrink:0;z-index:200;height:var(--nav);
+.topnav{position:sticky;top:0;z-index:200;height:var(--nav);
   display:flex;align-items:center;justify-content:space-between;
   padding:0 16px;background:var(--bg);border-bottom:1px solid var(--bor);
   box-shadow:var(--sh)}
@@ -732,7 +731,7 @@ button,input,select,textarea{font-family:'DM Sans',sans-serif;cursor:pointer;out
   padding:6px 14px;font-size:.76rem;font-weight:700;white-space:nowrap}
 
 /* ══ BOTTOM NAV ══ */
-.bnav{flex-shrink:0;z-index:200;height:var(--bnav);
+.bnav{position:fixed;bottom:0;left:0;right:0;z-index:200;height:var(--bnav);
   background:var(--sur);border-top:1px solid var(--bor);box-shadow:0 -2px 12px rgba(0,0,0,.06);
   display:grid;grid-template-columns:repeat(5,1fr);
   padding:0 0 env(safe-area-inset-bottom)}
@@ -753,11 +752,10 @@ button,input,select,textarea{font-family:'DM Sans',sans-serif;cursor:pointer;out
 .bni.fab .bni-lbl{color:var(--gold)}
 
 /* ══ PAGES ══ */
-.page{display:none}
-.page.on{display:flex;flex-direction:column;flex:1;min-height:0;width:100%;
-  overflow-y:auto;overflow-x:hidden;
-  -webkit-overflow-scrolling:touch;animation:pageIn .22s ease}
-#page-discover.on{overflow:hidden}
+.page{display:none;position:relative;z-index:1}
+.page.on{display:block;min-height:calc(100vh - var(--nav) - var(--bnav));
+  overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+  animation:pageIn .22s ease}
 @keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
 /* ══ HOME ══ */
@@ -1395,7 +1393,7 @@ select.fi{appearance:none;cursor:pointer}
   transition:.28s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;pointer-events:none}
 .toast.show{transform:translateX(-50%) translateY(0)}
 /* ══ SUPPLY CHAIN PAGE ══ */
-.sc-page{padding:0 0 30px;position:relative;z-index:1}
+.sc-page{padding:0 0 80px;position:relative;z-index:1;min-height:100%}
 .sc-hero{background:linear-gradient(135deg,var(--ink),var(--vio));padding:22px 16px 18px;
   border-bottom:1px solid var(--bor);position:relative;overflow:hidden}
 .sc-hero::before{content:'🏭';position:absolute;right:-10px;top:-10px;font-size:8rem;opacity:.07}
@@ -2189,7 +2187,7 @@ function renderGrocerySite(shop,shopName,shopPhone,shopDesc,shopCity,shopEmoji,m
 </nav>
 
 <!-- ════ PAGES WRAPPER — fills space between topnav and bnav ════ -->
-<div id="pagesWrap" style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column">
+<div id="pagesWrap">
 
 <!-- ════ HOME ════ -->
 <div id="page-home" class="page on">
@@ -2289,7 +2287,7 @@ function renderGrocerySite(shop,shopName,shopPhone,shopDesc,shopCity,shopEmoji,m
 </div>
 
 <!-- ════ DISCOVER ════ -->
-<div id="page-discover" class="page">
+<div id="page-discover" class="page" style="height:calc(100vh - var(--nav) - var(--bnav));overflow:hidden">
 
   <!-- FULL SCREEN MAP — base layer -->
   <div id="discMap" style="position:absolute;inset:0;width:100%;height:100%;z-index:1"></div>
@@ -3987,9 +3985,7 @@ function goTo(pg){
   if(pg==='addshop')resetAddShop();
   if(pg==='supply')renderSupply();
   if(pg==='grow')renderGrow();
-  // Scroll the active page to top, not the window
-  const activePg=document.getElementById("page-"+pg);
-  if(activePg)activePg.scrollTop=0;
+  window.scrollTo(0,0);
 }
 
 // ═══ IS OPEN ═══
@@ -4359,10 +4355,19 @@ async function renderDisc(){
   const q=(document.getElementById('discSearchIn')?.value||'').toLowerCase();
   const clearBtn=document.getElementById('discClearBtn');
   if(clearBtn)clearBtn.style.display=q?'block':'none';
-  const _dc=document.getElementById('discCards');
-  if(_dc)_dc.innerHTML='<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
 
-  if(apiOnline){_serverShops=await fetchServerShops(q,'',100)||[];}
+  // Render immediately from cache — don't wait for server
+  _doRenderDiscWith(q);
+
+  // Fetch fresh from server in background
+  if(apiOnline){
+    fetchServerShops(q,'',100).then(fresh=>{
+      if(fresh&&fresh.length){_serverShops=fresh;_doRenderDiscWith(q);}
+    }).catch(()=>{});
+  }
+}
+
+function _doRenderDiscWith(q){
   let shops=allShops();
 
   if(q)shops=shops.filter(s=>
@@ -4460,14 +4465,27 @@ function renderDiscMarkers(){
   radarLines.forEach(l=>{try{discMap.removeLayer(l);}catch(e){}});
   dMarkers=[];radarLines=[];
 
-  // Geocode any shops missing coordinates
+  // Geocode shops missing coordinates — use their actual city
+  let geocodeDelay=0;
   shown.forEach(s=>{
-    if(s.lat&&s.lng&&!isNaN(+s.lat))return; // already has coords
-    const q=encodeURIComponent((s.addr||s.city||'Coimbatore')+', Tamil Nadu, India');
-    fetch('https://nominatim.openstreetmap.org/search?q='+q+'&format=json&limit=1')
-      .then(r=>r.json()).then(d=>{
-        if(d&&d[0]){s.lat=+d[0].lat;s.lng=+d[0].lon;renderDiscMarkers();}
-      }).catch(()=>{});
+    if(s.lat&&s.lng&&!isNaN(+s.lat))return;
+    if(!s.city&&!s.addr&&!s.address)return; // no location data — skip
+    geocodeDelay+=300; // stagger requests to avoid rate limiting
+    const cityQ=s.city||s.addr||s.address||'';
+    if(!cityQ)return;
+    const q=encodeURIComponent(cityQ+', Tamil Nadu, India');
+    setTimeout(()=>{
+      fetch('https://nominatim.openstreetmap.org/search?q='+q+'&format=json&limit=1')
+        .then(r=>r.json()).then(d=>{
+          if(d&&d[0]){
+            s.lat=+d[0].lat; s.lng=+d[0].lon;
+            // Save to localStorage
+            const idx=myShops.findIndex(x=>x.name===s.name);
+            if(idx>=0){myShops[idx].lat=s.lat;myShops[idx].lng=s.lng;localStorage.setItem('ds_myshops',JSON.stringify(myShops));}
+            renderDiscMarkers(); // redraw with new coords
+          }
+        }).catch(()=>{});
+    }, geocodeDelay);
   });
 
   shown.forEach(s=>{
@@ -5287,7 +5305,7 @@ async function submitShop(){
     delivery:document.getElementById('tg-d').checked,
     showPhone:document.getElementById('tg-sp').checked,
     hours:{Monday:{open:'09:00',close:'21:00',closed:false},Tuesday:{open:'09:00',close:'21:00',closed:false},Wednesday:{open:'09:00',close:'21:00',closed:false},Thursday:{open:'09:00',close:'21:00',closed:false},Friday:{open:'09:00',close:'21:00',closed:false},Saturday:{open:'09:00',close:'21:00',closed:false},Sunday:{open:'09:00',close:'21:00',closed:false}},
-    lat:uLat||13.0772,lng:uLng||79.6712,
+    lat:uLat||null, lng:uLng||null,
     products:getProds().map(p=>({name:p.n,price:p.p,unit:'per item',img:p.img||'',emoji:p.emoji||'🍽️',category:p.cat||'Menu',description:p.desc||''})),
     registeredAt:Date.now(),bizId,
     oh:'09:00',oc:'21:00',rating:0,rc:0,views:1,verified:false,
@@ -5349,6 +5367,22 @@ async function submitShop(){
   }catch(e){}
 
   if(btn){btn.textContent='🎉 Register & Go Live →';btn.disabled=false;}
+
+  // Geocode from city/address if we don't have GPS coords
+  if(!shop.lat||!shop.lng){
+    const geoQ=encodeURIComponent((shop.address||'')+' '+(shop.city||'')+' Tamil Nadu India');
+    fetch('https://nominatim.openstreetmap.org/search?q='+geoQ+'&format=json&limit=1')
+      .then(r=>r.json()).then(d=>{
+        if(d&&d[0]){
+          shop.lat=+d[0].lat; shop.lng=+d[0].lon;
+          // Update in localStorage
+          const idx=myShops.findIndex(s=>s.bizId===shop.bizId||s.name===shop.name);
+          if(idx>=0){myShops[idx].lat=shop.lat;myShops[idx].lng=shop.lng;}
+          localStorage.setItem('ds_myshops',JSON.stringify(myShops));
+          LOCAL.save(myShops);
+        }
+      }).catch(()=>{});
+  }
   document.getElementById('reviewForm').style.display='none';
   document.getElementById('successScreen').classList.add('show');
   document.getElementById('successCard').innerHTML=`
@@ -6363,10 +6397,11 @@ function renderGrow(){
 
   let existingEl=document.getElementById('growExistingShops');
   if(!existingEl){
-    const plansWrap=document.querySelector('#growPlans > div');
+    const plansWrap=document.getElementById('growPlans');
     if(!plansWrap)return;
     existingEl=document.createElement('div');
     existingEl.id='growExistingShops';
+    existingEl.style.cssText='padding:0 16px';
     plansWrap.insertBefore(existingEl,plansWrap.firstChild);
   }
 
@@ -7228,6 +7263,7 @@ async function _initApp(){
   wakeServer().then(ok=>{if(ok)renderHome();});
   await renderHome();
   renderProfile();
+  renderGrow();
   renderSupply();
   startKeepAlive();
 }
