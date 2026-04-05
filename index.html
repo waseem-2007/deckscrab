@@ -72,9 +72,9 @@
   --sh:0 2px 12px rgba(0,0,0,.07);--sh2:0 4px 20px rgba(0,0,0,.1);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden}
+html{height:100%;overflow:hidden}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);
-  display:flex;flex-direction:column;height:100dvh;height:100vh;overflow:hidden;position:fixed;width:100%}
+  display:flex;flex-direction:column;height:100svh;height:100dvh;height:100vh;overflow:hidden;width:100%;max-width:100%}
 button,input,select,textarea{font-family:'DM Sans',sans-serif;cursor:pointer;outline:none}
 
 /* ══ TOP NAV ══ */
@@ -125,9 +125,11 @@ button,input,select,textarea{font-family:'DM Sans',sans-serif;cursor:pointer;out
 .bni.fab .bni-lbl{color:var(--gold)}
 
 /* ══ PAGES ══ */
-.page{display:none;position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;
-  -webkit-overflow-scrolling:touch;z-index:1;animation:pageIn .22s ease}
-.page.on{display:block}
+.page{display:none}
+.page.on{display:flex;flex-direction:column;flex:1;min-height:0;width:100%;
+  overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;animation:pageIn .22s ease}
+#page-discover.on{overflow:hidden}
 @keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
 /* ══ HOME ══ */
@@ -262,6 +264,7 @@ button,input,select,textarea{font-family:'DM Sans',sans-serif;cursor:pointer;out
   height:320px}
 .dlist{overflow-y:auto;padding:10px 12px;scrollbar-width:thin;scrollbar-color:var(--bor2) transparent}
 .dmap-wrap{position:relative;border-left:1px solid var(--bor)}
+#page-discover{padding:0!important}
 #discMap{width:100%;height:100%}
 .radar-btn{position:absolute;bottom:10px;right:10px;z-index:800;
   background:rgba(255,255,255,.92);border:1px solid var(--bor2);
@@ -703,9 +706,9 @@ select.fi{appearance:none;cursor:pointer}
   transition:.28s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;pointer-events:none}
 .toast.show{transform:translateX(-50%) translateY(0)}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden}
+html{height:100%;overflow:hidden}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);
-  display:flex;flex-direction:column;height:100dvh;height:100vh;overflow:hidden;position:fixed;width:100%}
+  display:flex;flex-direction:column;height:100svh;height:100dvh;height:100vh;overflow:hidden;width:100%;max-width:100%}
 body::before{display:none}
 button,input,select,textarea{font-family:'DM Sans',sans-serif;cursor:pointer;outline:none}
 
@@ -750,9 +753,11 @@ button,input,select,textarea{font-family:'DM Sans',sans-serif;cursor:pointer;out
 .bni.fab .bni-lbl{color:var(--gold)}
 
 /* ══ PAGES ══ */
-.page{display:none;position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;
-  -webkit-overflow-scrolling:touch;z-index:1;animation:pageIn .22s ease}
-.page.on{display:block}
+.page{display:none}
+.page.on{display:flex;flex-direction:column;flex:1;min-height:0;width:100%;
+  overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;animation:pageIn .22s ease}
+#page-discover.on{overflow:hidden}
 @keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
 /* ══ HOME ══ */
@@ -2184,7 +2189,7 @@ function renderGrocerySite(shop,shopName,shopPhone,shopDesc,shopCity,shopEmoji,m
 </nav>
 
 <!-- ════ PAGES WRAPPER — fills space between topnav and bnav ════ -->
-<div id="pagesWrap" style="flex:1;overflow:hidden;position:relative;display:flex;flex-direction:column">
+<div id="pagesWrap" style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column">
 
 <!-- ════ HOME ════ -->
 <div id="page-home" class="page on">
@@ -2284,7 +2289,7 @@ function renderGrocerySite(shop,shopName,shopPhone,shopDesc,shopCity,shopEmoji,m
 </div>
 
 <!-- ════ DISCOVER ════ -->
-<div id="page-discover" class="page" style="overflow:hidden">
+<div id="page-discover" class="page">
 
   <!-- FULL SCREEN MAP — base layer -->
   <div id="discMap" style="position:absolute;inset:0;width:100%;height:100%;z-index:1"></div>
@@ -3982,7 +3987,9 @@ function goTo(pg){
   if(pg==='addshop')resetAddShop();
   if(pg==='supply')renderSupply();
   if(pg==='grow')renderGrow();
-  window.scrollTo(0,0);
+  // Scroll the active page to top, not the window
+  const activePg=document.getElementById("page-"+pg);
+  if(activePg)activePg.scrollTop=0;
 }
 
 // ═══ IS OPEN ═══
@@ -4082,8 +4089,17 @@ function toggleHomeOpen(){
 async function renderHome(q=''){
   const search=q||(document.getElementById('homeSearch')?.value||'').toLowerCase();
   if(!search){
-    const fresh=await fetchServerShops();
-    if(fresh&&fresh.length){_serverShops=fresh;apiOnline=true;setDot('online');}
+    // Render immediately from cache, then refresh in background
+    let shops0=allShops();
+    if(shops0.length>0){
+      // Show cached data right away
+      _doRenderHome(search,shops0);
+    }
+    // Fetch fresh data in background
+    fetchServerShops().then(fresh=>{
+      if(fresh&&fresh.length){_serverShops=fresh;apiOnline=true;setDot('online');_doRenderHome(search,allShops());}
+    }).catch(()=>{});
+    return;
   }
   let shops=allShops();
 
@@ -4235,13 +4251,13 @@ function shopMatchesGroup(s,g){
 
 function initDiscMap(){
   if(discMap)return;
-  const center=uLat?[uLat,uLng]:[11.0168,76.9558]; // Default Coimbatore
+  const center=uLat?[uLat,uLng]:[11.1271,78.6569]; // Default Tamil Nadu center
 
   discMap=L.map('discMap',{
     zoomControl:false,scrollWheelZoom:true,tap:true,tapTolerance:15,
     touchZoom:true,doubleClickZoom:true,attributionControl:false,
     preferCanvas:true,renderer:L.canvas(),
-  }).setView(center,uLat?15:12);
+  }).setView(center,uLat?15:8);
 
   // ESRI World Street Map — crisp, works on ALL phones
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{
@@ -7295,32 +7311,53 @@ window.addEventListener('DOMContentLoaded',async()=>{
     // Already logged in — hide gate immediately
     hideGate();
   }else{
-    // Show gate — wait for Firebase to restore session
-    showGate();
-    setGateStatus('Checking sign-in…');
-    // Give Firebase up to 3s to restore previous session
-    await new Promise(resolve=>{
-      let waited=0;
-      const check=setInterval(()=>{
-        waited+=300;
-        if(_authReady||waited>=3000){clearInterval(check);resolve();}
-      },300);
-    });
-    if(_currentUser){
-      // Firebase restored session
-      setGateStatus('✅ Welcome back, '+(_currentUser.displayName||'')+'!');
-      setTimeout(()=>hideGate(),600);
+    // Check if there is cached user data from previous session
+    const cachedUser=localStorage.getItem('ds_guser');
+    const cachedPhone=localStorage.getItem('ds_owner_phone');
+    if(cachedUser||cachedPhone){
+      // Has previous login - show app immediately, Firebase will sync in background
+      hideGate();
     }else{
-      setGateStatus('');
-      return; // Stop here — gate stays up until they sign in
+      // New user — show gate
+      showGate();
+      setGateStatus('Sign in to continue');
+      // Give Firebase up to 4s to restore previous session
+      await new Promise(resolve=>{
+        let waited=0;
+        const check=setInterval(()=>{
+          waited+=200;
+          if(_authReady||waited>=4000){clearInterval(check);resolve();}
+        },200);
+      });
+      if(_currentUser){
+        setGateStatus('✅ Welcome back!');
+        setTimeout(()=>hideGate(),400);
+      }else{
+        setGateStatus('');
+        return;
+      }
     }
   }
 
-  // ── App init (only runs after login) ──
+  // ── App init ──
   ensureOwnerIdentity();
   if(el('secGrid'))buildSectors('');
   if(el('prodList')){addProd();addProd();}
   setDot('waking');
+  // Auto-request GPS silently on startup
+  if(navigator.geolocation&&!uLat){
+    navigator.geolocation.getCurrentPosition(function(pos){
+      var lat=pos.coords.latitude,lng=pos.coords.longitude;
+      fetch('https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lng+'&format=json&zoom=14')
+        .then(function(r){return r.json();})
+        .then(function(d){
+          var a=d.address||{};
+          var name=a.suburb||a.neighbourhood||a.village||a.town||a.city||'Your Location';
+          setLoc(lat,lng,name);
+        }).catch(function(){setLoc(lat,lng,'Your Location');});
+    },function(){},
+    {enableHighAccuracy:true,timeout:8000,maximumAge:60000});
+  }
   wakeServer().then(ok=>{if(ok)renderHome();});
   await renderHome();
   renderSupply();
