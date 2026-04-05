@@ -3863,7 +3863,7 @@ function getPriceLevel(s){
 }
 
 async function fetchServerShops(q='',cat='',rad=100){
-  if(!apiOnline)return[];
+  // Always try — don't gate on apiOnline
   const params=new URLSearchParams();
   if(q)params.set('q',q);
   if(uLat&&rad<100){params.set('lat',uLat);params.set('lng',uLng);params.set('radius',rad);}
@@ -4084,53 +4084,55 @@ function toggleHomeOpen(){
 
 async function renderHome(q=''){
   const search=q||(document.getElementById('homeSearch')?.value||'').toLowerCase();
-  if(!search){
-    // Render immediately from cache, then refresh in background
-    let shops0=allShops();
-    if(shops0.length>0){
-      // Show cached data right away
-      _doRenderHome(search,shops0);
-    }
-    // Fetch fresh data in background
-    fetchServerShops().then(fresh=>{
-      if(fresh&&fresh.length){_serverShops=fresh;apiOnline=true;setDot('online');_doRenderHome(search,allShops());}
-    }).catch(()=>{});
-    return;
-  }
-  let shops=allShops();
 
+  // Always fetch from server — non-blocking
+  fetchServerShops().then(fresh=>{
+    if(fresh&&fresh.length){
+      _serverShops=fresh;apiOnline=true;setDot('online');
+      if(!search)_renderHomeShops(allShops());
+    }
+  }).catch(()=>{});
+
+  // Render immediately from whatever we have
+  _renderHomeShops(allShops(), search);
+}
+
+function _renderHomeShops(shops, search=''){
   // Text search
-  if(search)shops=shops.filter(s=>
-    s.name.toLowerCase().includes(search)||
+  if(search) shops=shops.filter(s=>
+    (s.name||'').toLowerCase().includes(search)||
     getSectorName(s).toLowerCase().includes(search)||
     (s.desc||'').toLowerCase().includes(search)||
     (s.city||'').toLowerCase().includes(search)
   );
 
   // Category filter
-  if(homeCatFilter)shops=shops.filter(s=>shopMatchesCat(s,homeCatFilter));
+  if(homeCatFilter) shops=shops.filter(s=>shopMatchesCat(s,homeCatFilter));
 
   // Open now filter
-  if(homeOpenOnly)shops=shops.filter(s=>isOpen(s));
+  if(homeOpenOnly) shops=shops.filter(s=>isOpen(s));
 
   // Near me — sort by distance if location set
   if(homeNearMe&&uLat){
-    shops=shops.filter(s=>s.lat&&s.lng);
-    shops.sort((a,b)=>km(uLat,uLng,a.lat,a.lng)-km(uLat,uLng,b.lat,b.lng));
+    shops.sort((a,b)=>{
+      const da=(a.lat&&a.lng)?km(uLat,uLng,+a.lat,+a.lng):9999;
+      const db=(b.lat&&b.lng)?km(uLat,uLng,+b.lat,+b.lng):9999;
+      return da-db;
+    });
   }
 
-  setTxt('homeCount',shops.length+' found');
-  setTxt('homeListTitle',homeCatFilter||homeNearMe||homeOpenOnly||search?'Results':'Nearby Businesses');
+  setTxt('homeCount',shops.length+(shops.length===1?' business':' businesses'));
+  setTxt('homeListTitle',homeCatFilter||homeNearMe||homeOpenOnly||search?'Results':'All Businesses');
 
-  // Build featured cards (top 3 rated open shops when no filter active)
+  // Featured cards (top rated open shops, no filter active)
   const featEl=document.getElementById('homeFeatScroll');
   const featWrap=document.getElementById('homeFeatWrap');
   if(featEl&&featWrap){
     if(!homeCatFilter&&!homeNearMe&&!homeOpenOnly&&!search){
       featWrap.style.display='block';
-      const featured=allShops().filter(s=>s.rating>=4&&isOpen(s)).sort((a,b)=>(b.rating||0)-(a.rating||0)).slice(0,5);
-      const FEAT_GRADS=['linear-gradient(150deg,#2d0e00,#7c2d00)','linear-gradient(150deg,#001228,#0b2e60)','linear-gradient(150deg,#00200a,#005928)','linear-gradient(150deg,#1a0015,#4a0035)','linear-gradient(150deg,#0a0010,#1a0040)'];
-      featEl.innerHTML=featured.map((s,i)=>`
+      const featured=allShops().filter(s=>isOpen(s)).sort((a,b)=>(b.rating||0)-(a.rating||0)).slice(0,6);
+      const FEAT_GRADS=['linear-gradient(150deg,#2d0e00,#7c2d00)','linear-gradient(150deg,#001228,#0b2e60)','linear-gradient(150deg,#00200a,#005928)','linear-gradient(150deg,#1a0015,#4a0035)','linear-gradient(150deg,#0a0010,#1a0040)','linear-gradient(150deg,#1a1000,#3d2800)'];
+      featEl.innerHTML=featured.length?featured.map((s,i)=>`
         <div class="feat-card" style="background:${FEAT_GRADS[i%FEAT_GRADS.length]}" onclick="openDetail('${s.id}')">
           <div class="feat-emo">${getSectorEmoji(s)}</div>
           <div class="feat-ov" style="background:linear-gradient(160deg,rgba(0,0,0,.65),rgba(0,0,0,.15))"></div>
@@ -4140,56 +4142,55 @@ async function renderHome(q=''){
             <div class="feat-name">${s.name}</div>
             <div class="feat-row">
               <span class="${isOpen(s)?'feat-open':'feat-closed'}">${isOpen(s)?'Open':'Closed'}</span>
-              ${uLat&&s.lat&&s.lng?`<span class="feat-dist">📍 ${fmtDist(km(uLat,uLng,s.lat,s.lng))}</span>`:''}
+              ${uLat&&s.lat&&s.lng?`<span class="feat-dist">📍 ${fmtDist(km(uLat,uLng,+s.lat,+s.lng))}</span>`:''}
               ${s.rating?`<span class="feat-star">★ ${s.rating}</span>`:''}
             </div>
           </div>
-        </div>`).join('');
+        </div>`).join('')
+        :'<div style="padding:20px;color:var(--ink3);font-size:.82rem">Fetching nearby businesses…</div>';
     }else{
       featWrap.style.display='none';
     }
   }
 
+  // Main shop list
+  const _sl=document.getElementById('shopList');
+  if(!_sl)return;
+
   if(!shops.length){
-    const _sl=el('shopList');if(_sl)_sl.innerHTML=`
+    _sl.innerHTML=`
       <div style="text-align:center;padding:50px 20px">
-        <div style="font-size:4rem;margin-bottom:16px">${homeCatFilter?'🔍':'🏪'}</div>
-        <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;color:var(--ink);margin-bottom:8px">
-          ${search?'No results for "'+search+'"':homeCatFilter?'No '+homeCatFilter+' businesses yet':'No businesses yet'}
+        <div style="font-size:3.5rem;margin-bottom:14px">${homeCatFilter?'🔍':'🏪'}</div>
+        <div style="font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:700;color:var(--ink);margin-bottom:8px">
+          ${search?'No results for "'+search+'"':homeCatFilter?'No '+homeCatFilter+' businesses yet':'Loading businesses…'}
         </div>
-        <div style="font-size:.82rem;color:var(--ink3);line-height:1.7;margin-bottom:20px">
-          ${search||homeCatFilter?'Try a different search or category.':'Be the first to register your business! Free, instant and permanent.'}
+        <div style="font-size:.8rem;color:var(--ink3);line-height:1.7;margin-bottom:18px">
+          ${search||homeCatFilter?'Try a different search or browse all.':'Be the first! Register your business free.'}
         </div>
-        ${search||homeCatFilter
-          ?`<button onclick="document.getElementById('homeSearch').value='';homeCatFilter='';document.querySelectorAll('.hcat-btn').forEach(b=>b.classList.remove('on'));document.getElementById('hcat-all').classList.add('on');renderHome()" style="background:var(--sur);color:var(--txt);border:1.5px solid var(--bor);border-radius:999px;padding:10px 22px;font-size:.84rem;font-weight:700;cursor:pointer;margin-right:8px">Clear filters</button>`
-          :''}
-        <button onclick="goTo('addshop')" style="background:var(--gold);color:var(--bg);border:none;border-radius:999px;padding:11px 24px;font-size:.87rem;font-weight:700;cursor:pointer">+ Register Your Business</button>
+        <button onclick="goTo('addshop')" style="background:var(--gold);color:var(--bg);border:none;border-radius:999px;padding:11px 24px;font-size:.86rem;font-weight:700;cursor:pointer">+ Register Your Business</button>
       </div>`;
     return;
   }
 
-  // Build cards with banner + distance badge
-  const _sl=el('shopList');
-  if(_sl)_sl.innerHTML=shops.map(s=>{
+  _sl.innerHTML=shops.map(s=>{
     const open=isOpen(s);
-    const dist=uLat&&s.lat&&s.lng?km(uLat,uLng,s.lat,s.lng):null;
-    const bannerColor=getBannerColor(s);
+    const dist=uLat&&s.lat&&s.lng?km(uLat,uLng,+s.lat,+s.lng):null;
+    const color=getBannerColor(s);
     const emoji=getSectorEmoji(s);
     return`<div class="sc" onclick="openDetail('${s.id}')">
-      <div class="sc-banner" style="background:linear-gradient(90deg,${bannerColor}cc,${bannerColor}44)"></div>
+      <div class="sc-banner" style="background:linear-gradient(90deg,${color}cc,${color}22)"></div>
       <div class="sc-inner">
-        <div class="sc-ico" style="background:${bannerColor}18;border:1.5px solid ${bannerColor}33">${emoji}</div>
+        <div class="sc-ico" style="background:${color}18;border:1.5px solid ${color}33">${emoji}</div>
         <div class="sc-body">
           <div class="sc-name">${s.name}</div>
-          <div class="sc-sector">${getSectorName(s)}</div>
-          <div class="sc-addr">📍 ${[s.addr||s.address,s.city].filter(Boolean).join(', ')}</div>
+          <div class="sc-sector">${getSectorName(s)}${s.city?' · '+s.city:''}</div>
+          ${s.addr||s.address?`<div class="sc-addr">📍 ${s.addr||s.address}</div>`:''}
           <div class="sc-foot">
             <span class="sc-open-dot ${open?'open':'closed'}"></span>
-            <span class="sc-tag ${open?'open':'closed'}" style="padding:1px 7px">${open?'Open':'Closed'}</span>
+            <span class="sc-tag ${open?'open':'closed'}">${open?'Open':'Closed'}</span>
             ${dist!==null?`<span class="sc-dist">📍 ${fmtDist(dist)}</span>`:''}
             ${s.rating?`<span class="sc-rat">★ ${s.rating}</span>`:''}
-            ${s.views?`<span class="sc-view">👁 ${s.views>999?(s.views/1000).toFixed(1)+'k':s.views}</span>`:''}
-            ${s.verified?`<div class="sc-verified" title="Verified"></div>`:''}
+            ${s.wa||s.phone?`<span class="sc-wa">💬 WhatsApp</span>`:''}
             <span class="sc-price" style="margin-left:auto">${'₹'.repeat(getPriceLevel(s))}</span>
           </div>
         </div>
@@ -4197,6 +4198,8 @@ async function renderHome(q=''){
     </div>`;
   }).join('');
 }
+
+
 function filterHome(){renderHome(el('homeSearch')?.value||'');}
 function quickSearch(q){document.getElementById('homeSearch').value=q;renderHome(q);showToast(`🔍 ${q}`);}
 
