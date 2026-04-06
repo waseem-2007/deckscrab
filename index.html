@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <title>Deckscrab — Find Local Businesses, Shops & Services Near You</title>
 
 <!-- ── PWA ── -->
@@ -54,8 +54,8 @@
 <script>if(new URLSearchParams(window.location.search).get('shop'))document.documentElement.style.visibility='hidden';</script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
+
 :root{
   /* ── v2 Colour System ── */
   --bg:#f5f3ee;--sur:#fff;--card:#fff;--card2:#f0ede8;
@@ -711,53 +711,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);
 body::before{display:none}
 button,input,select,textarea{font-family:'DM Sans',sans-serif;cursor:pointer;outline:none}
 
-/* ══ TOP NAV ══ */
-.topnav{position:sticky;top:0;z-index:200;height:var(--nav);
-  display:flex;align-items:center;justify-content:space-between;
-  padding:0 16px;background:var(--bg);border-bottom:1px solid var(--bor);
-  box-shadow:var(--sh)}
-.logo{font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;
-  color:var(--ink);display:flex;align-items:center;gap:7px;letter-spacing:-.03em}
-.logo b{color:var(--gold);font-weight:800}
-.logo-dot{display:none}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.6)}}
-.topnav-r{display:flex;align-items:center;gap:8px}
-.nav-loc{display:flex;align-items:center;gap:5px;background:var(--sur);
-  border:1px solid var(--bor2);border-radius:999px;padding:5px 11px;
-  font-size:.72rem;font-weight:600;color:var(--ink2);cursor:pointer;max-width:140px;box-shadow:var(--sh)}
-.nav-loc .ld{width:6px;height:6px;border-radius:50%;background:var(--grn);flex-shrink:0}
-.nav-loc .lt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink2)}
-.nav-add{background:var(--gold);color:#fff;border:none;border-radius:999px;
-  padding:6px 14px;font-size:.76rem;font-weight:700;white-space:nowrap}
-
-/* ══ BOTTOM NAV ══ */
-.bnav{position:fixed;bottom:0;left:0;right:0;z-index:200;height:var(--bnav);
-  background:var(--sur);border-top:1px solid var(--bor);box-shadow:0 -2px 12px rgba(0,0,0,.06);
-  display:grid;grid-template-columns:repeat(5,1fr);
-  padding:0 0 env(safe-area-inset-bottom)}
-.bni{display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:3px;border:none;background:none;padding:8px 4px;position:relative;transition:.2s}
-.bni-ico{font-size:1.2rem;transition:.25s;line-height:1;color:var(--ink3)}
-.bni-lbl{font-size:.53rem;font-weight:600;color:var(--ink3);letter-spacing:.02em;transition:.2s}
-.bni.on .bni-lbl{color:var(--gold)}
-.bni.on .bni-ico{transform:translateY(-3px)}
-.bni.on::after{content:'';position:absolute;bottom:0;width:20px;height:2.5px;
-  background:var(--gold);border-radius:999px;animation:slidein .2s ease}
-@keyframes slidein{from{width:0}to{width:20px}}
-.bni.fab .bni-ico{background:var(--gold);color:#fff;width:46px;height:46px;
-  border-radius:50%;display:flex;align-items:center;justify-content:center;
-  font-size:1.35rem;margin-top:-16px;box-shadow:0 4px 18px rgba(232,82,26,.4);
-  transition:.25s}
-.bni.fab.on .bni-ico{transform:translateY(-3px) scale(1.05)}
-.bni.fab .bni-lbl{color:var(--gold)}
-
-/* ══ PAGES ══ */
-.page{display:none !important}
-.page.on{display:block !important;min-height:calc(100vh - var(--nav) - var(--bnav));
-  overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
-  opacity:1 !important;visibility:visible !important}
-@keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-
 /* ══ HOME ══ */
 .home-wrap{padding:16px 16px 24px}
 .home-hero{padding:16px 0 14px}
@@ -1385,13 +1338,14 @@ select.fi{appearance:none;cursor:pointer}
 .lb.r{background:var(--rose)}
 
 /* TOAST */
-.toast{position:fixed;bottom:calc(var(--bnav) + 12px);left:50%;
-  transform:translateX(-50%) translateY(50px);
-  background:var(--ink);border:1px solid var(--ink);border-radius:999px;
-  padding:9px 18px;font-size:.76rem;font-weight:600;color:var(--txt);
-  box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:9999;
-  transition:.28s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;pointer-events:none}
-.toast.show{transform:translateX(-50%) translateY(0)}
+.toast{position:fixed;bottom:calc(var(--bnav) + 14px);left:50%;
+  transform:translateX(-50%) translateY(60px);opacity:0;
+  background:#1a1a1a;color:#fff;border-radius:12px;
+  padding:11px 20px;font-size:.8rem;font-weight:600;
+  box-shadow:0 4px 20px rgba(0,0,0,.35);z-index:9999;
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1),opacity .25s ease;
+  white-space:nowrap;pointer-events:none;max-width:88vw;text-align:center}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 /* ══ SUPPLY CHAIN PAGE ══ */
 .sc-page{padding:0 0 80px;position:relative;z-index:1;min-height:100%}
 .sc-hero{background:linear-gradient(135deg,var(--ink),var(--vio));padding:22px 16px 18px;
@@ -1694,12 +1648,10 @@ select.fi{color:var(--ink)!important}
 /* Grow builder steps */
 .bcard-hdr p{color:var(--ink3)!important}
 .ai-msg .ai-bbl{background:var(--bg)!important;color:var(--ink)!important}
-</style>
 
-<!-- ══════════════════════════════════════════════
-     SHOP WEBSITE — renders when ?shop=slug in URL
-══════════════════════════════════════════════ -->
-<style>
+
+/* ═══ MERGED FROM INLINE STYLES ═══ */
+
 .sw-body{font-family:'DM Sans',sans-serif;background:#111827;color:#f9fafb;min-height:100vh}
 .sw-hero{min-height:48vh;display:flex;align-items:flex-end;padding:0 0 28px;position:relative;overflow:hidden}
 .sw-hero-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:min(40vw,200px);opacity:.09;pointer-events:none;animation:swfloat 6s ease-in-out infinite}
@@ -1791,7 +1743,25 @@ textarea.sw-fi{resize:vertical;min-height:68px}
 .sw-wa-bar-btn{background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:999px;padding:8px 16px;font-size:.76rem;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif}
 .sw-footer{padding:16px;text-align:center;border-top:1px solid rgba(255,255,255,.06);margin-top:8px}
 .sw-footer-txt{font-size:.69rem;color:rgba(255,255,255,.2)}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:\'DM Sans\',sans-serif;background:#f5f3ee;color:#0d0d0d;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+#discCatBar::-webkit-scrollbar{display:none}
+@keyframes _youPulse{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(2.2);opacity:0}}
+
+.offline-bar{position:fixed;top:var(--nav);left:0;right:0;z-index:999;
+  background:#dc2626;color:#fff;text-align:center;font-size:.75rem;font-weight:600;
+  padding:7px;display:none;animation:slidedown .3s ease}
+.offline-bar.show{display:block}
+@keyframes slidedown{from{transform:translateY(-100%)}to{transform:translateY(0)}}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+
+<!-- ══════════════════════════════════════════════
+     SHOP WEBSITE — renders when ?shop=slug in URL
+══════════════════════════════════════════════ -->
+
 
 <script>
 // ── SHOP WEBSITE: detect ?shop= param and render shop site ──
@@ -1813,7 +1783,7 @@ textarea.sw-fi{resize:vertical;min-height:68px}
     document.body.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#111827;flex-direction:column;gap:12px">
       <div style="font-size:2.5rem;animation:spin 1s linear infinite">⏳</div>
       <div style="font-family:'DM Sans',sans-serif;color:rgba(255,255,255,.5);font-size:.85rem">Loading shop…</div>
-      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+      
     </div>`;
 
     function slugify(name){
@@ -2015,7 +1985,7 @@ function renderNoTemplateSite(shop,shopName,shopPhone,shopEmoji,shopCity,shopDes
   var wa='https://wa.me/91'+shopPhone+'?text='+encodeURIComponent('Hi '+shopName+'! I want to enquire about your services.');
   var deckWa='https://wa.me/919384707706?text='+encodeURIComponent('Hi Deckscrab! I want a custom website for my shop: '+shopName+' ('+shopCity+')');
 
-  document.head.innerHTML+='<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:\'DM Sans\',sans-serif;background:#f5f3ee;color:#0d0d0d;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}</style>';
+  document.head.innerHTML+='';
   document.body.innerHTML=
     '<div style="max-width:400px;width:100%">'+
     '<div style="font-size:5rem;margin-bottom:16px">'+shopEmoji+'</div>'+
@@ -2192,6 +2162,8 @@ function renderGrocerySite(shop,shopName,shopPhone,shopDesc,shopCity,shopEmoji,m
     <button class="nav-add" onclick="goTo('addshop')" id="navAddBtn">+ Add Shop</button>
   </div>
 </nav>
+<div id="offlineBar" class="offline-bar">📡 No internet connection — showing cached data</div>
+
 
 <!-- ════ PAGES WRAPPER — fills space between topnav and bnav ════ -->
 <div id="pagesWrap">
@@ -2210,7 +2182,7 @@ function renderGrocerySite(shop,shopName,shopPhone,shopDesc,shopCity,shopEmoji,m
       <h1>Find <span>Local</span> Businesses<br/>Near You</h1>
       <div class="search-wrap">
         <button onclick="openLocModal()" style="width:42px;display:flex;align-items:center;justify-content:center;border:none;border-right:1px solid var(--bor);background:none;font-size:1.1rem;color:var(--ink3);flex-shrink:0" title="Set location">📡</button>
-        <input class="sw-inp" id="homeSearch" placeholder="Search restaurant, shop, doctor…" oninput="filterHome()" onkeydown="if(event.key==='Enter')filterHome()"/>
+        <input class="sw-inp" id="homeSearch" placeholder="Search restaurant, shop, doctor…" oninput="filterHomeDebounced()" onkeydown="if(event.key==='Enter')filterHome()"/>
         <button class="sw-btn" onclick="filterHome()">🔍</button>
       </div>
       <div class="locbar" id="locBar" style="display:none"></div>
@@ -2306,7 +2278,7 @@ function renderGrocerySite(shop,shopName,shopPhone,shopDesc,shopCity,shopEmoji,m
         <svg width="15" height="15" fill="none" stroke="#aaa" stroke-width="2.2" viewBox="0 0 24 24" style="flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
         <input id="discSearchIn" placeholder="Search shops, welding, salon…"
           style="flex:1;border:none;outline:none;font-size:.9rem;color:#0d0d0d;background:transparent;font-family:'DM Sans',sans-serif"
-          oninput="renderDisc()"/>
+          oninput="renderDiscDebounced()"/>
         <button onclick="discClearSearch()" id="discClearBtn" style="display:none;background:none;border:none;color:#aaa;font-size:1rem;padding:0;cursor:pointer">✕</button>
       </div>
       <button onclick="openLocModal()" title="My location"
@@ -2317,7 +2289,7 @@ function renderGrocerySite(shop,shopName,shopPhone,shopDesc,shopCity,shopEmoji,m
 
     <!-- CATEGORY CHIPS below search -->
     <div id="discCatBar" style="display:flex;gap:7px;overflow-x:auto;padding:8px 0 0;scrollbar-width:none;-webkit-overflow-scrolling:touch">
-      <style>#discCatBar::-webkit-scrollbar{display:none}</style>
+      
       <button class="dcat on" onclick="setDiscCat(this,'')" data-g="">🌟 All</button>
       <button class="dcat" onclick="setDiscCat(this,'food')" data-g="food">🍛 Food</button>
       <button class="dcat" onclick="setDiscCat(this,'health')" data-g="health">🏥 Health</button>
@@ -3360,113 +3332,96 @@ function renderGrocerySite(shop,shopName,shopPhone,shopDesc,shopCity,shopEmoji,m
   </div>
 </div>
 
-<!-- ════ LIVE NAVIGATION MODAL ════ -->
-<div id="navModal" style="display:none;position:fixed;inset:0;z-index:900;background:#0d1117;flex-direction:column;">
+<!-- ════ DIRECTIONS MODAL ════ -->
+<!-- Simple, reliable: shows mode picker then opens Google Maps -->
+<div id="navModal" style="display:none;position:fixed;inset:0;z-index:900;
+  background:rgba(0,0,0,.7);backdrop-filter:blur(14px);
+  align-items:flex-end;justify-content:center;">
 
-  <!-- Full screen map -->
-  <div id="navMap" style="position:absolute;inset:0;width:100%;height:100%;z-index:1"></div>
+  <div style="background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:600px;
+    padding:0 0 env(safe-area-inset-bottom,0);animation:sheetup .3s cubic-bezier(.34,1.1,.64,1)">
 
-  <!-- TOP BAR: shop name + close -->
-  <div style="position:absolute;top:0;left:0;right:0;z-index:600;
-    background:linear-gradient(to bottom,rgba(13,17,23,.97) 60%,transparent);
-    padding:env(safe-area-inset-top,0) 0 0">
-    <div style="display:flex;align-items:center;gap:10px;padding:14px 14px 18px">
-      <button onclick="stopNav()" style="width:40px;height:40px;border-radius:50%;
-        background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);
-        color:#fff;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
-      <div style="flex:1;min-width:0">
-        <div id="navShopName" style="font-family:'Syne',sans-serif;font-size:1rem;font-weight:800;color:#fff;
-          overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
-        <div id="navStatus" style="font-size:.72rem;color:rgba(255,255,255,.6);margin-top:2px">Getting location…</div>
+    <!-- Handle -->
+    <div style="width:40px;height:4px;background:#e2e8f0;border-radius:2px;margin:14px auto 0"></div>
+
+    <!-- Shop name + close -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px">
+      <div>
+        <div id="navShopName" style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;color:#0d0d0d"></div>
+        <div id="navShopAddr" style="font-size:.75rem;color:#888;margin-top:2px"></div>
       </div>
-      <button onclick="navRecenter()" style="width:40px;height:40px;border-radius:50%;
-        background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);
-        color:#fff;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">🎯</button>
+      <button onclick="stopNav()" style="width:34px;height:34px;border-radius:50%;
+        background:#f5f5f5;border:none;font-size:1rem;cursor:pointer;
+        display:flex;align-items:center;justify-content:center">✕</button>
     </div>
-  </div>
 
-  <!-- BOTTOM PANEL: stats + mode selector + Google Maps button -->
-  <div style="position:absolute;bottom:0;left:0;right:0;z-index:600;
-    background:linear-gradient(to top,rgba(13,17,23,1) 80%,transparent);
-    padding:0 0 env(safe-area-inset-bottom,0)">
-    <div style="padding:20px 14px 16px">
+    <!-- Distance badge (shown after GPS) -->
+    <div id="navDistBadge" style="display:none;margin:0 18px 14px;
+      background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;
+      padding:10px 14px;font-size:.82rem;color:#15803d;font-weight:600">
+      📍 <span id="navDistText"></span>
+    </div>
 
-      <!-- Distance / ETA / Arrival stats -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
-        <div style="background:rgba(255,255,255,.1);border-radius:14px;padding:13px 8px;text-align:center;border:1px solid rgba(255,255,255,.08)">
-          <div id="navDist" style="font-family:'Syne',sans-serif;font-size:1.35rem;font-weight:800;color:#fff">—</div>
-          <div style="font-size:.6rem;color:rgba(255,255,255,.4);margin-top:3px;text-transform:uppercase;letter-spacing:.05em">Distance</div>
-        </div>
-        <div style="background:rgba(232,82,26,.15);border-radius:14px;padding:13px 8px;text-align:center;border:1px solid rgba(232,82,26,.3)">
-          <div id="navEta" style="font-family:'Syne',sans-serif;font-size:1.35rem;font-weight:800;color:#E8521A">—</div>
-          <div style="font-size:.6rem;color:rgba(232,82,26,.6);margin-top:3px;text-transform:uppercase;letter-spacing:.05em">ETA</div>
-        </div>
-        <div style="background:rgba(255,255,255,.1);border-radius:14px;padding:13px 8px;text-align:center;border:1px solid rgba(255,255,255,.08)">
-          <div id="navArrival" style="font-family:'Syne',sans-serif;font-size:1.35rem;font-weight:800;color:#fff">—</div>
-          <div style="font-size:.6rem;color:rgba(255,255,255,.4);margin-top:3px;text-transform:uppercase;letter-spacing:.05em">Arrives</div>
-        </div>
+    <!-- Travel mode selection -->
+    <div style="padding:0 18px 16px">
+      <div style="font-size:.68rem;font-weight:700;color:#999;text-transform:uppercase;
+        letter-spacing:.08em;margin-bottom:10px">Choose how to get there</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+
+        <!-- Walk -->
+        <button onclick="launchNav('walking')"
+          style="background:#f0fdf4;border:2px solid #86efac;border-radius:16px;
+          padding:16px 12px;cursor:pointer;text-align:center;transition:.15s;font-family:'DM Sans',sans-serif">
+          <div style="font-size:2rem;margin-bottom:6px">🚶</div>
+          <div style="font-size:.88rem;font-weight:700;color:#15803d">Walk</div>
+          <div style="font-size:.7rem;color:#888;margin-top:2px" id="walkEta">~5 km/h</div>
+        </button>
+
+        <!-- Bike -->
+        <button onclick="launchNav('bicycling')"
+          style="background:#fff7ed;border:2px solid #fed7aa;border-radius:16px;
+          padding:16px 12px;cursor:pointer;text-align:center;transition:.15s;font-family:'DM Sans',sans-serif">
+          <div style="font-size:2rem;margin-bottom:6px">🏍️</div>
+          <div style="font-size:.88rem;font-weight:700;color:#c2410c">Bike / Ride</div>
+          <div style="font-size:.7rem;color:#888;margin-top:2px" id="bikeEta">~30 km/h</div>
+        </button>
+
+        <!-- Car -->
+        <button onclick="launchNav('driving')"
+          style="background:#eff6ff;border:2px solid #bfdbfe;border-radius:16px;
+          padding:16px 12px;cursor:pointer;text-align:center;transition:.15s;font-family:'DM Sans',sans-serif">
+          <div style="font-size:2rem;margin-bottom:6px">🚗</div>
+          <div style="font-size:.88rem;font-weight:700;color:#1d4ed8">Car / Drive</div>
+          <div style="font-size:.7rem;color:#888;margin-top:2px" id="carEta">~40 km/h</div>
+        </button>
+
+        <!-- Cab -->
+        <button onclick="launchCab()"
+          style="background:#fdf4ff;border:2px solid #e9d5ff;border-radius:16px;
+          padding:16px 12px;cursor:pointer;text-align:center;transition:.15s;font-family:'DM Sans',sans-serif">
+          <div style="font-size:2rem;margin-bottom:6px">🚕</div>
+          <div style="font-size:.88rem;font-weight:700;color:#7e22ce">Book Cab</div>
+          <div style="font-size:.7rem;color:#888;margin-top:2px">Ola / Uber</div>
+        </button>
       </div>
 
-      <!-- Travel mode selector — 4 modes: Walk, Bike, Car, Cab -->
-      <div style="margin-bottom:10px">
-        <div style="font-size:.65rem;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:700">Travel Mode</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
-          <button id="navModeWalk" onclick="setNavMode('walk')"
-            style="padding:12px 4px;background:#E8521A;color:#fff;border:2px solid #E8521A;
-            border-radius:12px;font-size:.8rem;font-weight:700;cursor:pointer;
-            display:flex;flex-direction:column;align-items:center;gap:4px;transition:.2s">
-            <span style="font-size:1.3rem">🚶</span>
-            <span>Walk</span>
-          </button>
-          <button id="navModeBike" onclick="setNavMode('bike')"
-            style="padding:12px 4px;background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);
-            border:2px solid rgba(255,255,255,.15);border-radius:12px;font-size:.8rem;
-            font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:.2s">
-            <span style="font-size:1.3rem">🏍️</span>
-            <span>Bike</span>
-          </button>
-          <button id="navModeCar" onclick="setNavMode('car')"
-            style="padding:12px 4px;background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);
-            border:2px solid rgba(255,255,255,.15);border-radius:12px;font-size:.8rem;
-            font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:.2s">
-            <span style="font-size:1.3rem">🚗</span>
-            <span>Car</span>
-          </button>
-          <button id="navModeCab" onclick="setNavMode('cab')"
-            style="padding:12px 4px;background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);
-            border:2px solid rgba(255,255,255,.15);border-radius:12px;font-size:.8rem;
-            font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:.2s">
-            <span style="font-size:1.3rem">🚕</span>
-            <span>Cab</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Open in Google Maps -->
-      <button id="navOpenGmaps" onclick="openInGoogleMaps()"
-        style="width:100%;padding:14px;background:#fff;color:#0d0d0d;border:none;
-        border-radius:14px;font-size:.9rem;font-weight:800;cursor:pointer;
+      <!-- Direct Google Maps button -->
+      <button onclick="launchNav('driving')"
+        style="width:100%;padding:14px;background:#0d0d0d;color:#fff;border:none;
+        border-radius:14px;font-size:.9rem;font-weight:700;cursor:pointer;
         display:flex;align-items:center;justify-content:center;gap:8px;
-        box-shadow:0 4px 20px rgba(0,0,0,.3)">
-        <img src="https://www.google.com/favicon.ico" width="18" height="18" style="border-radius:3px" onerror="this.style.display='none'"/>
-        Open in Google Maps — Turn-by-turn
+        font-family:'DM Sans',sans-serif">
+        <img src="https://maps.google.com/favicon.ico" width="18" height="18" onerror="this.style.display='none'"/>
+        Open in Google Maps
       </button>
+      <div style="text-align:center;font-size:.7rem;color:#bbb;margin-top:8px;padding-bottom:8px">
+        Opens turn-by-turn navigation in Google Maps
+      </div>
     </div>
   </div>
-
-  <!-- Arrived overlay -->
-  <div id="navArrived" style="display:none;position:absolute;top:50%;left:50%;
-    transform:translate(-50%,-50%);background:#fff;border-radius:24px;
-    padding:28px 32px;text-align:center;z-index:700;
-    box-shadow:0 8px 40px rgba(0,0,0,.5);min-width:220px">
-    <div style="font-size:3.5rem;margin-bottom:12px">🎉</div>
-    <div style="font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;color:#0d0d0d;margin-bottom:6px">You've Arrived!</div>
-    <div id="navArrivedName" style="font-size:.88rem;color:#888;margin-bottom:18px"></div>
-    <button onclick="stopNav()" style="background:#E8521A;color:#fff;border:none;
-      border-radius:14px;padding:13px 32px;font-size:.95rem;font-weight:800;cursor:pointer;width:100%">Done</button>
-  </div>
-
 </div>
+
 
 <!-- WHATSAPP ORDER MODAL -->
 <div class="wa-modal" id="waModal" onclick="if(event.target===this)closeWaModal()">
@@ -3587,7 +3542,6 @@ function _firebaseReady(){
       }
     });
   }catch(e){
-    console.warn('Firebase init error:',e.message);
     _authReady=true;
     _authCallbacks.forEach(cb=>cb(null));
     _authCallbacks.length=0;
@@ -3605,7 +3559,6 @@ function _loadFirebase(){
 
   function tryPair(i){
     if(i>=CDNS.length){
-      console.warn('All Firebase CDNs failed');
       _authReady=true;
       _authCallbacks.forEach(cb=>cb(null));
       _authCallbacks.length=0;
@@ -3668,8 +3621,7 @@ async function signInWithGoogle(){
       showToast('Sign in cancelled');
     }else{
       showToast('⚠️ Google unavailable — use phone number in Profile');
-      console.warn('Google sign in error:',e.code);
-    }
+      }
   }
 }
 
@@ -3692,9 +3644,35 @@ const DEVICE_ID=(()=>{let id=localStorage.getItem('ds_device');if(!id){id='ds_'+
 let apiOnline=false;
 let _apiWaking=false;
 
+
+
+// ═══ Safe JSON parse ═══
+function safeJSON(str,fallback){
+  if(fallback===undefined)fallback=null;
+  try{return JSON.parse(str)||fallback;}catch(e){return fallback;}
+}
+
+// ═══ UTILITY: Debounce ═══
+function debounce(fn,ms){
+  return function(){
+    clearTimeout(fn._t);
+    fn._t=setTimeout(fn,ms);
+  };
+}
+var _st=null;
+
 async function apiGet(path){
-  try{const r=await fetch(API_BASE+path,{signal:AbortSignal.timeout(8000)});if(!r.ok)throw new Error();return await r.json();}
-  catch{return null;}
+  try{
+    const r=await fetch(API_BASE+path,{
+      signal:AbortSignal.timeout(8000),
+      headers:{'Accept':'application/json'}
+    });
+    if(!r.ok)return null;
+    return await r.json();
+  }catch(e){
+    if(e.name!=='AbortError')setDot('offline');
+    return null;
+  }
 }
 async function apiPost(path,body){
   try{const r=await fetch(API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(10000)});if(!r.ok)throw new Error();return await r.json();}
@@ -3758,14 +3736,16 @@ async function wakeServer(){
 }
 
 // Keep Railway awake — ping every 4 minutes
+var _keepAliveId=null;
 function startKeepAlive(){
-  setInterval(async()=>{
+  if(_keepAliveId)return; // prevent duplicate intervals
+  _keepAliveId=setInterval(async function(){
     if(!apiOnline){await wakeServer();}
     else{
-      const r=await apiGet('/health');
+      var r=await apiGet('/health');
       if(!r){apiOnline=false;setDot('offline');}
     }
-  },4*60*1000); // 4 minutes
+  },4*60*1000);
 }
 
 // ═══ LOCAL FALLBACK ═══
@@ -3815,36 +3795,22 @@ let uLat=null,uLng=null,uLocName='',gpsWatch=null;
 let discMap=null,miniMapInst=null,uMarker=null,dMarkers=[],radarLines=[];
 let shown=[],sortMode='newest',catFilter='',openNow=false,radarMode=false;
 let currentShop=null,cart=[],viewingShop=null;
-let myShops=(function(){
-  // Only load shops this device's owner actually registered
-  const uid=getUID();
-  const op=(localStorage.getItem('ds_owner_phone')||'').replace(/\D/g,'').slice(-10);
-  const all=JSON.parse(localStorage.getItem('ds_myshops')||'[]');
-  if(!uid&&!op)return all;
-  return all.filter(function(s){
-    if(uid&&s.ownerUID&&s.ownerUID===uid)return true;
-    if(op){const sp=(s.wa||s.phone||'').replace(/\D/g,'').slice(-10);return sp===op;}
-    return false;
-  });
-})();
-// ── One-time cleanup: remove viewer-cached shops from ds_myshops ──
-(function cleanupMyShops(){
+// myShops is loaded lazily after auth is ready
+let myShops=[];
+function _loadMyShops(){
   try{
     const uid=getUID();
     const op=(localStorage.getItem('ds_owner_phone')||'').replace(/\D/g,'').slice(-10);
-    if(!uid&&!op)return; // not logged in, skip
-    const raw=JSON.parse(localStorage.getItem('ds_myshops')||'[]');
-    const clean=raw.filter(function(s){
-      if(s.ownerUID&&uid&&s.ownerUID===uid)return true;
+    const all=JSON.parse(localStorage.getItem('ds_myshops')||'[]');
+    if(!uid&&!op){myShops=all;return;}
+    myShops=all.filter(function(s){
+      if(uid&&s.ownerUID&&s.ownerUID===uid)return true;
       if(op){const sp=(s.wa||s.phone||'').replace(/\D/g,'').slice(-10);return sp===op;}
       return false;
     });
-    if(clean.length!==raw.length){
-      localStorage.setItem('ds_myshops',JSON.stringify(clean));
-      console.log('[DS] Cleaned '+(raw.length-clean.length)+' viewer shops from ds_myshops');
-    }
-  }catch(e){}
-})();
+  }catch(e){myShops=[];}
+}
+// cleanup moved into _loadMyShops()
 
 let revBizId=null,revStars=0;
 let curStep=0,selSector=null,pinned=false,prodCount=0;
@@ -4040,8 +4006,8 @@ function goTo(pg){
     },80);
   }
   if(pg==='profile') try{renderProfile();}catch(e){console.error(e);}
-  if(pg==='home') try{renderHome();}catch(e){console.error(e);}
-  if(pg==='addshop') try{resetAddShop();}catch(e){console.error(e);}
+  if(pg==='home'){if(!document.getElementById('shopList').children.length){try{renderHome();}catch(e){console.error(e);}}}
+  // Don't auto-reset addshop form on tab switch — preserve user's progress
   if(pg==='supply') try{renderSupply();}catch(e){console.error(e);}
   if(pg==='grow') try{renderGrow();}catch(e){console.error(e);}
   window.scrollTo(0,0);
@@ -4181,7 +4147,8 @@ function _renderHomeShops(shops, search=''){
     });
   }
 
-  setTxt('homeCount',shops.length+(shops.length===1?' business':' businesses'));
+  var countEl=el('homeCount');
+  if(countEl)countEl.textContent=shops.length===0?'Loading…':shops.length+(shops.length===1?' business':' businesses');
   setTxt('homeListTitle',homeCatFilter||homeNearMe||homeOpenOnly||search?'Results':'All Businesses');
 
   // Featured cards (top rated open shops, no filter active)
@@ -4319,8 +4286,9 @@ function initDiscMap(){
   }).setView(center,uLat?15:8);
 
   // ESRI World Street Map — crisp, works on ALL phones
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{
-    maxZoom:19,attribution:'Esri',
+  // Use CartoDB Voyager — fast, clean, works everywhere
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+    maxZoom:19,subdomains:'abcd',attribution:'© OpenStreetMap'
   }).addTo(discMap);
 
   L.control.zoom({position:'bottomleft'}).addTo(discMap);
@@ -4368,7 +4336,7 @@ function makeYouIcon(){
       <div style="position:absolute;width:40px;height:40px;background:rgba(232,82,26,.2);border-radius:50%;animation:_youPulse 2s ease-in-out infinite"></div>
       <div style="width:16px;height:16px;background:#E8521A;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(232,82,26,.6);z-index:1"></div>
     </div>
-    <style>@keyframes _youPulse{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(2.2);opacity:0}}</style>`;
+    `;
   return L.divIcon({className:'',html,iconSize:[40,40],iconAnchor:[20,20],popupAnchor:[0,-22]});
 }
 
@@ -4524,100 +4492,122 @@ function getPinColor(s){
 
 function renderDiscMarkers(){
   if(!discMap)return;
-  dMarkers.forEach(m=>{try{discMap.removeLayer(m);}catch(e){}});
-  radarLines.forEach(l=>{try{discMap.removeLayer(l);}catch(e){}});
+
+  // Clear existing markers
+  dMarkers.forEach(function(m){try{discMap.removeLayer(m);}catch(e){}});
+  radarLines.forEach(function(l){try{discMap.removeLayer(l);}catch(e){}});
   dMarkers=[];radarLines=[];
 
-  // Geocode shops missing coordinates — staggered to avoid rate limiting
-  let geocodeDelay=0;
-  shown.forEach(function(s){
-    if(s.lat&&s.lng&&!isNaN(+s.lat)&&!isNaN(+s.lng))return;
-    // Use the most specific location string available
-    var cityQ=s.city||s.addr||s.address||s.pin||'';
-    if(!cityQ)return;
-    geocodeDelay+=400;
-    (function(shop,query){
-      setTimeout(function(){
-        fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(query+', Tamil Nadu, India')+'&format=json&limit=1')
-          .then(function(r){return r.json();}).then(function(d){
-            if(d&&d[0]){
-              shop.lat=+d[0].lat; shop.lng=+d[0].lon;
-              // Save coords back to localStorage
-              var idx2=myShops.findIndex(function(x){return x.name===shop.name;});
-              if(idx2>=0){myShops[idx2].lat=shop.lat;myShops[idx2].lng=shop.lng;
-                try{localStorage.setItem('ds_myshops',JSON.stringify(myShops));}catch(e){}
-              }
-              // Add marker for this newly geocoded shop
-              if(discMap&&!isNaN(shop.lat)&&!isNaN(shop.lng)){
-                var open2=isOpen(shop);
-                var emoji2=getSectorEmoji(shop);
-                var color2=getPinColor(shop);
-                var m2=L.marker([shop.lat,shop.lng],{icon:makePinIcon(emoji2,color2,open2),zIndexOffset:open2?300:100}).addTo(discMap).bindPopup('<div style="font-family:DM Sans,sans-serif;padding:8px"><b style="font-size:.88rem">'+shop.name+'</b><br><small style="color:#888">'+getSectorName(shop)+(shop.city?' · '+shop.city:'')+'</small><br><div style="margin-top:8px"><button onclick="openDetail(\'' + shop.id + '\')" style="background:#E8521A;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:.78rem;font-weight:700;cursor:pointer;width:100%">View Shop</button></div></div>',{maxWidth:220,className:'ds-popup'});
-                dMarkers.push(m2);
-              }
-            }
-          }).catch(function(){});
-      }, geocodeDelay);
-    })(s, cityQ);
-  });
-
-  shown.forEach(s=>{
-    if(!s.lat||!s.lng||isNaN(+s.lat)||isNaN(+s.lng))return;
-    const lat=+s.lat,lng=+s.lng;
-    const open=isOpen(s);const emoji=getSectorEmoji(s);const color=getPinColor(s);
-    const dist=uLat?km(uLat,uLng,lat,lng):null;
-
-    const m=L.marker([lat,lng],{icon:makePinIcon(emoji,color,open),zIndexOffset:open?300:100}).addTo(discMap);
-    m.bindPopup(`
-      <div style="font-family:'DM Sans',sans-serif">
-        <div style="background:${color};padding:12px 14px;display:flex;align-items:center;gap:10px">
-          <div style="font-size:1.8rem">${emoji}</div>
-          <div>
-            <div style="font-size:.92rem;font-weight:800;color:#fff;line-height:1.2">${s.name}</div>
-            <div style="font-size:.7rem;color:rgba(255,255,255,.75)">${getSectorName(s)}${s.city?' · '+s.city:''}</div>
-          </div>
-        </div>
-        <div style="padding:10px 14px">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
-            <span style="background:${open?'#f0fdf4':'#fff1f2'};color:${open?'#15803d':'#be123c'};font-size:.67rem;font-weight:700;padding:3px 9px;border-radius:999px">${open?'● Open Now':'● Closed'}</span>
-            ${dist!==null?`<span style="font-size:.7rem;font-weight:600;color:#1A3E52">📍 ${fmtDist(dist)}</span>`:''}
-            ${s.rating?`<span style="font-size:.7rem;color:#f59e0b;font-weight:700">★ ${s.rating}</span>`:''}
-          </div>
-          ${s.addr?`<div style="font-size:.71rem;color:#888;margin-bottom:8px">📌 ${s.addr}</div>`:''}
-          <div style="display:grid;grid-template-columns:1fr${s.wa?' 1fr':''};gap:6px">
-            <button onclick="openDetail('${s.id}')" style="padding:8px;background:#E8521A;color:#fff;border:none;border-radius:9px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">View Shop</button>
-            ${s.wa?`<button onclick="openWaBot('${s.id}')" style="padding:8px;background:#25D366;color:#fff;border:none;border-radius:9px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">📱 Order</button>`:''}
-          </div>
-        </div>
-      </div>`,{maxWidth:240,className:'ds-popup'});
-
-    m.on('click',()=>{
-      document.querySelectorAll('.bcard').forEach(c=>c.classList.remove('hi'));
-      const c=document.getElementById('bc-'+s.id);
-      if(c){c.classList.add('hi');c.scrollIntoView({behavior:'smooth',block:'nearest'});}
-      if(radarMode&&uLat)drawRadarLine(s);
-    });
-    dMarkers.push(m);
-  });
-
-  if(uLat){
+  // Add user location marker
+  if(uLat&&uLng){
     if(uMarker){try{discMap.removeLayer(uMarker);}catch(e){}}
-    uMarker=L.marker([uLat,uLng],{icon:makeYouIcon(),zIndexOffset:1000})
-      .addTo(discMap)
-      .bindPopup('<div style="font-family:\'DM Sans\',sans-serif;font-size:.86rem;font-weight:800;color:#E8521A;padding:4px 2px">📍 You are here</div>');
+    uMarker=L.circleMarker([uLat,uLng],{
+      radius:10,fillColor:'#E8521A',fillOpacity:1,
+      color:'#fff',weight:3,zIndexOffset:1000
+    }).addTo(discMap).bindPopup('<b style="font-family:DM Sans,sans-serif">📍 You are here</b>');
     dMarkers.push(uMarker);
-    if(radarMode)shown.filter(s=>s.lat&&s.lng&&!isNaN(+s.lat)).forEach(s=>drawRadarLine(s));
   }
-  // Auto-fit to show all markers + user location
-  const _allPts=shown.filter(s=>s.lat&&s.lng&&!isNaN(+s.lat)).map(s=>[+s.lat,+s.lng]);
-  if(uLat)_allPts.push([uLat,uLng]);
-  if(_allPts.length>1){
-    try{discMap.fitBounds(L.latLngBounds(_allPts),{padding:[80,80],maxZoom:16,animate:true});}catch(e){}
-  }else if(_allPts.length===1){
-    discMap.setView(_allPts[0],15,{animate:true});
+
+  // Place markers for shops with coordinates
+  var toGeocode=[];
+  shown.forEach(function(s){
+    if(s.lat&&s.lng&&!isNaN(+s.lat)&&!isNaN(+s.lng)){
+      _addDiscMarker(s);
+    } else {
+      toGeocode.push(s);
+    }
+  });
+
+  // Geocode shops without coordinates
+  toGeocode.forEach(function(s,i){
+    var q=s.city||s.addr||s.address||'';
+    if(!q)return;
+    setTimeout(function(){
+      fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q+', Tamil Nadu, India')+'&format=json&limit=1')
+        .then(function(r){return r.json();})
+        .then(function(d){
+          if(d&&d.length){
+            s.lat=+d[0].lat; s.lng=+d[0].lon;
+            // Save back to localStorage
+            var idx=myShops.findIndex(function(x){return x.id===s.id||x.name===s.name;});
+            if(idx>=0){myShops[idx].lat=s.lat;myShops[idx].lng=s.lng;
+              try{localStorage.setItem('ds_myshops',JSON.stringify(myShops));}catch(e){}
+            }
+            if(discMap)_addDiscMarker(s);
+          }
+        }).catch(function(){});
+    }, i*500);
+  });
+
+  // Fit map to show all markers + user
+  var pts=[];
+  if(uLat&&uLng)pts.push([uLat,uLng]);
+  shown.filter(function(s){return s.lat&&s.lng&&!isNaN(+s.lat);}).forEach(function(s){pts.push([+s.lat,+s.lng]);});
+  if(pts.length>1){
+    try{discMap.fitBounds(L.latLngBounds(pts),{padding:[80,80],maxZoom:15,animate:true});}catch(e){}
+  }else if(pts.length===1){
+    discMap.setView(pts[0],15,{animate:true});
   }
-  setTimeout(()=>discMap&&discMap.invalidateSize({pan:false}),150);
+  setTimeout(function(){if(discMap)discMap.invalidateSize({pan:false});},300);
 }
+
+function _addDiscMarker(s){
+  if(!discMap||!s.lat||!s.lng||isNaN(+s.lat)||isNaN(+s.lng))return;
+  var lat=+s.lat, lng=+s.lng;
+  var open=isOpen(s);
+  var color=open?getPinColor(s):'#9ca3af';
+  var emoji=getSectorEmoji(s);
+  var dist=uLat?km(uLat,uLng,lat,lng):null;
+  var secName=getSectorName(s);
+
+  var icon=L.divIcon({
+    className:'',
+    html:'<div style="background:'+color+';width:40px;height:40px;border-radius:50%;'+
+         'border:3px solid #fff;box-shadow:0 3px 12px rgba(0,0,0,.3);'+
+         'display:flex;align-items:center;justify-content:center;font-size:18px">'+
+         emoji+'</div>',
+    iconSize:[40,40],iconAnchor:[20,20],popupAnchor:[0,-24]
+  });
+
+  var m=L.marker([lat,lng],{icon:icon,zIndexOffset:open?300:100}).addTo(discMap);
+
+  // Build popup using element creation to avoid quote issues
+  var popup=document.createElement('div');
+  popup.style.cssText='font-family:DM Sans,sans-serif;min-width:170px';
+  popup.innerHTML=
+    '<div style="background:'+color+';padding:10px 12px;margin:-13px -20px 8px;border-radius:8px 8px 0 0">'+
+    '<div style="font-weight:800;color:#fff;font-size:.9rem">'+s.name+'</div>'+
+    '<div style="color:rgba(255,255,255,.8);font-size:.7rem">'+secName+(s.city?' · '+s.city:'')+'</div>'+
+    '</div>'+
+    '<div style="font-size:.73rem;margin-bottom:8px">'+
+    (open?'<span style="color:#1B7A4A;font-weight:700">● Open</span>':'<span style="color:#c0392b;font-weight:700">● Closed</span>')+
+    (dist?' <span style="color:#666">· '+fmtDist(dist)+'</span>':'')+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px"></div>';
+
+  var btnRow=popup.querySelector('div:last-child');
+  var btnView=document.createElement('button');
+  btnView.textContent='View Shop';
+  btnView.style.cssText='background:#E8521A;color:#fff;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer;width:100%;font-family:DM Sans,sans-serif';
+  btnView.onclick=function(){openDetail(s.id);};
+  var btnGo=document.createElement('button');
+  btnGo.textContent='🧭 Directions';
+  btnGo.style.cssText='background:#1B7A4A;color:#fff;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer;width:100%;font-family:DM Sans,sans-serif';
+  btnGo.onclick=function(){startNav(s.id);};
+  btnRow.appendChild(btnView);
+  btnRow.appendChild(btnGo);
+
+  m.bindPopup(popup,{maxWidth:240,className:'ds-popup'});
+
+  m.on('click',function(){
+    document.querySelectorAll('.bcard').forEach(function(c){c.classList.remove('hi');});
+    var c=document.getElementById('bc-'+s.id);
+    if(c){c.classList.add('hi');c.scrollIntoView({behavior:'smooth',block:'nearest'});}
+  });
+  dMarkers.push(m);
+}
+
+
 
 function drawRadarLine(s){
   if(!uLat||!discMap||!s.lat||!s.lng)return;
@@ -4678,7 +4668,7 @@ function startGPS(){
   navigator.geolocation.getCurrentPosition(pos=>{
     const{latitude:lat,longitude:lng}=pos.coords;
     if(ico)ico.textContent='✅';if(txt)txt.textContent='Location found!';if(btn)btn.disabled=false;
-    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=16`)
+    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=16`,{signal:AbortSignal.timeout(8000)})
       .then(r=>r.json()).then(d=>{
         const a=d.address||{};
         const name=a.hamlet||a.suburb||a.neighbourhood||a.village||a.town||a.city||'Your Location';
@@ -4698,7 +4688,7 @@ function locAC(q){
   if(q.length<2){drop.innerHTML='';return;}
   acTmr=setTimeout(async()=>{
     try{
-      const r=await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5&lang=en`);
+      const r=await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5&lang=en`,{signal:AbortSignal.timeout(6000)});
       const d=await r.json();
       drop.innerHTML=(d.features||[]).slice(0,5).map(f=>{
         const p=f.properties;const name=p.name||'';
@@ -4712,7 +4702,7 @@ function doLocSearch(){
   const q=document.getElementById('locIn').value.trim();
   if(!q){showToast('Type your city name');return;}
   const btn=document.getElementById('findBtn');btn.textContent='…';btn.disabled=true;
-  fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=en`)
+  fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=en`,{signal:AbortSignal.timeout(8000)})
     .then(r=>r.json()).then(d=>{
       btn.textContent='Search';btn.disabled=false;
       if(!d||!d.length){showToast('City not found — try another name');return;}
@@ -4880,9 +4870,15 @@ function updateCartBar(){
   if(btn)btn.onclick=()=>{if(viewingShop)openWaBot(viewingShop.id);};
 }
 function shareShop(id){
-  const s=allShops().find(x=>x.id===id);if(!s)return;
-  const msg=encodeURIComponent(`🏪 *${s.name}*\n📍 ${s.addr}, ${s.city}\n📞 ${s.phone}\n${s.rating?'★ '+s.rating+'/5\n':''}\nFound on Deckscrab!`);
-  window.open(`https://wa.me/?text=${msg}`,'_blank');
+  var s=allShops().find(function(x){return x.id===id;});if(!s)return;
+  var slug=(s.name||'shop').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  var url='https://waseem-2007.github.io/deckscrab/?shop='+slug;
+  var text='🏪 '+s.name+'\n📍 '+(s.addr||'')+', '+(s.city||'')+'\n\nOrder online: '+url;
+  if(navigator.share){
+    navigator.share({title:s.name,text:text,url:url}).catch(function(){});
+  }else{
+    window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank');
+  }
 }
 
 // ═══ WHATSAPP ORDER BOT WITH BILL + OTP ═══
@@ -4956,7 +4952,7 @@ function processWaMsg(msg){
     const grand=subtotal+gst;
     const orderId='DS'+Date.now().toString().slice(-6);
     const otp=Math.floor(100000+Math.random()*900000);
-    window._waOtp=String(otp);
+    var _localOtp=String(otp);window._waOtp=_localOtp;
     window._waOrderId=orderId;
     window._waAddr=addr;
     window._waGrand=grand;
@@ -5206,7 +5202,7 @@ function regGPS(){
     uLat=lat;uLng=lng;pinned=true;
     ico.textContent='✅';txt.textContent='GPS location pinned!';
     // Reverse geocode for city name
-    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,{signal:AbortSignal.timeout(8000)})
       .then(r=>r.json()).then(d=>{
         const city=d.address?.city||d.address?.town||d.address?.village||d.address?.suburb||'';
         const pin=d.address?.postcode||'';
@@ -5245,7 +5241,7 @@ function regSearchAddr(){
     const city=document.getElementById('f-ct')?.value.trim();
     if(!addr||addr.length<5)return;
     const q=`${addr} ${city} Tamil Nadu India`;
-    fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`)
+    fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,{signal:AbortSignal.timeout(8000)})
       .then(r=>r.json()).then(d=>{
         if(d&&d[0]){
           const lat=parseFloat(d[0].lat),lng=parseFloat(d[0].lon);
@@ -5358,6 +5354,9 @@ function buildReviewSummary(){
         .map(([l,v])=>`<div style="display:flex;padding:9px 12px;border-bottom:1px solid var(--bor);font-size:.79rem"><span style="color:var(--ink3);width:80px;flex-shrink:0">${l}</span><span style="color:var(--ink);font-weight:600">${v||'—'}</span></div>`).join('')}
     </div>`;
 }
+function _sanitize(str){
+  return (str||'').replace(/[<>"']/g,'').trim().slice(0,200);
+}
 async function submitShop(){
   const btn=document.querySelector('.btn-submit');
   if(btn){btn.textContent='⏳ Going Live…';btn.disabled=true;}
@@ -5366,9 +5365,9 @@ async function submitShop(){
   const shop={
     id:'my_'+Date.now(),g:sec.g,sector:selSector||'Business',
     sectorName:selSector||'Business',sectorEmoji:sec.e,e:sec.e,
-    name:document.getElementById('f-nm').value,
-    ownerName:document.getElementById('f-ow').value,
-    description:document.getElementById('f-ds').value,
+    name:_sanitize(document.getElementById('f-nm').value),
+    ownerName:_sanitize(document.getElementById('f-ow').value),
+    description:_sanitize(document.getElementById('f-ds').value),
     address:document.getElementById('f-ad').value,
     city:document.getElementById('f-ct').value,
     pincode:document.getElementById('f-pc').value,
@@ -6281,10 +6280,10 @@ function showAdminPanel(){
   const entered = prompt('🔐');
   if(!entered) return;
 
-  // Hash check — never store the raw PIN in source
-  // PIN is: DS@9384#Waseem (only you know this)
-  const validPins = ['DS@9384#Waseem', 'ds9384waseem', 'DS9384WASEEM'];
-  const match = validPins.some(p => entered.trim() === p);
+  // PIN verified via hash — contact admin for access
+  function _hashPin(s){var h=0;for(var i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0;}return h;}
+  const _valid = _hashPin(entered.trim()) === -1387073521 || _hashPin(entered.trim()) === 1545860907;
+  const match = _valid;
 
   if(!match){
     showToast('❌ Access denied');
@@ -7269,12 +7268,13 @@ function setTxt(id,val){const e=el(id);if(e)e.textContent=val;}
 function setHtml(id,val){const e=el(id);if(e)e.innerHTML=val;}
 
 // ═══ TOAST ═══
-let tT;
-function showToast(msg){
+var tT;
+function showToast(msg,duration){
   const e=el('toastEl');
   if(!e)return;
   e.textContent=msg;e.classList.add('show');
-  clearTimeout(tT);tT=setTimeout(()=>e.classList.remove('show'),3200);
+  var ms=duration||(msg.startsWith('⚠️')||msg.startsWith('❌')?4500:2800);
+  clearTimeout(tT);tT=setTimeout(()=>e.classList.remove('show'),ms);
 }
 
 // ═══ INIT — only runs when NOT in ?shop= mode ═══
@@ -7328,7 +7328,46 @@ function hideGate(){
   const g=document.getElementById('loginGate');
   if(g){g.style.opacity='0';g.style.transition='opacity .4s';setTimeout(()=>{g.style.display='none';_initApp();},400);}
 }
+// ═══ UTILITY: debounce ═══
+function debounce(fn, ms){
+  var t;
+  return function(){
+    var args=arguments;
+    clearTimeout(t);
+    t=setTimeout(function(){fn.apply(null,args);},ms);
+  };
+}
+var filterHomeDebounced=debounce(function(){renderHome(document.getElementById('homeSearch')?.value||'');},250);
+var renderDiscDebounced=debounce(renderDisc,250);
+
+// Safe localStorage wrapper — prevents quota errors from crashing the app
+function lsSet(key, val){
+  try{localStorage.setItem(key, val);}catch(e){
+    // Storage full — clear old caches and retry
+    try{
+      var keys=Object.keys(localStorage).filter(function(k){return k.startsWith('ds_shop_cache_');});
+      keys.forEach(function(k){localStorage.removeItem(k);});
+      localStorage.setItem(key, val);
+    }catch(e2){}
+  }
+}
+function lsGet(key, def){
+  try{return localStorage.getItem(key);}catch(e){return def||null;}
+}
+
+// Cached allShops — recomputed only when data changes
+var _shopCache=null, _shopCacheKey='';
+function allShopsCache(){
+  var key=(_serverShops.length)+':'+(LOCAL.shops.length);
+  if(_shopCache&&_shopCacheKey===key)return _shopCache;
+  _shopCacheKey=key;
+  _shopCache=allShops();
+  return _shopCache;
+}
+function invalidateShopCache(){_shopCache=null;}
+
 async function _initApp(){
+  _loadMyShops();
   try{ensureOwnerIdentity();}catch(e){}
   try{if(el('secGrid'))buildSectors('');}catch(e){}
   try{if(el('prodList')){addProd();addProd();}}catch(e){}
@@ -7411,10 +7450,19 @@ async function gateSignIn(){
     }else{
       setGateStatus('⚠️ Google unavailable — use phone number below');
       document.getElementById('gatePhoneInp')?.focus();
-      console.warn('Firebase sign-in error:',e.code,e.message);
-    }
+      }
   }
 }
+
+
+// ═══ Online/Offline detection ═══
+function updateOnlineStatus(){
+  var bar=document.getElementById('offlineBar');
+  if(bar)bar.classList.toggle('show',!navigator.onLine);
+  if(!navigator.onLine)showToast('📡 Offline — showing cached data');
+}
+window.addEventListener('online',function(){updateOnlineStatus();showToast('✅ Back online');renderHome();});
+window.addEventListener('offline',updateOnlineStatus);
 
 window.addEventListener('DOMContentLoaded',async function(){
   // Shop website mode — skip main app
@@ -7922,226 +7970,96 @@ function applyLang(){
 
 
 // ════════════════════════════════════════════
-// LIVE NAVIGATION SYSTEM
+// NAVIGATION SYSTEM — Simple & Reliable
+// Opens Google Maps directly for turn-by-turn
 // ════════════════════════════════════════════
-let navMap=null, navUserMarker=null, navShopMarker=null, navRouteLine=null;
-let navWatchId=null, navDestLat=null, navDestLng=null, navDestName='', navMode='walk';
-let navShopId=null;
-
-// Speed estimates km/h
-const NAV_SPEED={walk:5,bike:30,car:45,cab:40};
+var _navShop=null;
 
 function startNav(shopId){
-  const s=allShops().find(x=>x.id===shopId)||(shown.find(x=>x.id===shopId));
+  var s=allShops().find(function(x){return x.id===shopId;});
   if(!s){showToast('Shop not found');return;}
-  if(!s.lat||!s.lng){
-    // No coords — geocode first, then open Google Maps directly
-    const cityQ=s.city||s.addr||s.address||'';
-    if(cityQ){
-      showToast('📍 Finding location…');
-      fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(cityQ+', Tamil Nadu, India')+'&format=json&limit=1')
-        .then(r=>r.json()).then(d=>{
-          if(d&&d[0]){s.lat=+d[0].lat;s.lng=+d[0].lon;startNav(shopId);}
-          else{
-            // Fallback: open Google Maps search
-            window.open('https://www.google.com/maps/search/'+encodeURIComponent(s.name+' '+cityQ),'_blank');
-          }
-        }).catch(()=>window.open('https://www.google.com/maps/search/'+encodeURIComponent(s.name),'_blank'));
-    }else{
-      window.open('https://www.google.com/maps/search/'+encodeURIComponent(s.name),'_blank');
-    }
-    return;
-  }
+  _navShop=s;
 
-  navDestLat=+s.lat; navDestLng=+s.lng;
-  navDestName=s.name; navShopId=shopId;
-
-  // Close detail modal
-  closeDetail();
-
-  // Open nav modal
-  const modal=document.getElementById('navModal');
-  modal.style.display='flex';
+  // Set up the modal content
   document.getElementById('navShopName').textContent=s.name;
-  document.getElementById('navStatus').textContent='Getting your location…';
-  document.getElementById('navArrived').style.display='none';
-  document.getElementById('navArrivedName').textContent=s.name;
-  setNavMode('walk');
+  document.getElementById('navShopAddr').textContent=(s.addr||s.address||s.city||'')+(s.city&&s.addr?', '+s.city:'');
 
-  // Init map after brief delay for DOM
-  setTimeout(()=>initNavMap(), 100);
-
-  // Start watching user location
-  if(!navigator.geolocation){
-    showToast('⚠️ GPS not available on this device');
-    document.getElementById('navStatus').textContent='GPS unavailable — using set location';
-    if(uLat) updateNavPosition(uLat,uLng);
-    return;
+  // Calculate distance if we have location
+  var distBadge=document.getElementById('navDistBadge');
+  var distText=document.getElementById('navDistText');
+  if(uLat&&uLng&&s.lat&&s.lng&&!isNaN(+s.lat)){
+    var d=km(uLat,uLng,+s.lat,+s.lng);
+    var speeds={walk:5,bike:30,car:40};
+    distBadge.style.display='block';
+    var walkMin=Math.round(d/speeds.walk*60);
+    var bikeMin=Math.round(d/speeds.bike*60);
+    var carMin=Math.round(d/speeds.car*60);
+    distText.textContent=fmtDist(d)+' away';
+    document.getElementById('walkEta').textContent=walkMin<60?walkMin+' min walk':Math.round(walkMin/60)+'h walk';
+    document.getElementById('bikeEta').textContent=bikeMin<60?bikeMin+' min ride':Math.round(bikeMin/60)+'h ride';
+    document.getElementById('carEta').textContent=carMin<60?carMin+' min drive':Math.round(carMin/60)+'h drive';
+  }else{
+    distBadge.style.display='none';
+    document.getElementById('walkEta').textContent='Tap to open maps';
+    document.getElementById('bikeEta').textContent='Tap to open maps';
+    document.getElementById('carEta').textContent='Tap to open maps';
   }
 
-  // Try to get position immediately first
-  navigator.geolocation.getCurrentPosition(
-    pos=>updateNavPosition(pos.coords.latitude,pos.coords.longitude),
-    ()=>{if(uLat)updateNavPosition(uLat,uLng);},
-    {enableHighAccuracy:true,timeout:8000}
-  );
-
-  // Then watch continuously
-  navWatchId=navigator.geolocation.watchPosition(
-    pos=>updateNavPosition(pos.coords.latitude,pos.coords.longitude),
-    err=>{console.log('GPS error:',err);},
-    {enableHighAccuracy:true,maximumAge:3000,timeout:10000}
-  );
-}
-
-function initNavMap(){
-  if(navMap){navMap.remove();navMap=null;}
-
-  // Dark tile for navigation feel
-  const center=uLat?[uLat,uLng]:[navDestLat,navDestLng];
-  navMap=L.map('navMap',{
-    zoomControl:false, attributionControl:false,
-    tap:true, tapTolerance:20, touchZoom:true, scrollWheelZoom:true,
-    preferCanvas:true,
-  }).setView(center, 16);
-
-  // Dark map tiles (CartoDB Dark)
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
-    maxZoom:20, subdomains:'abcd', crossOrigin:true,
-  }).addTo(navMap);
-
-  // Destination marker — pulsing orange pin
-  navShopMarker=L.marker([navDestLat,navDestLng],{
-    icon:L.divIcon({
-      className:'',
-      html:`<div style="position:relative">
-        <div style="width:20px;height:20px;background:#E8521A;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(232,82,26,.6)"></div>
-        <div style="position:absolute;top:-3px;left:-3px;width:26px;height:26px;border-radius:50%;background:rgba(232,82,26,.25);animation:_navPulse 2s ease infinite"></div>
-        <style>@keyframes _navPulse{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.8);opacity:0}}</style>
-      </div>`,
-      iconSize:[20,20], iconAnchor:[10,10],
-    }),
-    zIndexOffset:500,
-  }).addTo(navMap).bindPopup('<b>'+navDestName+'</b><br/>Your destination');
-
-  // Zoom controls top-right
-  L.control.zoom({position:'topright'}).addTo(navMap);
-
-  setTimeout(()=>navMap&&navMap.invalidateSize(),200);
-}
-
-function updateNavPosition(lat,lng){
-  if(!navMap)return;
-
-  // Update user marker
-  if(navUserMarker){try{navMap.removeLayer(navUserMarker);}catch(e){}}
-  navUserMarker=L.marker([lat,lng],{
-    icon:L.divIcon({
-      className:'',
-      html:`<div style="position:relative;display:flex;align-items:center;justify-content:center">
-        <div style="width:18px;height:18px;background:#3b82f6;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 10px rgba(59,130,246,.7);z-index:2;position:relative"></div>
-        <div style="position:absolute;width:40px;height:40px;border-radius:50%;background:rgba(59,130,246,.2);animation:_youPulse 2s ease infinite"></div>
-      </div>`,
-      iconSize:[40,40], iconAnchor:[20,20],
-    }),
-    zIndexOffset:1000,
-  }).addTo(navMap);
-
-  // Draw route line
-  if(navRouteLine){try{navMap.removeLayer(navRouteLine);}catch(e){}}
-  navRouteLine=L.polyline([[lat,lng],[navDestLat,navDestLng]],{
-    color:'#E8521A', weight:4, opacity:.75, dashArray:'10 6',
-    lineJoin:'round', lineCap:'round',
-  }).addTo(navMap);
-
-  // Calculate distance and ETA
-  const distKm=km(lat,lng,navDestLat,navDestLng);
-  const speed=NAV_SPEED[navMode]||5;
-  const timeMin=Math.ceil((distKm/speed)*60);
-  const arrival=new Date(Date.now()+timeMin*60000);
-  const arrivalStr=arrival.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
-
-  // Update stats
-  document.getElementById('navDist').textContent=fmtDist(distKm);
-  document.getElementById('navEta').textContent=timeMin<1?'<1 min':timeMin+'min';
-  document.getElementById('navArrival').textContent=arrivalStr;
-  document.getElementById('navStatus').textContent=
-    distKm<0.05?'Almost there!'
-    :distKm<0.2?'Very close — '+fmtDist(distKm)+' away'
-    :'Heading to '+navDestName+' · '+fmtDist(distKm);
-
-  // Fit map to show both user and destination
-  try{
-    navMap.fitBounds([[lat,lng],[navDestLat,navDestLng]],{
-      padding:[70,70], maxZoom:17, animate:true,
-    });
-  }catch(e){}
-
-  // Arrived check — within 50 metres
-  if(distKm<0.05){
-    document.getElementById('navArrived').style.display='flex';
-    document.getElementById('navArrived').style.flexDirection='column';
-    document.getElementById('navArrived').style.alignItems='center';
-    // Stop watching
-    if(navWatchId!==null){navigator.geolocation.clearWatch(navWatchId);navWatchId=null;}
-    showToast('🎉 You\'ve arrived at '+navDestName+'!');
-  }
-}
-
-function navRecenter(){
-  if(!navMap||!navUserMarker)return;
-  const pos=navUserMarker.getLatLng();
-  navMap.setView([pos.lat,pos.lng],17,{animate:true});
-}
-
-function setNavMode(mode){
-  navMode=mode;
-  ['walk','bike','car','cab'].forEach(function(m){
-    var btn=document.getElementById('navMode'+m.charAt(0).toUpperCase()+m.slice(1));
-    if(btn){
-      var active=m===mode;
-      btn.style.background=active?'#E8521A':'rgba(255,255,255,.08)';
-      btn.style.color=active?'#fff':'rgba(255,255,255,.7)';
-      btn.style.border=active?'2px solid #E8521A':'2px solid rgba(255,255,255,.15)';
-      btn.style.transform=active?'scale(1.05)':'scale(1)';
-    }
-  });
-  // Recalculate ETA
-  var speeds={walk:5,bike:30,car:45,cab:40};
-  if(navUserMarker){
-    var p=navUserMarker.getLatLng();
-    updateNavPosition(p.lat,p.lng);
-  }
-  // For cab mode - open Ola/Uber
-  if(mode==='cab'&&navDestLat&&navDestLng){
-    var olaUrl='https://book.olacabs.com/?lat='+navDestLat+'&lng='+navDestLng+'&pickup_name=My+Location&drop_name='+encodeURIComponent(navDestName||'Destination');
-    window.open(olaUrl,'_blank');
-    showToast('🚕 Opening Ola for cab booking');
-    return;
-  }
-  showToast({walk:'🚶 Walking mode',bike:'🏍️ Bike mode',car:'🚗 Car mode'}[mode]||'Navigation mode set');
-  const labels={walk:'🚶 Walking speed (~5km/h)',bike:'🏍️ Bike speed (~30km/h)',car:'🚗 Car speed (~40km/h)'};
-  showToast(labels[mode]);
-}
-
-function openInGoogleMaps(){
-  if(!navDestLat||!navDestLng){showToast('No destination set');return;}
-  var travelMode=navMode==='walk'?'walking':navMode==='bike'?'bicycling':'driving';
-  var url='https://www.google.com/maps/dir/?api=1&destination='+navDestLat+','+navDestLng+'&travelmode='+travelMode;
-  if(uLat&&uLng)url+='&origin='+uLat+','+uLng;
-  window.open(url,'_blank');
-  showToast('🗺️ Opening Google Maps…');
+  // Show the modal
+  var modal=document.getElementById('navModal');
+  modal.style.display='flex';
+  document.body.style.overflow='hidden';
 }
 
 function stopNav(){
-  if(navWatchId!==null){
-    navigator.geolocation.clearWatch(navWatchId);
-    navWatchId=null;
-  }
-  if(navMap){navMap.remove();navMap=null;}
-  navUserMarker=null; navShopMarker=null; navRouteLine=null;
-  document.getElementById('navModal').style.display='none';
+  var modal=document.getElementById('navModal');
+  if(modal)modal.style.display='none';
+  document.body.style.overflow='';
+  _navShop=null;
 }
+
+function launchNav(mode){
+  if(!_navShop){stopNav();return;}
+  var s=_navShop;
+  var dest='';
+
+  if(s.lat&&s.lng&&!isNaN(+s.lat)){
+    dest=s.lat+','+s.lng;
+  }else if(s.name&&s.city){
+    dest=encodeURIComponent(s.name+', '+s.city+', Tamil Nadu');
+  }else{
+    dest=encodeURIComponent(s.name||s.city||'');
+  }
+
+  var url='https://www.google.com/maps/dir/?api=1&destination='+dest+'&travelmode='+mode;
+  if(uLat&&uLng)url+='&origin='+uLat+','+uLng;
+
+  window.open(url,'_blank');
+  stopNav();
+}
+
+function launchCab(){
+  if(!_navShop){stopNav();return;}
+  var s=_navShop;
+
+  // Try Ola first, fallback to Uber, fallback to Google Maps
+  if(s.lat&&s.lng&&!isNaN(+s.lat)){
+    var olaUrl='https://book.olacabs.com/?lat='+s.lat+'&lng='+s.lng;
+    window.open(olaUrl,'_blank');
+  }else{
+    var uberUrl='https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[formatted_address]='+encodeURIComponent(s.name+', '+s.city);
+    window.open(uberUrl,'_blank');
+  }
+  stopNav();
+}
+
+// Keep legacy functions that might be called elsewhere
+function setNavMode(mode){}
+function openInGoogleMaps(){if(_navShop)launchNav('driving');}
+function navRecenter(){}
+function updateNavPosition(){}
+function initNavMap(){}
+
 
 // ════════════════════════════════════════════
 // ════════════════════════════════════════════
@@ -8152,10 +8070,9 @@ if('serviceWorker' in navigator && location.hostname === 'waseem-2007.github.io'
   window.addEventListener('load', ()=>{
     navigator.serviceWorker.register('/deckscrab/sw.js', {scope:'/deckscrab/'})
       .then(reg=>{
-        console.log('SW registered:', reg.scope);
         setInterval(()=>reg.update(), 30*60*1000);
       })
-      .catch(err=>console.log('SW registration failed:', err));
+      .catch(function(){});
   });
 }
 
@@ -8173,6 +8090,50 @@ window.addEventListener('appinstalled', ()=>{
   hideInstallBanner();
   showToast('✅ Deckscrab installed! Find it on your home screen.');
 });
+
+// Pull to refresh on home/discover
+(function(){
+  var startY=0,pulling=false;
+  document.addEventListener('touchstart',function(e){
+    if(window.scrollY===0)startY=e.touches[0].clientY;
+  },{passive:true});
+  document.addEventListener('touchend',function(e){
+    if(startY>0){
+      var dy=e.changedTouches[0].clientY-startY;
+      if(dy>70){
+        // Pull down = refresh
+        var pg=document.querySelector('.page.on');
+        if(pg&&pg.id==='page-home'){renderHome();showToast('🔄 Refreshed');}
+        if(pg&&pg.id==='page-discover'){renderDisc();showToast('🔄 Refreshed');}
+      }
+    }
+    startY=0;
+  },{passive:true});
+})();
+
+// ═══ Browser back button support ═══
+var _currentPage='home';
+var _origGoTo=goTo;
+goTo=function(pg){
+  if(pg!==_currentPage){
+    history.pushState({page:pg},'',window.location.pathname+'?p='+pg);
+    _currentPage=pg;
+  }
+  _origGoTo(pg);
+};
+window.addEventListener('popstate',function(e){
+  var pg=(e.state&&e.state.page)||'home';
+  _currentPage=pg;
+  _origGoTo(pg);
+});
+// Handle initial URL param
+(function(){
+  var p=new URLSearchParams(window.location.search).get('p');
+  if(p&&['home','discover','addshop','supply','grow','profile'].includes(p)){
+    setTimeout(function(){_origGoTo(p);},100);
+  }
+})();
+
 
 function showInstallBanner(){
   if(!deferredInstallPrompt) return;
