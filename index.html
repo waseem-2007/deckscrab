@@ -254,11 +254,18 @@ body {
 
 /* Discover page is special — fills viewport */
 #page-discover.active {
-  display: flex;
-  flex-direction: column;
+  display: block;
   height: calc(100vh - var(--nav-h) - var(--bnav-h));
   position: relative;
   overflow: hidden;
+}
+#discoverMap {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  background: #e8e3db;
 }
 
 /* ── BOTTOM NAV ── */
@@ -2040,7 +2047,7 @@ select.field-input { appearance: none; cursor: pointer; }
   </section>
 
   <section id="page-discover" class="page" aria-label="Discover on map">
-    <div id="discoverMap"></div>
+    <div id="discoverMap" style="position:absolute;inset:0;width:100%;height:100%;z-index:1"></div>
     <div class="disc-search-float">
       <div class="disc-search-inner">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
@@ -3219,8 +3226,20 @@ const DiscoverModule = (() => {
       document.head.appendChild(s);
     }
 
-    [50, 200, 500, 1000].forEach(t => setTimeout(() => _map && _map.invalidateSize({ pan: false }), t));
+    [50, 100, 200, 400, 700, 1200, 2000].forEach(t => setTimeout(() => {
+      if (_map) {
+        _map.invalidateSize({ pan: false, animate: false });
+      }
+    }, t));
     window.addEventListener('resize', () => setTimeout(() => _map && _map.invalidateSize({ pan: false }), 200), { passive: true });
+
+    // ResizeObserver — fires when container becomes visible
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(() => {
+        if (_map) _map.invalidateSize({ pan: false, animate: false });
+      });
+      ro.observe(container);
+    }
   }
 
   function buildCatBar() {
@@ -4615,7 +4634,13 @@ const NavModule = (() => {
     // Page-specific init
     switch (page) {
       case 'home':     DS.home.loadAndRender();   break;
-      case 'discover': DS.discover.init();         break;
+      case 'discover':
+        DS.discover.init();
+        // Force map resize after page becomes visible
+        [100, 300, 600, 1000].forEach(t => setTimeout(() => {
+          if (DS.discover._map) DS.discover._map.invalidateSize({ pan: false, animate: false });
+        }, t));
+        break;
       case 'addshop':  DS.addshop.init();          break;
       case 'grow':     DS.grow.render();           break;
       case 'profile':  DS.profile.render();        break;
