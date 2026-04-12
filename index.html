@@ -3781,6 +3781,8 @@ const AddShopModule = (() => {
   let _step = 0;
   let _selSector = null;
   let _pinned = false;
+  let _shopLat = null;   // ← dedicated shop lat (separate from user location)
+  let _shopLng = null;   // ← dedicated shop lng
   let _regMap = null;
   let _regMarker = null;
   let _photos = [null, null, null, null];
@@ -3834,8 +3836,12 @@ const AddShopModule = (() => {
     _step = 0;
     _selSector = null;
     _pinned = false;
+    _shopLat = null;
+    _shopLng = null;
     _photos = [null, null, null, null];
     _prods = [{ n: '', p: '' }, { n: '', p: '' }];
+    // Destroy old map so it rebuilds fresh each registration
+    if (_regMap) { try { _regMap.remove(); } catch {} _regMap = null; _regMarker = null; }
     renderCurrentStep();
   }
 
@@ -3983,38 +3989,63 @@ const AddShopModule = (() => {
               <span>📍</span><span id="regMapCoords">Tap GPS or tap map to pin your location</span>
             </div>
           </div>
-          ${_pinned ? `<div style="display:flex;align-items:center;gap:7px;background:var(--forest-soft);border:1px solid rgba(10,124,74,.2);border-radius:var(--radius-md);padding:9px 12px;margin-top:10px;font-size:.76rem;color:var(--forest)">✅ Location pinned</div>` : ''}
+          <div style="margin-top:10px;background:${_pinned?'var(--forest-soft)':'var(--surface-2)'};border:1.5px solid ${_pinned?'rgba(10,124,74,.25)':'var(--border-2)'};border-radius:var(--radius-md);padding:10px 13px">
+            <div style="font-size:.68rem;font-weight:700;color:${_pinned?'var(--forest)':'var(--ink-3)'};margin-bottom:3px">${_pinned?'✅ Shop location pinned':'⚠️ Location not pinned yet'}</div>
+            <div id="regLatLngDebug" style="font-family:var(--font-mono);font-size:.65rem;color:var(--ink-3)">${_shopLat?`lat: ${_shopLat.toFixed(6)}, lng: ${_shopLng.toFixed(6)}`:'Use GPS or tap the map above'}</div>
+            ${_pinned?'<div style="font-size:.65rem;color:var(--forest);margin-top:2px">Google Maps will use these exact coordinates for your shop</div>':''}
+          </div>
         </div>
       </div>
       <div class="step-nav">
         <button class="btn-back" onclick="DS.addshop.prev()">← Back</button>
         <button class="btn-next" onclick="DS.addshop.next(2)">Next: Products →</button>
       </div>`;
-    setTimeout(() => initRegMap(Store.location?.lat || 13.0772, Store.location?.lng || 79.6712), 300);
+    // Center map: use already-pinned shop loc > user loc > default Tamil Nadu
+    const mapLat = _shopLat || Store.location?.lat || 13.0772;
+    const mapLng = _shopLng || Store.location?.lng || 79.6712;
+    setTimeout(() => initRegMap(mapLat, mapLng), 300);
   }
 
   function initRegMap(lat, lng) {
-    if (_regMap) { _regMap.setView([lat, lng], 16); if (_regMarker) _regMarker.setLatLng([lat, lng]); return; }
+    // If map exists and has same container, just move it
+    const container = document.getElementById('regMapEl');
+    if (!container || typeof L === 'undefined') return;
+    if (_regMap) {
+      _regMap.setView([lat, lng], 18);
+      if (_regMarker) _regMarker.setLatLng([lat, lng]);
+      setTimeout(() => _regMap && _regMap.invalidateSize(), 100);
+      return;
+    }
     const el = document.getElementById('regMapEl');
     if (!el || typeof L === 'undefined') return;
 
-    _regMap = L.map('regMapEl', { zoomControl: true, attributionControl: false }).setView([lat, lng], 16);
+    _regMap = L.map('regMapEl', { zoomControl: true, attributionControl: false }).setView([lat, lng], 18);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 20, subdomains: 'abcd' }).addTo(_regMap);
 
     _regMarker = L.marker([lat, lng], { draggable: true }).addTo(_regMap);
     _regMarker.on('dragend', e => {
       const p = e.target.getLatLng();
-      Store.setLocation(p.lat, p.lng, Store.location?.name || 'Pinned');
+      _shopLat = p.lat;   // ← save to SHOP coords, not user location
+      _shopLng = p.lng;
       _pinned = true;
-      Utils.el('regMapCoords').textContent = `📍 ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+      const coords = `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`;
+      const el = Utils.el('regMapCoords');
+      if (el) el.textContent = `✅ Pinned: ${coords}`;
+      const dbg = Utils.el('regLatLngDebug');
+      if (dbg) dbg.textContent = `lat: ${p.lat.toFixed(6)}, lng: ${p.lng.toFixed(6)}`;
     });
 
     _regMap.on('click', e => {
-      Store.setLocation(e.latlng.lat, e.latlng.lng, Store.location?.name || 'Pinned');
+      _shopLat = e.latlng.lat;   // ← save to SHOP coords
+      _shopLng = e.latlng.lng;
       _pinned = true;
       if (_regMarker) _regMarker.setLatLng(e.latlng);
-      Utils.el('regMapCoords').textContent = `📍 ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
-      Utils.toast('📍 Location pinned! Drag the pin to adjust.');
+      const coords = `${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
+      const el = Utils.el('regMapCoords');
+      if (el) el.textContent = `✅ Pinned: ${coords}`;
+      const dbg = Utils.el('regLatLngDebug');
+      if (dbg) dbg.textContent = `lat: ${e.latlng.lat.toFixed(6)}, lng: ${e.latlng.lng.toFixed(6)}`;
+      Utils.toast('📍 Shop location pinned! Drag pin to fine-tune.');
     });
 
     if (Store.location?.lat) {
@@ -4033,16 +4064,22 @@ const AddShopModule = (() => {
 
     navigator.geolocation.getCurrentPosition(async pos => {
       const { latitude: lat, longitude: lng } = pos.coords;
-      if (ico) ico.textContent = '✅';
-      if (txt) txt.textContent = 'GPS location pinned!';
+      _shopLat = lat;   // ← GPS coords go to shop, not user location
+      _shopLng = lng;
       _pinned = true;
+      if (ico) ico.textContent = '✅';
+      if (txt) txt.textContent = `GPS pinned! ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
       const geo = await API.reverseGeocode(lat, lng);
+      // Also update user location so map centers correctly
       Store.setLocation(lat, lng, geo.name);
-      if (geo.city && !Utils.el('f-ct')?.value) Utils.el('f-ct').value = geo.city;
-      if (geo.pincode && !Utils.el('f-pc')?.value) Utils.el('f-pc').value = geo.pincode;
-      if (Utils.el('regMapCoords')) Utils.el('regMapCoords').textContent = `📍 ${geo.name}`;
+      if (geo.city && !Utils.el('f-ct')?.value) { const el=Utils.el('f-ct'); if(el) el.value = geo.city; }
+      if (geo.pincode && !Utils.el('f-pc')?.value) { const el=Utils.el('f-pc'); if(el) el.value = geo.pincode; }
+      const coordEl = Utils.el('regMapCoords');
+      if (coordEl) coordEl.textContent = `✅ GPS pinned: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      const dbg = Utils.el('regLatLngDebug');
+      if (dbg) dbg.textContent = `lat: ${lat.toFixed(6)}, lng: ${lng.toFixed(6)}`;
       initRegMap(lat, lng);
-      Utils.toast('📡 GPS location pinned!');
+      Utils.toast('✅ GPS location pinned to your shop!');
     }, () => {
       if (ico) ico.textContent = '📡';
       if (txt) txt.textContent = 'GPS failed — tap the map to pin';
@@ -4059,10 +4096,16 @@ const AddShopModule = (() => {
       const results = await API.geocode(`${addr} ${city} Tamil Nadu India`);
       if (results[0]) {
         const lat = parseFloat(results[0].lat), lng = parseFloat(results[0].lon);
-        Store.setLocation(lat, lng, Store.location?.name || city || 'Shop');
+        _shopLat = lat;   // ← address geocode goes to shop coords
+        _shopLng = lng;
         _pinned = true;
+        Store.setLocation(lat, lng, Store.location?.name || city || 'Shop');
         initRegMap(lat, lng);
-        Utils.el('regMapCoords').textContent = `📍 Found: ${results[0].display_name?.split(',').slice(0, 2).join(',')}`;
+        const foundName = (results[0].display_name||'').split(',').slice(0,2).join(',');
+        const coordEl = Utils.el('regMapCoords');
+        if (coordEl) coordEl.textContent = `✅ Found: ${foundName}`;
+        const dbg = Utils.el('regLatLngDebug');
+        if (dbg) dbg.textContent = `lat: ${lat.toFixed(6)}, lng: ${lng.toFixed(6)}`;
       }
     }, 1000);
   }
@@ -4160,7 +4203,13 @@ const AddShopModule = (() => {
     if (btn) { btn.textContent = '⏳ Going Live…'; btn.disabled = true; }
 
     const sec = SECTORS.find(s => s.n === _selSector) || { e: '🏪', n: 'Business', g: 'retail' };
-    const loc = Store.location;
+    // Use dedicated _shopLat/_shopLng — NOT Store.location (which is the USER's browsing location)
+    if (!_shopLat || !_shopLng) {
+      if (btn) { btn.textContent = '🎉 Register & Go Live →'; btn.disabled = false; }
+      Utils.toast('❌ Please pin your shop location on the map first!');
+      _step = 2; renderCurrentStep();
+      return;
+    }
     const shop = {
       id: Utils.uid('my'),
       name: Utils.sanitize(Utils.el('f-nm')?.value || ''),
@@ -4173,8 +4222,8 @@ const AddShopModule = (() => {
       address: Utils.el('f-ad')?.value || '',
       city: Utils.el('f-ct')?.value || '',
       pincode: Utils.el('f-pc')?.value || '',
-      lat: loc?.lat || null,
-      lng: loc?.lng || null,
+      lat: _shopLat,   // ← use dedicated shop coords
+      lng: _shopLng,
       phone: Utils.el('f-ph')?.value?.replace(/\D/g, '') || '',
       whatsapp: Utils.el('f-wa')?.value?.replace(/\D/g, '') || Utils.el('f-ph')?.value?.replace(/\D/g, '') || '',
       priceLevel: Utils.el('f-pr')?.value || '2',
@@ -4267,174 +4316,317 @@ const AddShopModule = (() => {
 
 /* ── profile.js ── */
 /**
- * profile.js — Profile page
+ * profile.js — Full Profile page
+ * Avatar · Stats · My Shops · Orders · Change PIN · Sync · Sign Out
  */
 const ProfileModule = (() => {
 
+  // ── Main render ───────────────────────────────────────────────────────────
   function render() {
     const c = Utils.el('profileContent');
     if (!c) return;
     Store.isLoggedIn() ? renderProfile(c) : renderSignIn(c);
   }
 
+  // ── Sign-in screen ────────────────────────────────────────────────────────
   function renderSignIn(c) {
     c.innerHTML = `
-      <div style="padding:16px">
-        <div class="signin-card">
-          <div class="signin-icon">🔐</div>
-          <div class="signin-title">Sign in to Deckscrab</div>
-          <div class="signin-sub">Manage your shops, track orders, and access your business dashboard from any device.</div>
-          <button class="google-btn" onclick="DS.profile.googleSignIn()">
-            <svg width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-            Continue with Google
-          </button>
-          <div style="font-size:.72rem;color:var(--ink-4);margin-bottom:14px;text-align:center">— or use phone number —</div>
-          <div class="phone-signin-row">
-            <input id="phoneSignInInp" class="field-input" type="tel" placeholder="10-digit WhatsApp number" style="flex:1"/>
-            <button class="btn-primary" onclick="DS.profile.phoneSignIn()">Go →</button>
-          </div>
+      <div style="padding:20px 16px 32px">
+        <div style="text-align:center;padding:32px 0 24px">
+          <div style="font-size:3.5rem;margin-bottom:12px">👤</div>
+          <div style="font-family:var(--font-display);font-size:1.3rem;font-weight:800;color:var(--ink);margin-bottom:6px">Sign in to Deckscrab</div>
+          <div style="font-size:.82rem;color:var(--ink-3);line-height:1.7;max-width:280px;margin:0 auto">Manage your shops, track orders and access your dashboard from any device.</div>
         </div>
+
+        <!-- Google -->
+        <button class="google-btn" onclick="DS.profile.googleSignIn()">
+          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+          Continue with Google
+        </button>
+
+        <div style="display:flex;align-items:center;gap:10px;margin:14px 0;font-size:.68rem;color:var(--ink-4);font-weight:700;letter-spacing:.06em;text-transform:uppercase">
+          <div style="flex:1;height:1px;background:var(--border)"></div>or use phone<div style="flex:1;height:1px;background:var(--border)"></div>
+        </div>
+
+        <!-- Phone sign-in -->
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input id="phoneSignInInp" class="field-input" type="tel" placeholder="10-digit WhatsApp number" style="flex:1"/>
+          <button class="btn-primary" onclick="DS.profile.phoneSignIn()" style="white-space:nowrap;padding:10px 16px">Go →</button>
+        </div>
+        <div style="font-size:.7rem;color:var(--ink-4);text-align:center">Your phone number identifies your shops across devices</div>
       </div>`;
   }
 
+  // ── Logged-in profile ─────────────────────────────────────────────────────
   function renderProfile(c) {
-    const user   = Store.user;
-    const shops  = Store.myShops();
+    const user    = Store.user;
+    const shops   = Store.myShops();
+    const orders  = Store.myOrders();
     const pending = Store.pendingOrderCount();
+    const reviews = shops.reduce((a, s) => a + (s.rc || 0), 0);
+    const views   = shops.reduce((a, s) => a + (s.views || 1), 0);
+
+    // Avatar initials
+    const name    = user?.name || (shops[0] ? shops[0].name : 'Shop Owner');
+    const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    const avatarColor = Utils.sectorColor(shops[0] || {});
 
     c.innerHTML = `
-      <div class="profile-hero">
-        <div class="profile-hero-bg">${shops[0]?.e || '👤'}</div>
-        <div class="profile-hero-overlay"></div>
-        <div class="profile-hero-content">
-          <div class="profile-name">
-            ${user?.photo ? `<img loading="lazy" src="${user.photo}" width="34" height="34" style="border-radius:50%;border:2px solid rgba(255,255,255,.3)" referrerpolicy="no-referrer"/>` : ''}
-            ${user?.name || (shops[0] ? shops[0].e + ' ' + shops[0].name : 'My Profile')}
+      <!-- ── HERO ── -->
+      <div style="background:linear-gradient(160deg,var(--ink),var(--ink-2));padding:28px 16px 22px;position:relative;overflow:hidden">
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:120px;opacity:.04">${shops[0]?.e || '👤'}</div>
+        <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(12,11,9,.95),rgba(12,11,9,.3))"></div>
+        <div style="position:relative;z-index:2;display:flex;align-items:flex-end;gap:14px">
+          <!-- Avatar -->
+          <div style="width:64px;height:64px;border-radius:50%;background:${avatarColor};border:3px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.5rem;font-weight:800;color:white;letter-spacing:-.02em;font-family:var(--font-display)">
+            ${user?.photo
+              ? `<img src="${user.photo}" width="64" height="64" style="border-radius:50%;object-fit:cover" referrerpolicy="no-referrer"/>`
+              : (shops[0]?.e || initials)}
           </div>
-          <div class="profile-sub">${user?.email || ''}${user?.phone ? '  ·  +91 ' + user.phone : ''}</div>
-          ${pending ? `<div style="margin-top:8px;display:inline-flex;align-items:center;gap:5px;background:rgba(239,68,68,.2);border-radius:var(--radius-full);padding:3px 11px;font-size:.72rem;font-weight:700;color:#fca5a5">📦 ${pending} order${pending !== 1 ? 's' : ''} pending</div>` : ''}
+          <div style="flex:1;min-width:0">
+            <div style="font-family:var(--font-display);font-size:1.2rem;font-weight:800;color:white;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
+            <div style="font-size:.72rem;color:rgba(255,255,255,.5);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              ${user?.phone ? `<span>📞 +91 ${user.phone}</span>` : ''}
+              ${user?.email ? `<span>✉️ ${user.email.split('@')[0]}…</span>` : ''}
+              ${shops.length ? `<span style="background:rgba(10,124,74,.3);color:#4ade80;border-radius:99px;padding:1px 8px;font-weight:700;font-size:.66rem">✓ ${shops.length} Shop${shops.length>1?'s':''}</span>` : ''}
+            </div>
+          </div>
         </div>
+        ${pending ? `<div style="position:relative;z-index:2;margin-top:12px;display:inline-flex;align-items:center;gap:6px;background:rgba(239,68,68,.25);border:1px solid rgba(239,68,68,.4);border-radius:99px;padding:5px 13px;font-size:.72rem;font-weight:700;color:#fca5a5">📦 ${pending} order${pending>1?'s':''} waiting for your response</div>` : ''}
       </div>
 
-      <div class="profile-body">
-        ${shops.length ? `
-          <div class="profile-stats">
-            <div class="profile-stat"><div class="profile-stat-n">👁 ${shops.reduce((a, s) => a + (s.views || 1), 0)}</div><div class="profile-stat-l">Views</div></div>
-            <div class="profile-stat"><div class="profile-stat-n">🏪 ${shops.length}</div><div class="profile-stat-l">Shops</div></div>
-            <div class="profile-stat"><div class="profile-stat-n">📦 ${Store.myOrders().length}</div><div class="profile-stat-l">Orders</div></div>
-          </div>` : ''}
+      <!-- ── QUICK STATS ── -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:14px 12px;border-bottom:1px solid var(--border)">
+        ${[
+          ['🏪', shops.length,  'Shops'],
+          ['📦', orders.length, 'Orders'],
+          ['⭐', reviews,       'Reviews'],
+          ['👁', views,         'Views'],
+        ].map(([icon, n, label]) => `
+          <div style="background:var(--surface-1);border:1px solid var(--border-2);border-radius:var(--radius-md);padding:12px 6px;text-align:center;box-shadow:var(--shadow-sm)">
+            <div style="font-size:1.1rem;margin-bottom:2px">${icon}</div>
+            <div style="font-family:var(--font-display);font-size:1.1rem;font-weight:800;color:var(--ink)">${n}</div>
+            <div style="font-size:.58rem;color:var(--ink-4);text-transform:uppercase;letter-spacing:.06em;margin-top:1px">${label}</div>
+          </div>`).join('')}
+      </div>
 
-        <!-- Upgrade card -->
-        <div style="background:var(--ink);border-radius:var(--radius-lg);padding:16px;display:flex;align-items:center;gap:12px;margin-bottom:14px">
-          <span style="font-size:1.8rem;flex-shrink:0">🚀</span>
+      <div style="padding:14px 12px 32px">
+
+        <!-- ── UPGRADE CARD ── -->
+        ${!shops.some(s=>s.websiteEnabled) ? `
+        <div style="background:var(--ink);border-radius:var(--radius-lg);padding:15px;display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <span style="font-size:1.7rem;flex-shrink:0">🚀</span>
           <div style="flex:1">
-            <div style="font-family:var(--font-display);font-size:.9rem;font-weight:700;color:white;margin-bottom:2px">Get Your Website + Bot</div>
-            <div style="font-size:.72rem;color:rgba(255,255,255,.5)">24/7 ordering. Auto WhatsApp alerts. ₹399/mo.</div>
+            <div style="font-family:var(--font-display);font-size:.88rem;font-weight:700;color:white;margin-bottom:2px">Build Your Website Free</div>
+            <div style="font-size:.7rem;color:rgba(255,255,255,.45)">Cart · WhatsApp orders · Owner dashboard</div>
           </div>
-          <button onclick="DS.nav.go('grow')" style="background:var(--flame);color:white;border:none;border-radius:var(--radius-md);padding:8px 14px;font-size:.77rem;font-weight:700;flex-shrink:0;cursor:pointer">Upgrade</button>
+          <button onclick="DS.nav.go('grow')" style="background:var(--flame);color:white;border:none;border-radius:var(--radius-md);padding:8px 13px;font-size:.75rem;font-weight:700;flex-shrink:0;cursor:pointer">Build →</button>
+        </div>` : ''}
+
+        <!-- ── MY SHOPS ── -->
+        <div style="font-family:var(--font-display);font-size:.95rem;font-weight:700;color:var(--ink);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+          <span>🏪 My Shops</span>
+          <button onclick="DS.nav.go('addshop')" style="background:var(--flame-soft);border:1px solid var(--flame-mid);color:var(--flame);border-radius:99px;padding:4px 12px;font-size:.7rem;font-weight:700;cursor:pointer">+ Add New</button>
         </div>
 
-        <!-- Menu -->
-        <div class="profile-menu">
-          <div class="profile-menu-item" onclick="DS.profile.showOrders()"><span class="pmi-left">📦 My Orders${pending ? ` <span style="background:var(--rose);color:white;border-radius:10px;padding:1px 7px;font-size:.6rem">${pending}</span>` : ''}</span><span class="pmi-arrow">›</span></div>
-          <div class="profile-menu-item" onclick="DS.profile.showShops()"><span class="pmi-left">🏪 My Listed Shops</span><span class="pmi-arrow">›</span></div>
-          <div class="profile-menu-item" onclick="DS.profile.syncShops()"><span class="pmi-left">☁️ Sync to Server</span><span class="pmi-arrow">›</span></div>
-          <div class="profile-menu-item" onclick="DS.nav.go('addshop')"><span class="pmi-left">➕ Add New Business</span><span class="pmi-arrow">›</span></div>
-          <div class="profile-menu-item" onclick="DS.location.openModal()"><span class="pmi-left">📍 Set My Location</span><span class="pmi-arrow">›</span></div>
-          <div class="profile-menu-item" onclick="DS.profile.signOut()"><span class="pmi-left" style="color:var(--rose)">🚪 Sign Out</span><span class="pmi-arrow">›</span></div>
+        ${shops.length ? shops.map(s => renderShopCard(s)).join('') : `
+          <div style="background:var(--surface-1);border:1.5px dashed var(--border-2);border-radius:var(--radius-lg);padding:24px;text-align:center;margin-bottom:14px">
+            <div style="font-size:2rem;margin-bottom:8px">🏪</div>
+            <div style="font-size:.85rem;font-weight:600;color:var(--ink);margin-bottom:4px">No shops yet</div>
+            <div style="font-size:.75rem;color:var(--ink-3);margin-bottom:14px">Register your first shop — free, takes 60 seconds</div>
+            <button class="btn-primary" onclick="DS.nav.go('addshop')" style="padding:10px 20px;font-size:.82rem">+ Register My Shop</button>
+          </div>`}
+
+        <!-- ── RECENT ORDERS ── -->
+        <div style="font-family:var(--font-display);font-size:.95rem;font-weight:700;color:var(--ink);margin:16px 0 10px;display:flex;align-items:center;justify-content:space-between">
+          <span>📦 Recent Orders</span>
+          ${pending ? `<span style="background:var(--rose);color:white;border-radius:99px;padding:2px 9px;font-size:.65rem;font-weight:700">${pending} pending</span>` : ''}
+        </div>
+        ${renderOrdersList(orders)}
+
+        <!-- ── ACTIONS MENU ── -->
+        <div style="font-family:var(--font-display);font-size:.95rem;font-weight:700;color:var(--ink);margin:16px 0 10px">⚙️ Account</div>
+        <div style="background:var(--surface-1);border:1px solid var(--border-2);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-sm)">
+          ${menuItem('🔐', 'Change Shop PIN', 'Secure your owner dashboard', 'DS.profile.openPinModal()')}
+          ${menuItem('☁️', 'Sync to Server', 'Push local shops to backend', 'DS.profile.syncShops()')}
+          ${menuItem('📍', 'Set My Location', 'Update your area', 'DS.location.openModal()')}
+          ${menuItem('🌐', 'Build Website', 'Free ordering website for your shop', "DS.nav.go('grow')")}
+          <div class="profile-menu-item" onclick="DS.profile.signOut()" style="border-bottom:none">
+            <span class="pmi-left" style="color:var(--rose)">🚪 Sign Out</span>
+            <span class="pmi-arrow" style="color:var(--rose)">›</span>
+          </div>
         </div>
 
-        <div id="profileShopsSection"></div>
+      </div>
+
+      <!-- ── CHANGE PIN MODAL ── -->
+      <div id="pinModalOv" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);align-items:flex-end;justify-content:center" onclick="if(event.target===this)DS.profile.closePinModal()">
+        <div style="background:var(--surface-1);border-radius:var(--radius-xl) var(--radius-xl) 0 0;width:100%;max-width:480px;padding:20px 18px 32px;animation:sheetUp .3s var(--ease-out)">
+          <div style="width:36px;height:4px;background:var(--border-2);border-radius:99px;margin:0 auto 16px"></div>
+          <div style="font-family:var(--font-display);font-size:1rem;font-weight:700;color:var(--ink);margin-bottom:4px">🔐 Change Shop PIN</div>
+          <div style="font-size:.76rem;color:var(--ink-3);margin-bottom:16px">The PIN protects your owner dashboard. Default is <strong>1234</strong> — change it now!</div>
+          <div class="field"><label>Current PIN <span style="color:var(--rose)">*</span></label><input id="pinCurInp" class="field-input" type="password" maxlength="4" inputmode="numeric" placeholder="Current 4-digit PIN"/></div>
+          <div class="field"><label>New PIN <span style="color:var(--rose)">*</span></label><input id="pinNewInp" class="field-input" type="password" maxlength="4" inputmode="numeric" placeholder="New 4-digit PIN"/></div>
+          <div class="field"><label>Confirm New PIN <span style="color:var(--rose)">*</span></label><input id="pinConInp" class="field-input" type="password" maxlength="4" inputmode="numeric" placeholder="Re-enter new PIN"/></div>
+          <div style="display:flex;gap:8px;margin-top:14px">
+            <button class="btn-secondary" onclick="DS.profile.closePinModal()" style="flex:1">Cancel</button>
+            <button class="btn-primary" onclick="DS.profile.savePin()" style="flex:2">🔐 Update PIN</button>
+          </div>
+          <div style="font-size:.72rem;color:var(--ink-4);text-align:center;margin-top:10px">PIN is stored locally on this device per shop</div>
+        </div>
       </div>`;
   }
 
-  function showShops() {
-    const sec = Utils.el('profileShopsSection');
-    if (!sec) return;
-    sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    const shops = Store.myShops();
+  // ── Shop card ─────────────────────────────────────────────────────────────
+  function renderShopCard(s) {
+    const slug   = API.slugify(s.name);
+    const webUrl = s.websiteUrl || `https://waseem-2007.github.io/deckscrab/?shop=${slug}`;
+    const open   = Utils.isOpen(s);
+    const color  = Utils.sectorColor(s);
 
-    if (!shops.length) {
-      sec.innerHTML = `<div style="text-align:center;padding:32px 20px">
-        <div style="font-size:2.5rem;margin-bottom:12px">🏪</div>
-        <div style="font-family:var(--font-display);font-size:1rem;font-weight:700;color:var(--ink);margin-bottom:6px">No Shops Yet</div>
-        <div style="font-size:.8rem;color:var(--ink-3);margin-bottom:18px">Register your first shop free — takes 60 seconds.</div>
-        <button class="btn-primary" onclick="DS.nav.go('addshop')">+ Register Shop</button>
+    return `
+      <div style="background:var(--surface-1);border:1px solid var(--border-2);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:10px;box-shadow:var(--shadow-sm)">
+        <!-- Banner -->
+        <div style="height:64px;background:linear-gradient(135deg,${color}30,${color}10);display:flex;align-items:center;padding:0 14px;gap:12px;position:relative">
+          <span style="font-size:2rem">${s.e || '🏪'}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-family:var(--font-display);font-size:.95rem;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.name}</div>
+            <div style="font-size:.65rem;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:.05em">${s.sectorName || s.sector || ''}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+            <span style="font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:99px;background:${open ? 'rgba(10,124,74,.15)' : 'rgba(192,57,43,.1)'};color:${open ? 'var(--forest)' : 'var(--rose)'}">${open ? '● Open' : '● Closed'}</span>
+            ${s._src === 'server' ? '<span style="font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:99px;background:rgba(10,124,74,.1);color:var(--forest)">☁️ Synced</span>' : '<span style="font-size:.58rem;padding:2px 7px;border-radius:99px;background:var(--surface-2);color:var(--ink-4)">📱 Local</span>'}
+          </div>
+        </div>
+
+        <div style="padding:12px 14px">
+          <!-- Info row -->
+          <div style="font-size:.72rem;color:var(--ink-3);margin-bottom:10px">
+            ${s.addr || s.city ? `📍 ${[s.addr, s.city].filter(Boolean).join(', ')}` : ''}
+            ${s.phone ? `&nbsp;·&nbsp; 📞 ${s.phone}` : ''}
+          </div>
+
+          <!-- Website section -->
+          <div style="background:${s.websiteEnabled ? 'rgba(10,124,74,.06)' : 'var(--surface-2)'};border:1.5px solid ${s.websiteEnabled ? 'rgba(10,124,74,.2)' : 'var(--border-2)'};border-radius:var(--radius-md);padding:10px 12px;margin-bottom:10px">
+            ${s.websiteEnabled ? `
+              <div style="font-size:.63rem;font-weight:700;color:var(--forest);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">🟢 Website Live</div>
+              <div style="font-size:.69rem;color:var(--blue);word-break:break-all;font-weight:600;margin-bottom:8px">${webUrl}</div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap">
+                <a href="${webUrl}" target="_blank" style="padding:5px 10px;background:var(--blue);color:white;border-radius:6px;font-size:.66rem;font-weight:700;text-decoration:none">🌐 Open</a>
+                <button onclick="navigator.clipboard?.writeText('${webUrl}').then(()=>Utils.toast('✅ Link copied!'))" style="padding:5px 10px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--ink-2);border-radius:6px;font-size:.66rem;font-weight:700;cursor:pointer">📋 Copy</button>
+                <button onclick="window.open('https://wa.me/?text='+encodeURIComponent('Order from ${s.name}:\\n${webUrl}'),'_blank')" style="padding:5px 10px;background:#25D366;color:white;border:none;border-radius:6px;font-size:.66rem;font-weight:700;cursor:pointer">💬 Share</button>
+                <button onclick="DS.grow.editSite('${s.id}')" style="padding:5px 10px;background:var(--flame-soft);border:1px solid var(--flame-mid);color:var(--flame);border-radius:6px;font-size:.66rem;font-weight:700;cursor:pointer">✏️ Edit</button>
+              </div>` : `
+              <div style="font-size:.7rem;color:var(--ink-3);margin-bottom:7px">📵 No website yet — build one free in 60 seconds</div>
+              <button onclick="DS.grow.openBuilder('${s.id}')" style="width:100%;padding:8px;background:var(--flame);color:white;border:none;border-radius:var(--radius-sm);font-size:.75rem;font-weight:700;cursor:pointer">🌐 Build Website Free →</button>`}
+          </div>
+
+          <!-- Action buttons -->
+          <div style="display:flex;gap:6px">
+            <button onclick="DS.detail.open('${s.id}')" style="flex:1;padding:8px 4px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:var(--radius-sm);font-size:.68rem;font-weight:700;color:var(--ink-2);cursor:pointer">👁 View</button>
+            <button onclick="DS.nav.go('grow')" style="flex:1;padding:8px 4px;background:var(--flame-soft);border:1px solid var(--flame-mid);border-radius:var(--radius-sm);font-size:.68rem;font-weight:700;color:var(--flame);cursor:pointer">🚀 Boost</button>
+            <button onclick="DS.profile.syncShops()" style="flex:1;padding:8px 4px;background:rgba(26,86,219,.08);border:1px solid rgba(26,86,219,.2);border-radius:var(--radius-sm);font-size:.68rem;font-weight:700;color:var(--blue);cursor:pointer">☁️ Sync</button>
+            <button onclick="DS.profile.deleteShop('${s.id}')" style="flex:1;padding:8px 4px;background:var(--rose-soft);border:1px solid rgba(192,57,43,.2);border-radius:var(--radius-sm);font-size:.68rem;font-weight:700;color:var(--rose);cursor:pointer">🗑 Delete</button>
+          </div>
+        </div>
       </div>`;
-      return;
+  }
+
+  // ── Orders list ───────────────────────────────────────────────────────────
+  function renderOrdersList(orders) {
+    if (!orders.length) return `
+      <div style="background:var(--surface-1);border:1px solid var(--border-2);border-radius:var(--radius-lg);padding:22px;text-align:center;margin-bottom:14px">
+        <div style="font-size:1.8rem;margin-bottom:8px">📦</div>
+        <div style="font-size:.84rem;font-weight:600;color:var(--ink);margin-bottom:4px">No orders yet</div>
+        <div style="font-size:.74rem;color:var(--ink-3)">Customer orders will appear here in real time</div>
+      </div>`;
+
+    const STATUS = {
+      pending:   { label:'🔴 Pending',   bg:'rgba(217,119,6,.12)',   color:'var(--amber)' },
+      new:       { label:'🆕 New',        bg:'rgba(26,86,219,.12)',   color:'var(--blue)'  },
+      confirmed: { label:'✅ Confirmed',  bg:'rgba(10,124,74,.12)',   color:'var(--forest)'},
+      preparing: { label:'🍳 Preparing', bg:'rgba(217,119,6,.12)',   color:'var(--amber)' },
+      done:      { label:'✅ Done',       bg:'rgba(10,124,74,.12)',   color:'var(--forest)'},
+      rejected:  { label:'❌ Rejected',  bg:'rgba(192,57,43,.12)',   color:'var(--rose)'  },
+    };
+
+    return orders.slice(0, 15).map(o => {
+      const st = STATUS[o.status] || STATUS.pending;
+      const ts = o.ts || o.createdAt || o.time || Date.now();
+      const timeStr = typeof ts === 'number'
+        ? new Date(ts).toLocaleDateString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
+        : ts;
+      return `
+        <div style="background:var(--surface-1);border:1px solid var(--border-2);border-radius:var(--radius-md);padding:13px 14px;margin-bottom:8px;box-shadow:var(--shadow-sm)">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+            <div>
+              <div style="font-family:var(--font-mono);font-size:.76rem;font-weight:700;color:var(--blue)">#${o.orderId || o.id?.slice(-5) || '——'}</div>
+              <div style="font-size:.67rem;color:var(--ink-4);margin-top:2px">⏰ ${timeStr}</div>
+            </div>
+            <span style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:99px;background:${st.bg};color:${st.color}">${st.label}</span>
+          </div>
+          ${o.custName || o.name ? `<div style="font-size:.76rem;color:var(--ink-2);margin-bottom:4px">👤 ${o.custName||o.name}${(o.custPhone||o.phone) ? '  ·  📞 +91 '+(o.custPhone||o.phone) : ''}</div>` : ''}
+          ${o.items?.length ? `<div style="font-size:.72rem;color:var(--ink-3);margin-bottom:6px">${Array.isArray(o.items)?o.items.join(', '):(o.items||'')}</div>` : ''}
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="font-family:var(--font-display);font-size:.95rem;font-weight:800;color:var(--flame)">₹${o.total || '—'}</div>
+            ${(o.status === 'pending' || o.status === 'new') ? `
+              <div style="display:flex;gap:5px">
+                <button onclick="DS.profile.updateOrder('${o.id||o.orderId}','confirmed')" style="padding:5px 11px;background:var(--forest);color:white;border:none;border-radius:6px;font-size:.65rem;font-weight:700;cursor:pointer">✅ Confirm</button>
+                <button onclick="DS.profile.updateOrder('${o.id||o.orderId}','rejected')" style="padding:5px 11px;background:none;border:1px solid var(--rose);color:var(--rose);border-radius:6px;font-size:.65rem;font-weight:700;cursor:pointer">❌ Reject</button>
+              </div>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Helper: menu item row ─────────────────────────────────────────────────
+  function menuItem(icon, label, sub, onclick) {
+    return `
+      <div class="profile-menu-item" onclick="${onclick}">
+        <div class="pmi-left" style="flex-direction:column;align-items:flex-start;gap:1px">
+          <span style="display:flex;align-items:center;gap:7px;font-size:.85rem;font-weight:600;color:var(--ink)">${icon} ${label}</span>
+          <span style="font-size:.68rem;color:var(--ink-3);padding-left:21px">${sub}</span>
+        </div>
+        <span class="pmi-arrow">›</span>
+      </div>`;
+  }
+
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  function googleSignIn() {
+    if (window._fbAuth) {
+      try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        window._fbAuth.signInWithPopup(provider)
+          .then(r => {
+            Store.setUser({ uid:r.user.uid, name:r.user.displayName, email:r.user.email, photo:r.user.photoURL });
+            render();
+            Utils.toast('✅ Signed in as ' + r.user.displayName);
+          })
+          .catch(() => Utils.toast('⚠️ Google failed — use phone number instead'));
+      } catch { Utils.toast('⚠️ Use phone number instead'); }
+    } else {
+      Utils.toast('⚠️ Use phone number below');
     }
-
-    sec.innerHTML = `<div style="font-family:var(--font-display);font-size:.98rem;font-weight:700;color:var(--ink);margin:16px 0 12px">🏪 My Listed Shops</div>` +
-      shops.map(s => {
-        const slug   = API.slugify(s.name);
-        const webUrl = s.websiteUrl || `https://waseem-2007.github.io/deckscrab/?shop=${slug}`;
-        return `
-          <div class="my-shop-card">
-            <div class="my-shop-banner" style="background:linear-gradient(135deg,${Utils.sectorColor(s)}40,${Utils.sectorColor(s)}10)">
-              <span style="font-size:2.2rem">${s.e || '🏪'}</span>
-              <div class="my-shop-live">🟢 LIVE</div>
-            </div>
-            <div class="my-shop-body">
-              <div class="my-shop-name">${s.name}</div>
-              <div class="my-shop-cat">${s.sectorName || s.sector || ''}</div>
-              <div style="font-size:.7rem;color:var(--ink-3);margin-bottom:8px">📍 ${[s.addr, s.city].filter(Boolean).join(', ')}</div>
-              <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:9px 11px;margin-bottom:10px">
-                <div style="font-size:.66rem;color:var(--ink-4);margin-bottom:4px">🌐 Your website link</div>
-                <div style="font-size:.69rem;color:var(--blue);word-break:break-all;margin-bottom:7px">${webUrl}</div>
-                <div style="display:flex;gap:5px">
-                  <a href="${webUrl}" target="_blank" style="background:var(--blue);color:white;border-radius:6px;padding:5px 10px;font-size:.68rem;font-weight:700;text-decoration:none">🌐 Open</a>
-                  <button onclick="navigator.clipboard?.writeText('${webUrl}').then(()=>Utils.toast('✅ Link copied!'))" style="background:var(--surface-2);border:1px solid var(--border-2);color:var(--ink-2);border-radius:6px;padding:5px 10px;font-size:.68rem;font-weight:700;cursor:pointer">📋 Copy</button>
-                  <button onclick="Utils.shareShop(${JSON.stringify({ name: s.name, addr: s.addr, city: s.city }).replace(/'/g, "\\'")})" style="background:linear-gradient(135deg,#25D366,#128C7E);color:white;border:none;border-radius:6px;padding:5px 10px;font-size:.68rem;font-weight:700;cursor:pointer">💬 Share</button>
-                </div>
-              </div>
-              <div class="my-shop-actions">
-                <button class="my-shop-btn my-shop-btn--view" onclick="DS.detail.open('${s.id}')">👁 View</button>
-                <button class="my-shop-btn my-shop-btn--boost" onclick="DS.nav.go('grow')">🚀 Boost</button>
-                <button class="my-shop-btn my-shop-btn--del" onclick="DS.profile.deleteShop('${s.id}')">🗑 Delete</button>
-              </div>
-            </div>
-          </div>`;
-      }).join('');
   }
 
-  function showOrders() {
-    const sec = Utils.el('profileShopsSection');
-    if (!sec) return;
-    sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    const orders = Store.myOrders();
-
-    if (!orders.length) {
-      sec.innerHTML = `<div style="text-align:center;padding:32px 20px">
-        <div style="font-size:2.5rem;margin-bottom:12px">📦</div>
-        <div style="font-family:var(--font-display);font-size:1rem;font-weight:700;color:var(--ink);margin-bottom:6px">No Orders Yet</div>
-        <div style="font-size:.8rem;color:var(--ink-3)">When customers order via WhatsApp, they appear here.</div>
-      </div>`;
-      return;
-    }
-
-    const STATUS = { confirmed: { l: '✅ Confirmed', c: 'var(--forest)' }, rejected: { l: '❌ Rejected', c: 'var(--rose)' }, pending: { l: '🔴 Pending', c: 'var(--amber)' } };
-
-    sec.innerHTML = `<div style="font-family:var(--font-display);font-size:.98rem;font-weight:700;color:var(--ink);margin:16px 0 12px">📦 Recent Orders</div>` +
-      orders.slice(0, 30).map(o => {
-        const st = STATUS[o.status] || STATUS.pending;
-        return `
-          <div style="background:var(--surface-1);border:1px solid var(--border-2);border-radius:var(--radius-md);padding:13px;margin-bottom:9px;box-shadow:var(--shadow-sm)">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-              <div>
-                <div style="font-family:var(--font-mono);font-size:.75rem;font-weight:700;color:var(--blue)">#${o.orderId || o.id?.slice(-6) || '——'}</div>
-                <div style="font-size:.67rem;color:var(--ink-3);margin-top:2px">⏰ ${new Date(o.ts || o.createdAt || Date.now()).toLocaleDateString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
-              </div>
-              <div style="text-align:right">
-                <div style="font-family:var(--font-display);font-size:1rem;font-weight:800;color:var(--flame)">₹${o.total || '—'}</div>
-                <div style="font-size:.65rem;font-weight:700;color:${st.c}">${st.l}</div>
-              </div>
-            </div>
-            ${o.custName ? `<div style="font-size:.76rem;color:var(--ink-2)">👤 ${o.custName}${o.custPhone ? '  ·  📞 +91 ' + o.custPhone : ''}</div>` : ''}
-            ${o.items?.length ? `<div style="font-size:.72rem;color:var(--ink-3);margin-top:4px">${o.items.map(i => i.name || i.n).join(', ')}</div>` : ''}
-          </div>`;
-      }).join('');
+  function phoneSignIn() {
+    const raw   = (Utils.el('phoneSignInInp')?.value || '').replace(/\D/g, '');
+    const phone = raw.slice(-10);
+    if (phone.length !== 10) { Utils.toast('⚠️ Enter a valid 10-digit number'); return; }
+    Store.setUser({ uid:'phone_'+phone, phone, name:'Shop Owner', email:'' });
+    render();
+    Utils.toast('✅ Signed in with +91 ' + phone);
   }
 
+  function signOut() {
+    if (!confirm('Sign out of Deckscrab?')) return;
+    Store.clearUser();
+    if (window._fbAuth) window._fbAuth.signOut().catch(() => {});
+    render();
+    Utils.toast('👋 Signed out');
+  }
+
+  // ── Shop actions ──────────────────────────────────────────────────────────
   async function syncShops() {
     const shops = Store.myShops();
     if (!shops.length) { Utils.toast('No shops to sync'); return; }
@@ -4443,157 +4635,731 @@ const ProfileModule = (() => {
     for (const s of shops) {
       try { const r = await API.createShop(s); if (r?.ok || r?.id) ok++; } catch {}
     }
-    Utils.toast(ok > 0 ? `✅ ${ok} shop${ok !== 1 ? 's' : ''} synced!` : '❌ Sync failed — check connection');
-    if (ok > 0) DS.home.loadAndRender();
+    Utils.toast(ok > 0 ? `✅ ${ok} shop${ok>1?'s':''} synced!` : '❌ Sync failed — check connection');
+    if (ok > 0) { DS.home.loadAndRender(); render(); }
   }
 
   async function deleteShop(id) {
-    if (!confirm('Delete this listing? Cannot be undone.')) return;
+    if (!confirm('Delete this listing? This cannot be undone.')) return;
     const shop = Store.myShops().find(s => s.id === id);
     Store.deleteLocalShop(id);
     if (shop?.bizId) try { await API.deleteShop(shop.bizId); } catch {}
-    Utils.toast('🗑️ Deleted');
+    Utils.toast('🗑️ Shop deleted');
     render();
   }
 
-  function googleSignIn() {
-    if (window._fbAuth) {
-      try {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        window._fbAuth.signInWithPopup(provider).then(r => {
-          Store.setUser({ uid: r.user.uid, name: r.user.displayName, email: r.user.email, photo: r.user.photoURL });
-          render();
-          Utils.toast('✅ Signed in as ' + r.user.displayName);
-        }).catch(() => Utils.toast('⚠️ Google sign-in failed — use phone number'));
-      } catch { Utils.toast('⚠️ Use phone number instead'); }
-    } else {
-      Utils.toast('⚠️ Firebase not loaded — use phone number');
-    }
-  }
-
-  function phoneSignIn() {
-    const phone = (Utils.el('phoneSignInInp')?.value || '').replace(/\D/g, '').slice(-10);
-    if (phone.length !== 10) { Utils.toast('⚠️ Enter a valid 10-digit number'); return; }
-    Store.setUser({ uid: 'phone_' + phone, phone, name: 'Shop Owner', email: '' });
+  // ── Order actions ─────────────────────────────────────────────────────────
+  function updateOrder(id, status) {
+    Store.updateOrder(id, { status });
+    Utils.toast(status === 'confirmed' ? '✅ Order confirmed' : '❌ Order rejected');
     render();
-    Utils.toast('✅ Signed in with +91 ' + phone);
   }
 
-  function signOut() {
-    if (!confirm('Sign out?')) return;
-    Store.clearUser();
-    if (window._fbAuth) window._fbAuth.signOut().catch(() => {});
-    render();
-    Utils.toast('👋 Signed out');
+  // ── Change PIN modal ──────────────────────────────────────────────────────
+  function openPinModal() {
+    const modal = Utils.el('pinModalOv');
+    if (modal) { modal.style.display = 'flex'; Utils.el('pinCurInp')?.focus(); }
   }
 
-  return { render, showShops, showOrders, syncShops, deleteShop, googleSignIn, phoneSignIn, signOut };
+  function closePinModal() {
+    const modal = Utils.el('pinModalOv');
+    if (modal) modal.style.display = 'none';
+    ['pinCurInp','pinNewInp','pinConInp'].forEach(id => { const el = Utils.el(id); if (el) el.value = ''; });
+  }
+
+  function savePin() {
+    const shops = Store.myShops();
+    if (!shops.length) { Utils.toast('⚠️ No shops found'); return; }
+    const cur = Utils.el('pinCurInp')?.value || '';
+    const np  = Utils.el('pinNewInp')?.value || '';
+    const cp  = Utils.el('pinConInp')?.value || '';
+
+    // Check current PIN against each shop's localStorage key
+    const slug  = API.slugify(shops[0].name);
+    const pfx   = `ds_p_${slug}_`;
+    const stored = localStorage.getItem(pfx + 'pin') || '1234';
+
+    if (cur !== stored) { Utils.toast('❌ Current PIN is wrong'); return; }
+    if (!/^\d{4}$/.test(np)) { Utils.toast('❌ PIN must be exactly 4 digits'); return; }
+    if (np !== cp) { Utils.toast('❌ PINs do not match'); return; }
+
+    // Update PIN for all shops
+    shops.forEach(s => {
+      const k = `ds_p_${API.slugify(s.name)}_pin`;
+      localStorage.setItem(k, np);
+    });
+    closePinModal();
+    Utils.toast('✅ PIN updated for all your shops!');
+  }
+
+  return {
+    render,
+    googleSignIn, phoneSignIn, signOut,
+    syncShops, deleteShop,
+    updateOrder,
+    openPinModal, closePinModal, savePin,
+    showShops: render,
+    showOrders: render,
+    generateQR: () => {},
+    downloadQR: () => {},
+    generateAllQRs: () => {},
+  };
 })();
 
 
 /* ── grow.js ── */
 /**
- * grow.js — Grow page (pricing plans + website builder intro)
+ * grow.js — Full Website Builder (original Deckscrab builder restored)
+ * Generates complete shop websites with owner dashboard, cart, orders
  */
 const GrowModule = (() => {
 
+  // ══ THEME GRADIENTS ══
+  const GRADS = {
+    dark:  { h:'linear-gradient(135deg,#1a1a2e,#374151)', a:'#f59e0b', bg:'#0a0f1a', text:'#f5f0e8', card:'#141929', border:'rgba(255,255,255,.08)' },
+    warm:  { h:'linear-gradient(135deg,#92400e,#c2410c)', a:'#f97316', bg:'#1a0a00', text:'#fef3e8', card:'#2a1200', border:'rgba(255,115,0,.15)' },
+    green: { h:'linear-gradient(135deg,#14532d,#15803d)', a:'#22c55e', bg:'#021a0e', text:'#f0fdf4', card:'#0a2010', border:'rgba(34,197,94,.15)' },
+  };
+
+  // ══ RESTAURANT CSS ══
+  const REST_CSS = `*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}:root{--fire:#ff4500;--gold:#ff8c00;--dark:#0f0800;--surface:#1a1200;--card:#221800;--border:rgba(255,140,0,.12);--text:#f5f0e8;--muted:#a89070;--green:#22c55e;--red:#ef4444;--blue:#3b82f6;--s2:#2a1f00}html{scroll-behavior:smooth;overflow-x:hidden}body{background:var(--dark);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:rgba(15,8,0,.97);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:200}.brand{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}.brand-icon{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--fire),var(--gold));display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}.brand-name{font-size:17px;font-weight:700}.brand-open{font-size:10px;color:var(--green);margin-top:1px;display:flex;align-items:center;gap:4px}.brand-open::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.5s infinite}@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}.search-bar-wrap{padding:12px 16px;border-bottom:1px solid var(--border);background:rgba(15,8,0,.95);position:sticky;top:66px;z-index:100}.s-wrap{position:relative}.s-inp{width:100%;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:12px;padding:11px 14px 11px 42px;color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border-color .2s}.s-inp:focus{border-color:rgba(255,69,0,.35)}.s-inp::placeholder{color:var(--muted)}.s-ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px}.offer-band{background:linear-gradient(90deg,var(--fire),var(--gold));padding:10px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}.ob-t{font-size:12px;font-weight:600;color:#fff}.ob-c{background:rgba(255,255,255,.25);padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;color:#fff}.section{padding:16px}.sec-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.sec-ttl{font-size:16px;font-weight:700}.cats-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}.cats-row::-webkit-scrollbar{display:none}.cat-chip{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:transform .2s}.cat-chip:active{transform:scale(.93)}.cat-chip.sel .cat-circ{border-color:var(--fire);background:rgba(255,69,0,.12)}.cat-circ{width:64px;height:64px;border-radius:50%;background:var(--card);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:28px;transition:all .2s}.cat-lbl{font-size:11px;color:var(--muted);font-weight:500;text-align:center}.menu-list{display:flex;flex-direction:column;gap:10px;padding-bottom:140px}.item-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;display:flex;gap:14px;transition:border-color .2s}.item-card:hover{border-color:rgba(255,69,0,.25)}.item-card.oos{opacity:.5;pointer-events:none}.item-img{width:92px;height:92px;border-radius:12px;background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:38px;flex-shrink:0}.item-info{flex:1;min-width:0}.veg-b{display:inline-flex;align-items:center;font-size:9px;padding:2px 7px;border-radius:3px;font-weight:600;margin-bottom:6px;letter-spacing:.3px;border:1px solid}.veg-b.v{color:var(--green);border-color:var(--green)}.veg-b.nv{color:var(--red);border-color:var(--red)}.pop-b{display:inline-flex;background:rgba(255,140,0,.15);color:var(--gold);font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;margin-left:6px}.item-name{font-size:15px;font-weight:600;margin-bottom:4px;line-height:1.3}.item-desc{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.item-foot{display:flex;align-items:center;justify-content:space-between}.item-price{font-size:17px;font-weight:700}.item-mrp{font-size:12px;color:var(--muted);text-decoration:line-through;margin-left:4px;font-weight:400}.add-btn{background:rgba(255,69,0,.1);border:2px solid var(--fire);color:var(--fire);padding:7px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s}.add-btn:hover{background:var(--fire);color:#fff}.qty-ctrl{display:flex;align-items:center;background:var(--fire);border-radius:8px;overflow:hidden}.qb{width:34px;height:36px;background:transparent;border:none;color:#fff;font-size:18px;cursor:pointer;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:inherit}.qn{width:32px;text-align:center;font-size:14px;font-weight:700;color:#fff}.cart-fab{position:fixed;bottom:72px;left:16px;right:16px;background:linear-gradient(135deg,var(--fire),var(--gold));border-radius:16px;padding:16px 20px;display:none;align-items:center;justify-content:space-between;cursor:pointer;z-index:150;box-shadow:0 8px 32px rgba(255,69,0,.4);border:none;font-family:inherit}.cart-fab.up{display:flex}.cf-left{display:flex;align-items:center;gap:12px}.cf-bdg{background:rgba(255,255,255,.25);width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff}.cf-txt{font-size:14px;font-weight:600;color:#fff}.cf-sub{font-size:11px;color:rgba(255,255,255,.75);margin-top:1px}.cf-price{font-size:16px;font-weight:800;color:#fff}.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(15,8,0,.97);backdrop-filter:blur(12px);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:8px 0 14px;z-index:100}.nav-btn{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:0 16px;border:none;background:none;font-family:inherit}.nav-btn.active .ni,.nav-btn.active .nl{color:var(--fire)}.ni{font-size:22px;color:var(--muted)}.nl{font-size:10px;color:var(--muted);font-weight:500}.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;opacity:0;pointer-events:none;transition:opacity .3s;backdrop-filter:blur(4px)}.overlay.open{opacity:1;pointer-events:all}.sheet{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-radius:24px 24px 0 0;z-index:301;transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);max-height:95vh;min-height:50vh;display:flex;flex-direction:column;box-sizing:border-box}.sheet.open{transform:translateY(0)}.sh-handle{width:40px;height:4px;background:rgba(255,255,255,.12);border-radius:2px;margin:12px auto 0}.sh-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}.sh-ttl{font-size:17px;font-weight:700}.sh-close{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.07);border:none;color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}.sh-body{overflow-y:auto;flex:1;padding:14px 20px;-webkit-overflow-scrolling:touch}.ci-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}.ci-row:last-child{border:none}.ci-em{font-size:22px}.ci-name{font-size:14px;font-weight:600;flex:1}.ci-price{font-size:14px;font-weight:700;color:var(--gold);margin-right:10px}.bill-box{margin-bottom:14px}.bill-r{display:flex;justify-content:space-between;font-size:14px;color:var(--muted);margin-bottom:8px}.bill-r.tot{color:var(--text);font-weight:700;font-size:16px;border-top:1px dashed var(--border);padding-top:10px}.big-btn{width:100%;background:linear-gradient(135deg,var(--fire),var(--gold));color:#fff;border:none;padding:16px;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;transition:transform .1s}.big-btn:active{transform:scale(.98)}.cf-form{display:none;padding:0 20px 8px}.cf-form.show{display:block}.cf-sec{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px}.cf-sec-t{font-size:14px;font-weight:700;margin-bottom:14px}.cf-inp{width:100%;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-size:14px;font-family:inherit;outline:none;margin-bottom:8px;transition:border-color .2s}.cf-inp:focus{border-color:rgba(255,69,0,.4)}.cf-inp::placeholder{color:var(--muted)}.pay-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pay-opt{border:2px solid var(--border);border-radius:10px;padding:12px 8px;text-align:center;cursor:pointer;transition:all .2s}.pay-opt.sel{border-color:var(--fire);background:rgba(255,69,0,.08)}.pay-ic{font-size:22px;margin-bottom:4px}.pay-lb{font-size:11px;font-weight:600;color:var(--muted)}.pay-opt.sel .pay-lb{color:var(--fire)}.suc-screen{position:fixed;inset:0;background:var(--dark);z-index:450;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px}.suc-screen.show{display:flex}.suc-em{font-size:80px;animation:pop .5s cubic-bezier(.34,1.56,.64,1)}@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}.suc-ttl{font-size:28px;font-weight:700;margin:18px 0 8px}.suc-sub{font-size:15px;color:var(--muted);line-height:1.7;margin-bottom:28px}.track-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;width:100%;margin-bottom:22px}.ttrack{display:flex;align-items:center;justify-content:space-between;margin-top:14px}.ts{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:10px;color:var(--muted);text-align:center}.ts.done{color:var(--green)}.ts.active{color:var(--fire)}.ts-ic{font-size:22px}.t-line{flex:1;height:2px;background:var(--border);margin:0 3px;margin-bottom:16px}.t-line.done{background:var(--green)}.t-line.act{background:linear-gradient(to right,var(--green),var(--border))}.back-btn{background:rgba(255,255,255,.07);border:1px solid var(--border);color:var(--text);padding:14px 40px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}.pin-screen{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:500;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(8px)}.pin-screen.show{display:flex}.pin-card{background:var(--surface);border-radius:28px 28px 0 0;width:100%;max-width:420px;overflow:hidden;box-shadow:0 -20px 60px rgba(0,0,0,.8)}.pin-header{background:linear-gradient(135deg,#1a0a00,#3d1500);padding:24px 20px 20px;text-align:center}.pin-header-icon{font-size:44px;margin-bottom:8px}.pin-header-title{font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px}.pin-header-sub{font-size:13px;color:var(--muted)}.pin-body{padding:20px}.pin-dots{display:flex;gap:12px;justify-content:center;margin-bottom:8px}.pd{width:54px;height:58px;border-radius:12px;background:rgba(255,255,255,.05);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:var(--text);transition:all .2s}.pd.fill{border-color:var(--fire);background:rgba(255,69,0,.12);color:var(--fire)}.pd.shake{animation:shk .4s}@keyframes shk{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}.pin-err{font-size:12px;color:var(--red);text-align:center;min-height:16px;margin-bottom:14px;font-weight:500}.numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.nb{background:rgba(255,255,255,.06);border-radius:14px;padding:17px 8px;font-size:20px;font-weight:600;color:var(--text);cursor:pointer;font-family:inherit;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px;user-select:none;border:none}.nb:active{background:rgba(255,69,0,.2);transform:scale(.93)}.nb-sub{font-size:8px;color:var(--muted);letter-spacing:1px;font-weight:500}.pin-cancel{text-align:center;padding:14px 8px;font-size:13px;color:var(--muted);cursor:pointer}.pin-lockout{font-size:11px;color:var(--red);text-align:center;margin-top:6px;min-height:16px}.pin-hint{font-size:11px;color:rgba(255,140,0,.6);text-align:center;margin-bottom:4px}.owner-dash{position:fixed;inset:0;background:var(--dark);z-index:400;display:none;flex-direction:column;overflow:hidden}.owner-dash.show{display:flex}.owner-topbar{background:linear-gradient(135deg,#1a1200,#2d1a00);padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}.ot-left{display:flex;align-items:center;gap:10px}.ot-av{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--fire),var(--gold));display:flex;align-items:center;justify-content:center;font-size:18px}.ot-name{font-size:14px;font-weight:700}.ot-role{font-size:10px;color:var(--green);margin-top:1px}.logout-btn{display:flex;align-items:center;gap:6px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--red);padding:8px 14px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}.owner-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0}.o-st{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:10px 6px;text-align:center}.o-st-n{font-size:20px;font-weight:800;color:var(--gold)}.o-st-l{font-size:9px;color:var(--muted);margin-top:2px;letter-spacing:.3px}.owner-tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}.o-tab{flex:1;padding:13px 4px;text-align:center;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}.o-tab.active{color:var(--fire);border-bottom-color:var(--fire)}.owner-body{flex:1;overflow-y:auto;padding:16px;padding-bottom:30px}.f-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px}.f-ttl{font-size:15px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}.f-lbl{font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;display:block}.f-row{margin-bottom:14px}.f-inp{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border-color .2s}.f-inp:focus{border-color:rgba(255,69,0,.5)}.f-inp::placeholder{color:rgba(255,255,255,.2)}.f-sel{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-size:14px;font-family:inherit;outline:none;-webkit-appearance:none}.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.veg-row{display:flex;gap:8px}.veg-opt{flex:1;padding:10px;border-radius:10px;border:2px solid var(--border);text-align:center;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s}.veg-opt.v.s{border-color:var(--green);background:rgba(34,197,94,.1);color:var(--green)}.veg-opt.n.s{border-color:var(--red);background:rgba(239,68,68,.1);color:var(--red)}.sub-btn{width:100%;background:linear-gradient(135deg,var(--fire),var(--gold));color:#fff;border:none;padding:14px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px}.mmi{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;gap:12px;align-items:center;margin-bottom:10px}.mmi-em{width:50px;height:50px;border-radius:10px;background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}.mmi-info{flex:1;min-width:0}.mmi-name{font-size:14px;font-weight:600;margin-bottom:2px}.mmi-sub{font-size:11px;color:var(--muted);margin-bottom:3px}.mmi-price{font-size:15px;font-weight:700;color:var(--gold)}.mmi-acts{display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0}.sw-row{display:flex;align-items:center;gap:5px}.sw-lbl{font-size:10px;color:var(--muted);font-weight:600}.sw{width:38px;height:22px;border-radius:11px;background:rgba(239,68,68,.5);position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}.sw.on{background:var(--green)}.sw::after{content:'';position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;top:3px;left:3px;transition:transform .2s}.sw.on::after{transform:translateX(16px)}.del-btn{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--red);padding:5px 10px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}.ord-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px}.ord-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}.ord-id{font-size:13px;font-weight:700;color:var(--gold)}.ord-time{font-size:11px;color:var(--muted);margin-top:2px}.ord-st{font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px}.st-new{background:rgba(59,130,246,.15);color:#60a5fa}.st-prep{background:rgba(255,140,0,.15);color:var(--gold)}.st-done{background:rgba(34,197,94,.15);color:var(--green)}.ord-items{font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:8px}.ord-total{font-size:14px;font-weight:700;margin-bottom:5px}.ord-addr{font-size:12px;color:var(--muted);margin-bottom:12px}.ord-acts{display:flex;gap:8px}.oa{flex:1;padding:10px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}.oa-acc{background:var(--green);color:#fff;border:none}.oa-rej{background:transparent;border:1px solid var(--red);color:var(--red)}.oa-rdy{background:transparent;border:1px solid var(--gold);color:var(--gold)}.set-info{background:rgba(255,140,0,.07);border:1px solid rgba(255,140,0,.18);border-radius:10px;padding:14px;font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:16px}.set-info strong{color:var(--gold)}.danger-btn{width:100%;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:var(--red);padding:14px;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}.toast{position:fixed;top:72px;left:50%;transform:translateX(-50%) translateY(-20px);background:#1e1208;border:1px solid var(--border);color:var(--text);padding:12px 20px;border-radius:12px;font-size:13px;font-weight:500;z-index:999;opacity:0;transition:all .3s;white-space:nowrap;pointer-events:none;box-shadow:0 8px 30px rgba(0,0,0,.6)}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}.empty-st{text-align:center;padding:60px 24px;color:var(--muted)}.empty-ic{font-size:56px;margin-bottom:14px;opacity:.45}.empty-t{font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px}.empty-s{font-size:13px;line-height:1.6}@media(min-width:600px){body{max-width:420px;margin:0 auto;box-shadow:0 0 80px rgba(0,0,0,.9)}}`;
+
+  // ══ RESTAURANT HTML ══
+  const REST_HTML = `<div id="customerApp"><div class="topbar"><div class="brand" id="brandBtn" onclick="onBrandTap()"><div class="brand-icon" id="brandEmoji">🍛</div><div><div class="brand-name" id="brandName">My Shop</div><div class="brand-open" id="brandHours">Open Now</div></div></div><span style="font-size:20px;cursor:pointer" onclick="toast('📞 Call: '+_DS_SHOP_PHONE)">📞</span></div><div class="search-bar-wrap"><div class="s-wrap"><span class="s-ico">🔍</span><input class="s-inp" id="searchBar" type="text" placeholder="Search menu..." oninput="filterMenu()"></div></div><div class="offer-band" onclick="toast('🎉 Use FIRSTBITE for 20% off your first order!')"><span class="ob-t">🎉 New user offer — 20% off first order!</span><span class="ob-c">FIRSTBITE</span></div><div class="section" style="padding-bottom:0"><div class="sec-hd"><div class="sec-ttl">What are you craving?</div></div><div class="cats-row" id="catsRow"><div class="cat-chip sel" onclick="filterCat('all',this)"><div class="cat-circ">🍽️</div><div class="cat-lbl">All</div></div></div></div><div class="section"><div class="sec-hd"><div class="sec-ttl" id="menuTitle">🔥 Today's Menu</div></div><div class="menu-list" id="menuList"></div><div class="empty-st" id="emptyMenu" style="display:none"><div class="empty-ic">🍽️</div><div class="empty-t">No items found</div><div class="empty-s">Try a different category</div></div></div><button class="cart-fab" id="cartFab" onclick="openCart()"><div class="cf-left"><div class="cf-bdg" id="cfBdg">0</div><div><div class="cf-txt" id="cfTxt">View Cart</div><div class="cf-sub" id="cartSubName">Loading...</div></div></div><div class="cf-price">₹<span id="cfPrice">0</span></div></button><div class="bottom-nav"><button class="nav-btn active" onclick="toast('🏠 Home')"><span class="ni">🏠</span><span class="nl">Home</span></button><button class="nav-btn" onclick="toast('🔍 Search')"><span class="ni">🔍</span><span class="nl">Search</span></button><button class="nav-btn" onclick="openCart()"><span class="ni">🛒</span><span class="nl">Cart</span></button><button class="nav-btn" onclick="toast('📦 Orders')"><span class="ni">📦</span><span class="nl">Orders</span></button><button class="nav-btn" onclick="toast('👤 Profile')"><span class="ni">👤</span><span class="nl">Profile</span></button></div></div><div class="overlay" id="cartOverlay" onclick="closeCart()"></div><div class="sheet" id="cartSheet"><div class="sh-handle"></div><div class="sh-head"><div class="sh-ttl">🛒 Your Cart</div><button class="sh-close" onclick="closeCart()">✕</button></div><div class="sh-body" id="cartBody"></div><div class="cf-form" id="cfForm"><div class="cf-sec"><div class="cf-sec-t">📍 Delivery Details</div><input class="cf-inp" id="cf-name" placeholder="Your full name"><input class="cf-inp" id="cf-phone" placeholder="Phone number" type="tel"><textarea class="cf-inp" id="cf-addr" placeholder="Full delivery address" rows="2" style="resize:none;margin-bottom:0"></textarea></div><div class="cf-sec"><div class="cf-sec-t">💳 Payment</div><div class="pay-grid"><div class="pay-opt sel" onclick="setPay(this,'upi')"><div class="pay-ic">📱</div><div class="pay-lb">UPI / GPay</div></div><div class="pay-opt" onclick="setPay(this,'cash')"><div class="pay-ic">💵</div><div class="pay-lb">Cash on Delivery</div></div><div class="pay-opt" onclick="setPay(this,'card')"><div class="pay-ic">💳</div><div class="pay-lb">Debit/Credit</div></div><div class="pay-opt" onclick="setPay(this,'wallet')"><div class="pay-ic">👛</div><div class="pay-lb">Wallet</div></div></div></div></div><div style="padding:14px 20px;border-top:1px solid var(--border)" id="cartFooter"></div></div><div class="suc-screen" id="sucScreen"><div class="suc-em">🎉</div><div class="suc-ttl">Order Placed!</div><div class="suc-sub" id="sucMsg">Your order is being prepared.<br>Delivery in <strong>30–45 minutes</strong></div><div class="track-card"><div style="font-size:13px;font-weight:600;color:var(--muted)">Order #<span id="oidShow">000</span></div><div class="ttrack"><div class="ts done"><div class="ts-ic">✅</div><span>Placed</span></div><div class="t-line done"></div><div class="ts active"><div class="ts-ic">👨‍🍳</div><span>Preparing</span></div><div class="t-line act"></div><div class="ts"><div class="ts-ic">🛵</div><span>On way</span></div><div class="t-line"></div><div class="ts"><div class="ts-ic">🏠</div><span>Delivered</span></div></div></div><button class="back-btn" onclick="closeSuc()">Continue Ordering</button></div><div class="pin-screen" id="pinScreen"><div class="pin-card"><div class="pin-header"><div class="pin-header-icon">🔐</div><div class="pin-header-title">Owner Access</div><div class="pin-header-sub">Enter your secret 4-digit PIN</div></div><div class="pin-body"><div class="pin-hint" id="pinHint"></div><div class="pin-dots"><div class="pd" id="pd0">—</div><div class="pd" id="pd1">—</div><div class="pd" id="pd2">—</div><div class="pd" id="pd3">—</div></div><div class="pin-err" id="pinErr"></div><div class="numpad"><button class="nb" onclick="pNum('1')">1<span class="nb-sub"></span></button><button class="nb" onclick="pNum('2')">2<span class="nb-sub">ABC</span></button><button class="nb" onclick="pNum('3')">3<span class="nb-sub">DEF</span></button><button class="nb" onclick="pNum('4')">4<span class="nb-sub">GHI</span></button><button class="nb" onclick="pNum('5')">5<span class="nb-sub">JKL</span></button><button class="nb" onclick="pNum('6')">6<span class="nb-sub">MNO</span></button><button class="nb" onclick="pNum('7')">7<span class="nb-sub">PQRS</span></button><button class="nb" onclick="pNum('8')">8<span class="nb-sub">TUV</span></button><button class="nb" onclick="pNum('9')">9<span class="nb-sub">WXYZ</span></button><button class="nb" onclick="pNum('')" style="font-size:11px;color:var(--muted)">●●●</button><button class="nb" onclick="pNum('0')">0</button><button class="nb" onclick="pDel()" style="font-size:22px">⌫</button></div><div class="pin-lockout" id="pinLock"></div></div><div class="pin-cancel" onclick="cancelPin()">← Back to customer view</div></div></div><div class="owner-dash" id="ownerDash"><div class="owner-topbar"><div class="ot-left"><div class="ot-av">👨‍🍳</div><div><div class="ot-name" id="ownerDashName">My Shop</div><div class="ot-role">🔒 Owner — Secured Access</div></div></div><button class="logout-btn" onclick="doLogout()">🔒 Logout</button></div><div class="owner-stats"><div class="o-st"><div class="o-st-n" id="stItems">0</div><div class="o-st-l">ITEMS</div></div><div class="o-st"><div class="o-st-n" id="stOrders">0</div><div class="o-st-l">ORDERS</div></div><div class="o-st"><div class="o-st-n" id="stRevenue">₹0</div><div class="o-st-l">REVENUE</div></div><div class="o-st"><div class="o-st-n" id="stNew" style="color:#3b82f6">0</div><div class="o-st-l">NEW</div></div></div><div class="owner-tabs"><div class="o-tab active" onclick="oTab('add',this)">➕ Add Item</div><div class="o-tab" onclick="oTab('menu',this)">📋 Menu</div><div class="o-tab" onclick="oTab('orders',this)">🔔 Orders</div><div class="o-tab" onclick="oTab('settings',this)">⚙️ Settings</div></div><div class="owner-body" id="tab-add"><div class="f-card"><div class="f-ttl">🍽️ Add New Item</div><div class="f-row"><label class="f-lbl">Item Name *</label><input class="f-inp" id="i-name" placeholder="e.g. Mutton Biryani"></div><div class="f-row"><label class="f-lbl">Description</label><textarea class="f-inp" id="i-desc" placeholder="Describe the item..." rows="2" style="resize:none"></textarea></div><div class="g2"><div class="f-row"><label class="f-lbl">Price (₹) *</label><input class="f-inp" id="i-price" placeholder="280" type="number"></div><div class="f-row"><label class="f-lbl">MRP (₹)</label><input class="f-inp" id="i-mrp" placeholder="350" type="number"></div></div><div class="g2"><div class="f-row"><label class="f-lbl">Category</label><select class="f-sel" id="i-cat"><option value="Meals">Meals</option><option value="Rice">Rice</option><option value="Bread">Bread</option><option value="Drinks">Drinks</option><option value="Snacks">Snacks</option><option value="Desserts">Desserts</option><option value="Specials">Specials</option></select></div><div class="f-row"><label class="f-lbl">Emoji</label><input class="f-inp" id="i-emoji" placeholder="🍛"></div></div><div class="f-row"><label class="f-lbl">Type</label><div class="veg-row"><div class="veg-opt n s" id="nvOpt" onclick="setVeg(false)">🔴 Non-Veg</div><div class="veg-opt v" id="vegOpt" onclick="setVeg(true)">🟢 Vegetarian</div></div></div><div class="f-row"><label class="f-lbl">Mark Popular?</label><div class="veg-row"><div class="veg-opt v s" id="popY" onclick="setPop(true)">⭐ Yes</div><div class="veg-opt n" id="popN" onclick="setPop(false)">No</div></div></div><button class="sub-btn" onclick="addItem()">➕ Add to Menu</button></div></div><div class="owner-body" id="tab-menu" style="display:none"><div id="menuManage"></div><div class="empty-st" id="menuManageEmpty" style="display:none"><div class="empty-ic">🍽️</div><div class="empty-t">No items yet</div><div class="empty-s">Add from the Add Item tab</div></div></div><div class="owner-body" id="tab-orders" style="display:none;padding-bottom:30px"><div id="ordersList"></div><div class="empty-st" id="ordersEmpty"><div class="empty-ic">📦</div><div class="empty-t">No orders yet</div><div class="empty-s">Customer orders appear here in real-time</div></div></div><div class="owner-body" id="tab-settings" style="display:none"><div class="f-card"><div class="f-ttl">🔐 Change PIN</div><div class="set-info">Default PIN is <strong>1234</strong> — change it now to secure your shop!</div><div class="f-row"><label class="f-lbl">Current PIN</label><input class="f-inp" id="curPin" placeholder="Current PIN" type="password" maxlength="4" inputmode="numeric"></div><div class="f-row"><label class="f-lbl">New PIN</label><input class="f-inp" id="newPin" placeholder="New 4-digit PIN" type="password" maxlength="4" inputmode="numeric"></div><div class="f-row"><label class="f-lbl">Confirm PIN</label><input class="f-inp" id="confPin" placeholder="Re-enter new PIN" type="password" maxlength="4" inputmode="numeric"></div><button class="sub-btn" onclick="changePin()">🔐 Update PIN</button></div><div class="f-card"><div class="f-ttl">🔑 How to Open Owner Panel</div><div class="set-info">From the customer screen, <strong style="color:var(--fire)">tap the shop logo (top-left) 5 times quickly.</strong><br><br>No button is shown to customers — completely invisible.</div></div><div class="f-card"><div class="f-ttl">🗑️ Data</div><button class="danger-btn" onclick="clearOrders()">🗑️ Clear All Order History</button></div></div></div><div class="toast" id="toastEl"></div>`;
+
+  // ══ SHOP WEBSITE JS (injected into generated site) ══
+  const SITE_JS = `
+var PREFIX=_DS_PREFIX||'ds_';
+var cart={},payMode='upi',isOwner=false,pinAttempts=0,pinLockUntil=0,brandTaps=0,brandTapT=0,isVeg=false,isPop=true,curCatFilter='all';
+function getMenu(){try{return JSON.parse(localStorage.getItem(PREFIX+'menu'))||_DS_MENU||[];}catch(e){return _DS_MENU||[];}}
+function saveMenu(m){try{localStorage.setItem(PREFIX+'menu',JSON.stringify(m));}catch(e){}}
+function getOrders(){try{return JSON.parse(localStorage.getItem(PREFIX+'orders'))||[];}catch(e){return[];}}
+function saveOrders(o){try{localStorage.setItem(PREFIX+'orders',JSON.stringify(o.slice(0,200)));}catch(e){}}
+function getPin(){return localStorage.getItem(PREFIX+'pin')||'1234';}
+function savePin(p){localStorage.setItem(PREFIX+'pin',p);}
+function toast(m){var t=document.getElementById('toastEl');if(!t)return;t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(function(){t.classList.remove('show');},2500);}
+function renderMenu(){
+  var menu=getMenu(),list=document.getElementById('menuList'),empty=document.getElementById('emptyMenu');
+  var q=(document.getElementById('searchBar')||{value:''}).value.toLowerCase();
+  var filtered=menu.filter(function(i){
+    var matchCat=curCatFilter==='all'||i.cat===curCatFilter;
+    var matchQ=!q||i.n.toLowerCase().includes(q)||(i.desc||'').toLowerCase().includes(q);
+    return matchCat&&matchQ&&i.inStock!==false;
+  });
+  if(!list)return;
+  list.innerHTML='';
+  if(!filtered.length){if(empty)empty.style.display='';return;}
+  if(empty)empty.style.display='none';
+  filtered.forEach(function(item){
+    var inCart=cart[item.id]||0;
+    var div=document.createElement('div');
+    div.className='item-card'+(item.inStock===false?' oos':'');
+    div.innerHTML='<div class="item-img">'+item.emoji+'</div><div class="item-info">'
+      +'<div><span class="veg-b '+(item.veg?'v':'nv')+'">'+(item.veg?'VEG':'NON-VEG')+'</span>'+(item.pop?'<span class="pop-b">⭐ Popular</span>':'')+'</div>'
+      +'<div class="item-name">'+item.n+'</div>'
+      +(item.desc?'<div class="item-desc">'+item.desc+'</div>':'')
+      +'<div class="item-foot"><div><span class="item-price">₹'+item.p+'</span>'+(item.mrp&&item.mrp>item.p?'<span class="item-mrp">₹'+item.mrp+'</span>':'')+'</div>'
+      +(inCart>0
+        ?'<div class="qty-ctrl"><button class="qb" onclick="chg(\''+item.id+'\',-1)">−</button><span class="qn">'+inCart+'</span><button class="qb" onclick="chg(\''+item.id+'\',1)">+</button></div>'
+        :'<button class="add-btn" onclick="chg(\''+item.id+'\',1)">ADD</button>')
+      +'</div></div>';
+    list.appendChild(div);
+  });
+  updateCartFab();
+}
+function buildCats(){
+  var menu=getMenu(),cats=['all'];
+  menu.forEach(function(i){if(i.cat&&cats.indexOf(i.cat)<0)cats.push(i.cat);});
+  var row=document.getElementById('catsRow');if(!row)return;
+  var catEmojis={Biryani:'🍚',Sides:'🥘',Starters:'🍗',Drinks:'🥤',Desserts:'🍮',Meals:'🍛',Rice:'🍚',Bread:'🫓',Snacks:'🍟',Specials:'⭐',Grains:'🌾',Oils:'🫙',Vegetables:'🥦',Dairy:'🥛',All:'🍽️'};
+  row.innerHTML=cats.map(function(c){return'<div class="cat-chip'+(c==='all'?' sel':'')+'" onclick="filterCat(\''+c+'\',this)"><div class="cat-circ">'+(catEmojis[c]||'🏪')+'</div><div class="cat-lbl">'+(c==='all'?'All':c)+'</div></div>';}).join('');
+}
+function filterCat(cat,el){curCatFilter=cat;document.querySelectorAll('.cat-chip').forEach(function(b){b.classList.remove('sel');});if(el)el.classList.add('sel');renderMenu();}
+function filterMenu(){renderMenu();}
+function chg(id,d){
+  var menu=getMenu(),item=menu.find(function(i){return i.id===id;});if(!item)return;
+  cart[id]=(cart[id]||0)+d;if(cart[id]<0)cart[id]=0;
+  if(cart[id]===0)delete cart[id];
+  renderMenu();updateCartFab();
+}
+function updateCartFab(){
+  var fab=document.getElementById('cartFab');if(!fab)return;
+  var keys=Object.keys(cart),total=0,count=0;
+  var menu=getMenu();
+  keys.forEach(function(id){var item=menu.find(function(i){return i.id===id;});if(item){total+=item.p*(cart[id]||0);count+=cart[id]||0;}});
+  if(count>0){fab.classList.add('up');document.getElementById('cfBdg').textContent=count;document.getElementById('cfPrice').textContent=total;document.getElementById('cartSubName').textContent=_DS_SHOP_NAME;}
+  else{fab.classList.remove('up');}
+}
+function openCart(){
+  var ov=document.getElementById('cartOverlay'),sh=document.getElementById('cartSheet');
+  if(ov)ov.classList.add('open');if(sh)sh.classList.add('open');
+  renderCartBody();
+}
+function closeCart(){
+  var ov=document.getElementById('cartOverlay'),sh=document.getElementById('cartSheet');
+  if(ov)ov.classList.remove('open');if(sh)sh.classList.remove('open');
+  var cf=document.getElementById('cfForm');if(cf)cf.classList.remove('show');
+}
+function renderCartBody(){
+  var body=document.getElementById('cartBody'),footer=document.getElementById('cartFooter');
+  if(!body)return;
+  var menu=getMenu(),items=[],total=0;
+  Object.keys(cart).forEach(function(id){var item=menu.find(function(i){return i.id===id;});if(item&&cart[id]>0){items.push({item:item,qty:cart[id]});total+=item.p*cart[id];}});
+  if(!items.length){body.innerHTML='<div class="empty-st"><div class="empty-ic">🛒</div><div class="empty-t">Cart is empty</div><div class="empty-s">Add items from the menu</div></div>';if(footer)footer.innerHTML='';return;}
+  body.innerHTML=items.map(function(r){return'<div class="ci-row"><span class="ci-em">'+r.item.emoji+'</span><span class="ci-name">'+r.item.n+'</span><span class="ci-price">₹'+r.item.p+'×'+r.qty+'</span><div class="qty-ctrl"><button class="qb" onclick="chg(\''+r.item.id+'\',-1);renderCartBody()">−</button><span class="qn">'+r.qty+'</span><button class="qb" onclick="chg(\''+r.item.id+'\',1);renderCartBody()">+</button></div></div>';}).join('')
+    +'<div class="bill-box" style="margin-top:14px"><div class="bill-r"><span>Subtotal</span><span>₹'+total+'</span></div><div class="bill-r"><span>Delivery</span><span style="color:var(--green)">FREE</span></div><div class="bill-r tot"><span>Total</span><span>₹'+total+'</span></div></div>';
+  if(footer)footer.innerHTML='<button class="big-btn" onclick="startCheckout()">Proceed to Checkout →</button>';
+}
+function startCheckout(){
+  var cf=document.getElementById('cfForm');if(cf)cf.classList.add('show');
+  var footer=document.getElementById('cartFooter');
+  if(footer)footer.innerHTML='<button class="big-btn" onclick="placeOrder()">🛵 Place Order</button>';
+}
+function setPay(el,mode){payMode=mode;document.querySelectorAll('.pay-opt').forEach(function(b){b.classList.remove('sel');});if(el)el.classList.add('sel');}
+function placeOrder(){
+  var name=(document.getElementById('cf-name')||{value:''}).value.trim();
+  var phone=(document.getElementById('cf-phone')||{value:''}).value.replace(/\\D/g,'');
+  var addr=(document.getElementById('cf-addr')||{value:''}).value.trim();
+  if(!name){toast('Enter your name');return;}
+  if(phone.length<10){toast('Enter a valid phone number');return;}
+  if(!addr){toast('Enter delivery address');return;}
+  var menu=getMenu(),items=[],total=0;
+  Object.keys(cart).forEach(function(id){var item=menu.find(function(i){return i.id===id;});if(item&&cart[id]>0){items.push(item.emoji+' '+item.n+' x'+cart[id]+' = ₹'+(item.p*cart[id]));total+=item.p*cart[id];}});
+  var oid=Math.floor(Math.random()*90000+10000).toString();
+  var order={id:oid,name:name,phone:phone,addr:addr,items:items,total:total,pay:payMode,status:'new',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})};
+  var orders=getOrders();orders.unshift(order);saveOrders(orders);
+  var waMsg='🛵 *New Order #'+oid+'*\\n\\n👤 '+name+'\\n📞 +91 '+phone+'\\n📍 '+addr+'\\n\\n🛒 *Items:*\\n'+items.join('\\n')+'\\n\\n💰 *Total: ₹'+total+'*\\n💳 Payment: '+payMode.toUpperCase();
+  window.open('https://wa.me/91'+_DS_SHOP_PHONE+'?text='+encodeURIComponent(waMsg),'_blank');
+  cart={};closeCart();
+  document.getElementById('oidShow').textContent=oid;
+  document.getElementById('sucScreen').classList.add('show');
+  toast('Order #'+oid+' placed!');
+}
+function closeSuc(){document.getElementById('sucScreen').classList.remove('show');renderMenu();}
+// ══ OWNER PIN ══
+var pinBuffer='';
+function onBrandTap(){var n=Date.now();if(n-brandTapT>800)brandTaps=0;brandTaps++;brandTapT=n;if(brandTaps>=5){brandTaps=0;openPin();}}
+function openPin(){
+  if(Date.now()<pinLockUntil){toast('Too many attempts. Wait '+Math.ceil((pinLockUntil-Date.now())/1000)+'s');return;}
+  pinBuffer='';updateDots();
+  var el=document.getElementById('pinHint');if(el)el.textContent=localStorage.getItem(PREFIX+'firstLogin')?'':'Default PIN: 1234';
+  document.getElementById('pinScreen').classList.add('show');
+}
+function cancelPin(){document.getElementById('pinScreen').classList.remove('show');pinBuffer='';}
+function pNum(n){if(pinBuffer.length>=4)return;if(!n)return;pinBuffer+=n;updateDots();if(pinBuffer.length===4)setTimeout(checkPin,200);}
+function pDel(){pinBuffer=pinBuffer.slice(0,-1);updateDots();}
+function updateDots(){for(var i=0;i<4;i++){var d=document.getElementById('pd'+i);if(d){d.textContent=i<pinBuffer.length?'●':'—';d.classList.toggle('fill',i<pinBuffer.length);}}}
+function checkPin(){
+  if(pinBuffer===getPin()){
+    document.getElementById('pinScreen').classList.remove('show');
+    localStorage.setItem(PREFIX+'firstLogin','1');
+    openOwner();pinAttempts=0;
+  } else {
+    pinAttempts++;
+    var err=document.getElementById('pinErr');if(err)err.textContent='Wrong PIN ('+(3-Math.min(pinAttempts,3))+' left)';
+    document.querySelectorAll('.pd').forEach(function(d){d.classList.add('shake');setTimeout(function(){d.classList.remove('shake');},400);});
+    if(pinAttempts>=3){pinLockUntil=Date.now()+30000;document.getElementById('pinScreen').classList.remove('show');toast('Locked for 30s — too many wrong attempts');pinAttempts=0;}
+    pinBuffer='';updateDots();
+  }
+}
+// ══ OWNER DASHBOARD ══
+function openOwner(){
+  isOwner=true;
+  document.getElementById('ownerDash').classList.add('show');
+  var n=document.getElementById('ownerDashName');if(n)n.textContent=_DS_SHOP_NAME;
+  updateStats();renderOwnerMenu();renderOwnerOrders();
+}
+function doLogout(){isOwner=false;document.getElementById('ownerDash').classList.remove('show');}
+function oTab(t,el){
+  ['add','menu','orders','settings'].forEach(function(id){var b=document.getElementById('tab-'+id);if(b)b.style.display='none';});
+  var active=document.getElementById('tab-'+t);if(active)active.style.display='block';
+  document.querySelectorAll('.o-tab').forEach(function(b){b.classList.remove('active');});if(el)el.classList.add('active');
+  if(t==='menu')renderOwnerMenu();if(t==='orders')renderOwnerOrders();
+}
+function updateStats(){
+  var menu=getMenu(),orders=getOrders(),newOrds=orders.filter(function(o){return o.status==='new';});
+  var rev=orders.filter(function(o){return o.status==='done';}).reduce(function(a,o){return a+o.total;},0);
+  var si=document.getElementById('stItems'),so=document.getElementById('stOrders'),sr=document.getElementById('stRevenue'),sn=document.getElementById('stNew');
+  if(si)si.textContent=menu.length;if(so)so.textContent=orders.length;if(sr)sr.textContent='₹'+rev;if(sn)sn.textContent=newOrds.length;
+}
+function setVeg(v){isVeg=v;document.getElementById('vegOpt').classList.toggle('s',v);document.getElementById('nvOpt').classList.toggle('s',!v);}
+function setPop(v){isPop=v;document.getElementById('popY').classList.toggle('s',v);document.getElementById('popN').classList.toggle('s',!v);}
+function addItem(){
+  var n=(document.getElementById('i-name')||{value:''}).value.trim();
+  var p=parseFloat((document.getElementById('i-price')||{value:'0'}).value)||0;
+  if(!n||p<=0){toast('Enter item name and price');return;}
+  var menu=getMenu();
+  menu.push({id:'i'+Date.now(),n:n,desc:(document.getElementById('i-desc')||{value:''}).value.trim(),p:p,mrp:parseFloat((document.getElementById('i-mrp')||{value:'0'}).value)||0,cat:(document.getElementById('i-cat')||{value:'Menu'}).value,emoji:(document.getElementById('i-emoji')||{value:'🍽️'}).value||'🍽️',veg:isVeg,pop:isPop,inStock:true});
+  saveMenu(menu);
+  ['i-name','i-desc','i-price','i-mrp','i-emoji'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+  toast('✅ Item added!');buildCats();renderMenu();updateStats();
+}
+function renderOwnerMenu(){
+  var menu=getMenu(),wrap=document.getElementById('menuManage'),emp=document.getElementById('menuManageEmpty');
+  if(!wrap)return;
+  if(!menu.length){if(emp)emp.style.display='';wrap.innerHTML='';return;}
+  if(emp)emp.style.display='none';
+  wrap.innerHTML=menu.map(function(item){
+    return'<div class="mmi"><div class="mmi-em">'+item.emoji+'</div><div class="mmi-info"><div class="mmi-name">'+item.n+'</div><div class="mmi-sub">'+item.cat+'</div><div class="mmi-price">₹'+item.p+'</div></div><div class="mmi-acts"><div class="sw-row"><span class="sw-lbl">'+(item.inStock!==false?'In Stock':'Out')+'</span><div class="sw '+(item.inStock!==false?'on':'')+'" onclick="toggleStock(\''+item.id+'\')"></div></div><button class="del-btn" onclick="delItem(\''+item.id+'\')">Delete</button></div></div>';
+  }).join('');
+}
+function toggleStock(id){var m=getMenu(),i=m.find(function(x){return x.id===id;});if(i){i.inStock=!i.inStock;saveMenu(m);renderOwnerMenu();renderMenu();toast(i.inStock?'✅ In stock':'❌ Marked out of stock');}}
+function delItem(id){if(!confirm('Delete this item?'))return;var m=getMenu().filter(function(i){return i.id!==id;});saveMenu(m);renderOwnerMenu();renderMenu();updateStats();toast('🗑️ Deleted');}
+function renderOwnerOrders(){
+  var orders=getOrders(),list=document.getElementById('ordersList'),emp=document.getElementById('ordersEmpty');
+  if(!list)return;
+  if(!orders.length){if(emp)emp.style.display='';list.innerHTML='';return;}
+  if(emp)emp.style.display='none';
+  var stMap={new:'st-new',preparing:'st-prep',done:'st-done'};
+  var stLabel={new:'🆕 New',preparing:'🍳 Preparing',done:'✅ Done'};
+  list.innerHTML=orders.slice(0,30).map(function(o){
+    return'<div class="ord-card"><div class="ord-head"><div><div class="ord-id">#'+o.id+'</div><div class="ord-time">⏰ '+o.time+'</div></div><span class="ord-st '+(stMap[o.status]||'st-new')+'">'+(stLabel[o.status]||'🆕 New')+'</span></div><div class="ord-items">'+o.items.join('<br>')+'</div><div class="ord-total">💰 Total: ₹'+o.total+'</div><div class="ord-addr">📍 '+o.addr+'<br>👤 '+o.name+' · 📞 +91 '+o.phone+'</div><div class="ord-acts"><button class="oa oa-acc" onclick="updStatus(\''+o.id+'\',\'done\')">✅ Done</button><button class="oa oa-rdy" onclick="updStatus(\''+o.id+'\',\'preparing\')">🍳 Prep</button><button class="oa oa-rej" onclick="updStatus(\''+o.id+'\',\'rejected\')">❌ Reject</button></div></div>';
+  }).join('');
+}
+function updStatus(id,status){var orders=getOrders(),o=orders.find(function(x){return x.id===id;});if(o){o.status=status;saveOrders(orders);renderOwnerOrders();updateStats();toast('Order '+id+' → '+status);}}
+function changePin(){
+  var cur=document.getElementById('curPin').value,np=document.getElementById('newPin').value,cp=document.getElementById('confPin').value;
+  if(cur!==getPin()){toast('Current PIN is wrong');return;}
+  if(np.length!==4||!/^\\d{4}$/.test(np)){toast('PIN must be 4 digits');return;}
+  if(np!==cp){toast('PINs do not match');return;}
+  savePin(np);toast('✅ PIN updated successfully!');
+  ['curPin','newPin','confPin'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+}
+function clearOrders(){if(!confirm('Clear all order history?'))return;localStorage.removeItem(PREFIX+'orders');renderOwnerOrders();updateStats();toast('🗑️ Orders cleared');}
+// ══ INIT ══
+document.addEventListener('DOMContentLoaded',function(){
+  var n=document.getElementById('brandName');if(n)n.textContent=_DS_SHOP_NAME;
+  var e=document.getElementById('brandEmoji');if(e)e.textContent=_DS_SHOP_EMJ;
+  var h=document.getElementById('brandHours');if(h)h.textContent='Open '+_DS_OPEN+' – '+_DS_CLOSE;
+  var t=document.getElementById('cfTxt');if(t)t.textContent='View Cart';
+  if(!getMenu().length||!localStorage.getItem(PREFIX+'menu'))saveMenu(_DS_MENU);
+  buildCats();renderMenu();
+});`;
+
+  // ══ BUILDER STATE ══
+  let _step = 0, _prodCount = 0, _curTmpl = 'restaurant', _curTheme = 'dark';
+
+  // ══ MAIN RENDER ══
   function render() {
     const c = Utils.el('growContent');
     if (!c) return;
+    const myShops = Store.myShops();
+
     c.innerHTML = `
-      <div class="grow-hero">
-        <div class="grow-hero-pill">🚀 Business Growth</div>
-        <h2 class="grow-hero-title">Your Shop Gets a<br/><span>Real Website</span></h2>
-        <p class="grow-hero-sub">Customers browse your menu, order, and pay online. You get a WhatsApp notification instantly. Set up in minutes.</p>
+      <div style="background:linear-gradient(135deg,#1a1200,#2d1a00);padding:22px 16px 20px;position:relative;overflow:hidden">
+        <div style="position:absolute;right:-10px;top:-10px;font-size:100px;opacity:.06">🌐</div>
+        <div style="font-size:.65rem;font-weight:700;letter-spacing:.1em;color:rgba(255,140,0,.6);text-transform:uppercase;margin-bottom:10px;font-family:var(--font-mono)">Free Website Builder</div>
+        <div style="font-family:var(--font-display);font-size:1.5rem;font-weight:800;color:#f5f0e8;letter-spacing:-.03em;line-height:1.1;margin-bottom:8px">Build Your Shop<br/><span style="color:#ff8c00">Website in 4 Steps</span></div>
+        <div style="font-size:.8rem;color:rgba(245,240,232,.5);line-height:1.7;margin-bottom:16px">Real ordering website with cart, owner dashboard, WhatsApp orders. Free during launch.</div>
+        <button onclick="DS.grow.openBuilder()" style="background:linear-gradient(135deg,#ff4500,#ff8c00);color:white;border:none;border-radius:var(--radius-md);padding:12px 22px;font-size:.88rem;font-weight:800;cursor:pointer">🌐 Start Building →</button>
       </div>
 
-      <div class="plans-wrap">
-        ${plan({
-          icon: '🌐',
-          name: 'Website + Bot',
-          price: 399,
-          popular: true,
-          desc: 'Your own ordering website — customers browse, order, pay and you get auto-notified on WhatsApp.',
-          features: [
-            'Your own ordering website',
-            'yourshop.deckscrab.in link',
-            'Full product menu with prices',
-            'UPI · Card · Cash payments',
-            'Auto WhatsApp order alerts',
-            'GST bill generation',
-            'OTP customer verification',
-          ],
-          ctaText: '🚀 Get Website — Free Trial',
-          waMsg: 'Hi! I want the Website + Bot plan (₹399/mo) for my shop on Deckscrab.',
-        })}
-        ${plan({
-          icon: '📣',
-          name: 'Ads & Boost',
-          price: 999,
-          popular: false,
-          desc: 'Push your listing to the top of search results and home page. Shown first to nearby customers.',
-          features: [
-            'Priority on home page',
-            'Top of search results',
-            'Featured map pin',
-            'Push notifications to users',
-            'Weekly analytics report',
-            'Location targeting',
-            'Verified badge ✓',
-          ],
-          ctaText: '📣 Start Boosting',
-          waMsg: 'Hi! I want the Ads & Boost plan (₹999/mo) for my shop on Deckscrab.',
-        })}
+      <div style="padding:14px 12px 8px">
 
-        <!-- WhatsApp CTA -->
-        <div style="background:linear-gradient(135deg,rgba(37,211,102,.1),rgba(7,94,84,.12));border:1.5px solid rgba(37,211,102,.25);border-radius:var(--radius-xl);padding:22px;text-align:center;margin-bottom:20px">
-          <div style="font-size:1.8rem;margin-bottom:10px">💬</div>
-          <div style="font-family:var(--font-display);font-size:1.1rem;font-weight:800;color:var(--ink);margin-bottom:6px">Have Questions?</div>
-          <div style="font-size:.82rem;color:var(--ink-3);line-height:1.7;margin-bottom:16px;max-width:280px;margin-left:auto;margin-right:auto">Chat directly with us on WhatsApp. We'll help set up your website personally — no tech skills needed.</div>
-          <button
-            onclick="window.open('https://wa.me/919384707706?text='+encodeURIComponent('Hi Deckscrab! I want to grow my business. Can you help?'),'_blank')"
-            style="background:#25D366;color:white;border:none;border-radius:var(--radius-full);padding:13px 26px;font-size:.9rem;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:8px"
-          >💬 Chat — 9384707706</button>
-        </div>
+        ${myShops.length ? myShops.slice(0,3).map(s => {
+          const slug = API.slugify(s.name);
+          const url = s.websiteUrl || `https://waseem-2007.github.io/deckscrab/?shop=${slug}`;
+          return s.websiteEnabled ? `
+            <div style="background:var(--surface-1);border:1.5px solid rgba(10,124,74,.25);border-radius:var(--radius-lg);padding:14px;margin-bottom:10px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                <span style="font-size:1.6rem">${s.e||'🏪'}</span>
+                <div style="flex:1"><div style="font-size:.88rem;font-weight:700;color:var(--ink)">${s.name}</div><div style="font-size:.67rem;color:var(--forest);font-weight:700">🟢 Website Live</div></div>
+              </div>
+              <div style="font-size:.69rem;color:var(--blue);word-break:break-all;margin-bottom:8px">${url}</div>
+              <div style="display:flex;gap:6px">
+                <a href="${url}" target="_blank" style="flex:1;padding:8px;background:var(--blue);color:white;border-radius:8px;font-size:.72rem;font-weight:700;text-decoration:none;text-align:center">🌐 Open</a>
+                <button onclick="navigator.clipboard?.writeText('${url}').then(()=>Utils.toast('✅ Copied!'))" style="flex:1;padding:8px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--ink-2);border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer">📋 Copy</button>
+                <button onclick="window.open('https://wa.me/?text='+encodeURIComponent('Order from ${s.name}:\\n${url}'),'_blank')" style="flex:1;padding:8px;background:#25D366;color:white;border:none;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer">💬 Share</button>
+                <button onclick="DS.grow.editSite('${s.id}')" style="flex:1;padding:8px;background:var(--flame-soft);border:1px solid var(--flame-mid);color:var(--flame);border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer">✏️ Edit</button>
+              </div>
+            </div>` : '';
+        }).join('') : ''}
 
-        <!-- FAQ -->
-        <div style="font-family:var(--font-display);font-size:.97rem;font-weight:700;color:var(--ink);margin-bottom:12px">Common Questions</div>
-        ${[
-          ['How fast will my website go live?', 'Within 2 hours of payment. We set it up for you, no tech skills needed.'],
-          ['Is the free listing really free?', 'Yes! Basic listing (what you already have) is 100% free forever. Website & Ads are paid extras.'],
-          ['Can I cancel anytime?', 'Yes, cancel anytime via WhatsApp. No contracts, no lock-in.'],
-          ['What payment methods do you accept?', 'UPI (GPay, PhonePe, PayTM), Net Banking, and Cash via agent.'],
-        ].map(([q, a]) => `
-          <details style="background:var(--surface-1);border:1px solid var(--border-2);border-radius:var(--radius-md);margin-bottom:8px;overflow:hidden">
-            <summary style="padding:13px 14px;font-size:.84rem;font-weight:600;color:var(--ink);cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center">
-              ${q} <span style="color:var(--ink-3);font-size:.9rem">+</span>
-            </summary>
-            <div style="padding:0 14px 13px;font-size:.8rem;color:var(--ink-3);line-height:1.7">${a}</div>
-          </details>`).join('')}
-      </div>`;
-  }
+        <!-- Plan cards -->
+        <div style="font-family:var(--font-display);font-size:.95rem;font-weight:700;color:var(--ink);margin:8px 0 12px">💼 Upgrade Plans</div>
+        ${planCard({icon:'🌐',name:'Website + Bot',price:399,popular:true,features:['Full ordering website','Cart & checkout','Owner dashboard & PIN','WhatsApp order alerts','Add/manage menu items','Order tracking','Free during launch!']})}
+        ${planCard({icon:'📣',name:'Ads & Boost',price:999,popular:false,features:['Top of search results','Featured map pin','Push notifications','Weekly analytics','Verified badge ✓','Geo-targeted ads']})}
 
-  function plan({ icon, name, price, popular, desc, features, ctaText, waMsg }) {
-    return `
-      <div class="plan-card ${popular ? 'plan-card--featured' : ''}">
-        ${popular ? `<div class="plan-featured-badge">⭐ Most Popular</div>` : ''}
-        <div style="${popular ? 'padding-top:8px' : ''}">
-          <div class="plan-icon">${icon}</div>
-          <div class="plan-name">${name}</div>
-          <div class="plan-desc">${desc}</div>
-          <div class="plan-price">₹${price}<sub>/month</sub></div>
-          <ul class="plan-features">
-            ${features.map(f => `<li>${f}</li>`).join('')}
-          </ul>
-          <button
-            class="plan-btn ${popular ? 'plan-btn--flame' : 'plan-btn--ghost'}"
-            onclick="window.open('https://wa.me/919384707706?text='+encodeURIComponent('${waMsg}'),'_blank')"
-          >${ctaText}</button>
+        <div style="background:rgba(37,211,102,.08);border:1.5px solid rgba(37,211,102,.2);border-radius:var(--radius-lg);padding:16px;text-align:center;margin-bottom:16px">
+          <div style="font-size:1.4rem;margin-bottom:6px">💬</div>
+          <div style="font-family:var(--font-display);font-size:.93rem;font-weight:700;color:var(--ink);margin-bottom:4px">Need help?</div>
+          <div style="font-size:.76rem;color:var(--ink-3);margin-bottom:12px">Chat with us — we'll set up your website personally</div>
+          <button onclick="window.open('https://wa.me/919384707706?text='+encodeURIComponent('Hi! I want to build a website for my shop on Deckscrab.'),'_blank')" style="background:#25D366;color:white;border:none;border-radius:var(--radius-full);padding:11px 22px;font-size:.86rem;font-weight:800;cursor:pointer">💬 Chat — 9384707706</button>
         </div>
       </div>`;
   }
 
-  return { render };
+  function planCard({icon,name,price,popular,features}) {
+    const btnAction = popular
+      ? 'DS.grow.openBuilder()'
+      : `window.open('https://wa.me/919384707706?text='+encodeURIComponent('Hi! I want the ${name} plan.'),'_blank')`;
+    const btnLabel = popular ? '🚀 Get Started — Build Free' : '📣 Start Boosting';
+    const btnClass = popular ? 'plan-btn--flame' : 'plan-btn--ghost';
+    return `<div class="plan-card ${popular?'plan-card--featured':''}" style="${popular?'margin-top:8px':''}">
+      ${popular?'<div class="plan-featured-badge">⭐ Most Popular</div>':''}
+      <div style="${popular?'padding-top:6px':''}">
+        <div class="plan-icon">${icon}</div>
+        <div class="plan-name">${name}</div>
+        <div class="plan-price">₹${price}<sub>/month</sub></div>
+        <ul class="plan-features">${features.map(f=>`<li>${f}</li>`).join('')}</ul>
+        <button class="plan-btn ${btnClass}" onclick="${btnAction}">${btnLabel}</button>
+      </div>
+    </div>`;
+  }
+
+  // ══ BUILDER ══
+  function openBuilder(shopId) {
+    _step = 0; _prodCount = 0;
+    const myShops = Store.myShops();
+    const preShop = shopId ? myShops.find(s=>s.id===shopId) : myShops[0];
+    renderBuilderPage(preShop);
+  }
+
+  function editSite(shopId) { openBuilder(shopId); }
+
+  function renderBuilderPage(preShop) {
+    const c = Utils.el('growContent');
+    if (!c) return;
+    const myShops = Store.myShops();
+    const s = preShop || {};
+
+    c.innerHTML = `
+      <div style="background:#0f0800;padding:16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,140,0,.12)">
+        <button onclick="DS.grow.render()" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 12px;font-size:.78rem;color:#f5f0e8;cursor:pointer">← Back</button>
+        <div style="font-family:var(--font-display);font-size:.97rem;font-weight:700;color:#f5f0e8">Website Builder</div>
+      </div>
+
+      <!-- Step bar -->
+      <div style="display:flex;gap:4px;padding:14px 16px 10px">
+        ${[0,1,2,3].map(i=>`<div style="flex:1;height:3px;border-radius:3px;background:${i<=_step?'#ff4500':'rgba(255,255,255,.1)'}"></div>`).join('')}
+      </div>
+
+      <!-- STEP 0: Details -->
+      <div id="bs0" style="${_step===0?'':'display:none'}">
+        <div style="padding:0 14px 14px">
+          <div style="background:#1a1200;border:1px solid rgba(255,140,0,.15);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:12px">
+            <div style="padding:11px 14px;border-bottom:1px solid rgba(255,140,0,.1);font-size:.84rem;font-weight:700;color:#f5f0e8">📋 Step 1 — Shop Details</div>
+            <div style="padding:14px">
+              <label style="font-size:.7rem;font-weight:600;color:#888;display:block;margin-bottom:4px">Business Name *</label>
+              <input id="wb-name" class="field-input" placeholder="e.g. Murugan Mess" value="${s.name||''}"/>
+              <label style="font-size:.7rem;font-weight:600;color:#888;display:block;margin-bottom:4px;margin-top:10px">Tagline *</label>
+              <input id="wb-tag" class="field-input" placeholder="Authentic South Indian meals since 2005" value="${s.desc||''}"/>
+              <label style="font-size:.7rem;font-weight:600;color:#888;display:block;margin-bottom:4px;margin-top:10px">Category</label>
+              <select id="wb-cat" class="field-input">
+                <option value="🍛">🍛 Restaurant / Mess</option>
+                <option value="🛒">🛒 Grocery / Kirana</option>
+                <option value="💊">💊 Medical / Pharmacy</option>
+                <option value="🥐">🥐 Bakery / Sweets</option>
+                <option value="☕">☕ Cafe / Tea Shop</option>
+                <option value="💇">💇 Salon / Parlour</option>
+                <option value="🔧">🔧 Mechanic / Garage</option>
+                <option value="🏪">🏪 Other Business</option>
+              </select>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+                <div><label style="font-size:.7rem;font-weight:600;color:#888;display:block;margin-bottom:4px">WhatsApp *</label><input id="wb-phone" class="field-input" type="tel" placeholder="9876543210" value="${(s.wa||s.phone||'').replace(/\D/g,'').slice(-10)}"/></div>
+                <div><label style="font-size:.7rem;font-weight:600;color:#888;display:block;margin-bottom:4px">City *</label><input id="wb-city" class="field-input" placeholder="Arakkonam" value="${s.city||''}"/></div>
+              </div>
+              <label style="font-size:.7rem;font-weight:600;color:#888;display:block;margin-bottom:4px;margin-top:10px">Address</label>
+              <input id="wb-addr" class="field-input" placeholder="Shop No., Street, Area" value="${s.addr||''}"/>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+                <div><label style="font-size:.7rem;font-weight:600;color:#888;display:block;margin-bottom:4px">Opens at</label><input id="wb-open" class="field-input" value="9:00 AM"/></div>
+                <div><label style="font-size:.7rem;font-weight:600;color:#888;display:block;margin-bottom:4px">Closes at</label><input id="wb-close" class="field-input" value="9:00 PM"/></div>
+              </div>
+            </div>
+          </div>
+          <button class="btn-next" onclick="DS.grow.builderNext(0)">Next: Add Menu →</button>
+        </div>
+      </div>
+
+      <!-- STEP 1: Menu -->
+      <div id="bs1" style="${_step===1?'':'display:none'}">
+        <div style="padding:0 14px 14px">
+          <div style="background:#1a1200;border:1px solid rgba(255,140,0,.15);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:12px">
+            <div style="padding:11px 14px;border-bottom:1px solid rgba(255,140,0,.1);font-size:.84rem;font-weight:700;color:#f5f0e8">🍽️ Step 2 — Menu / Products</div>
+            <div style="padding:14px">
+              <div style="display:grid;grid-template-columns:32px 1fr 72px 74px 26px;gap:5px;margin-bottom:6px">
+                ${['Emoji','Name','Price','Category',''].map(h=>`<div style="font-size:.6rem;font-weight:700;color:#888">${h}</div>`).join('')}
+              </div>
+              <div id="wb-prodlist"></div>
+              <button onclick="DS.grow.addProd()" style="width:100%;padding:9px;background:none;border:1.5px dashed rgba(255,255,255,.1);border-radius:8px;font-size:.75rem;color:#888;cursor:pointer;margin-top:4px">+ Add Item</button>
+              <div style="background:rgba(255,69,0,.06);border:1px solid rgba(255,69,0,.15);border-radius:8px;padding:8px 11px;margin-top:10px;font-size:.72rem;color:rgba(255,140,0,.8)">💡 Add real prices. Example: Meals ₹80 · Coffee ₹20 · Chapati ₹40</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px"><button class="btn-back" onclick="DS.grow.builderPrev()">← Back</button><button class="btn-next" onclick="DS.grow.builderNext(1)">Next: Design →</button></div>
+        </div>
+      </div>
+
+      <!-- STEP 2: Design + Preview -->
+      <div id="bs2" style="${_step===2?'':'display:none'}">
+        <div style="padding:0 14px 14px">
+          <div style="background:#1a1200;border:1px solid rgba(255,140,0,.15);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:12px">
+            <div style="padding:11px 14px;border-bottom:1px solid rgba(255,140,0,.1);font-size:.84rem;font-weight:700;color:#f5f0e8">🎨 Step 3 — Design</div>
+            <div style="padding:14px">
+              <div style="font-size:.75rem;font-weight:600;color:#888;margin-bottom:8px">Template Style</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+                <div id="tmpl-restaurant" onclick="DS.grow.pickTmpl('restaurant')" style="border-radius:10px;overflow:hidden;cursor:pointer;border:2.5px solid ${_curTmpl==='restaurant'?'#ff4500':'transparent'};transition:.2s">
+                  <div style="height:72px;background:linear-gradient(135deg,#0f0800,#3d1500);display:flex;align-items:center;justify-content:center;gap:8px;padding:0 10px"><span style="font-size:1.5rem">🍛</span><div><div style="font-size:.7rem;font-weight:800;color:#fff">RESTAURANT</div><div style="font-size:.56rem;color:rgba(255,255,255,.5)">Menu · Cart · Orders</div></div></div>
+                  <div style="background:#ff4500;height:3px"></div>
+                  <div style="background:#1a0a00;padding:4px;text-align:center;font-size:.6rem;font-weight:700;color:#ff8c00">🔥 Also: Mess · Cafe · Bakery</div>
+                </div>
+                <div id="tmpl-grocery" onclick="DS.grow.pickTmpl('grocery')" style="border-radius:10px;overflow:hidden;cursor:pointer;border:2.5px solid ${_curTmpl==='grocery'?'#16a34a':'transparent'};transition:.2s">
+                  <div style="height:72px;background:linear-gradient(135deg,#071a0e,#14532d);display:flex;align-items:center;justify-content:center;gap:8px;padding:0 10px"><span style="font-size:1.5rem">🛒</span><div><div style="font-size:.7rem;font-weight:800;color:#fff">GROCERY</div><div style="font-size:.56rem;color:rgba(255,255,255,.5)">Products · Cart · Orders</div></div></div>
+                  <div style="background:#16a34a;height:3px"></div>
+                  <div style="background:#0a1a10;padding:4px;text-align:center;font-size:.6rem;font-weight:700;color:#22c55e">🌿 Also: Kirana · Dairy · Fruits</div>
+                </div>
+              </div>
+              <div style="font-size:.75rem;font-weight:600;color:#888;margin-bottom:8px">Colour Theme</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px">
+                ${[['dark','🌙 Classic Dark','linear-gradient(135deg,#1a1a2e,#374151)','#f59e0b'],['warm','🔥 Warm Orange','linear-gradient(135deg,#92400e,#c2410c)','#f97316'],['green','🌿 Fresh Green','linear-gradient(135deg,#14532d,#15803d)','#22c55e']].map(([tid,label,bg,acc])=>`
+                  <div id="theme-${tid}" onclick="DS.grow.pickTheme('${tid}')" style="border-radius:10px;overflow:hidden;cursor:pointer;border:2.5px solid ${_curTheme===tid?acc:'transparent'}">
+                    <div style="height:56px;background:${bg};display:flex;align-items:center;justify-content:center"><div style="background:${acc};border-radius:99px;padding:3px 10px;font-size:.6rem;font-weight:800;color:#fff">ORDER</div></div>
+                    <div style="background:#0a0f1a;padding:4px;text-align:center;font-size:.58rem;font-weight:700;color:#e2e8f0">${label}</div>
+                  </div>`).join('')}
+              </div>
+            </div>
+          </div>
+          <!-- Live Preview -->
+          <div style="background:#1a1200;border:1px solid rgba(255,140,0,.15);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:12px">
+            <div style="padding:11px 14px;border-bottom:1px solid rgba(255,140,0,.1);font-size:.84rem;font-weight:700;color:#f5f0e8">👁️ Live Preview</div>
+            <div style="background:#1a2232;padding:7px 12px;display:flex;align-items:center;gap:8px">
+              <div><span style="width:9px;height:9px;border-radius:50%;background:#ff5f57;display:inline-block"></span><span style="width:9px;height:9px;border-radius:50%;background:#ffbd2e;display:inline-block;margin:0 4px"></span><span style="width:9px;height:9px;border-radius:50%;background:#28ca41;display:inline-block"></span></div>
+              <div style="flex:1;background:rgba(255,255,255,.06);border-radius:5px;padding:3px 10px;font-size:.63rem;color:#7dd3fc;font-family:monospace" id="wb-previewUrl">yourshop.deckscrab.in</div>
+            </div>
+            <iframe id="wb-previewFrame" style="width:100%;height:500px;border:none;display:block;background:#1a1a2e"></iframe>
+          </div>
+          <div style="display:flex;gap:8px"><button class="btn-back" onclick="DS.grow.builderPrev()">← Back</button><button class="btn-next" onclick="DS.grow.builderNext(2)">Next: Go Live →</button></div>
+        </div>
+      </div>
+
+      <!-- STEP 3: Go Live -->
+      <div id="bs3" style="${_step===3?'':'display:none'}">
+        <div style="padding:0 14px 32px">
+          <div style="background:#1a1200;border:1px solid rgba(255,140,0,.15);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:12px">
+            <div style="padding:11px 14px;border-bottom:1px solid rgba(255,140,0,.1);font-size:.84rem;font-weight:700;color:#f5f0e8">🚀 Step 4 — Go Live!</div>
+            <div style="padding:14px">
+              <div id="wb-summary" style="background:var(--surface-2);border-radius:var(--radius-md);padding:12px;margin-bottom:14px;font-size:.82rem"></div>
+              <div style="background:rgba(31,217,122,.07);border:1.5px solid rgba(31,217,122,.2);border-radius:var(--radius-md);padding:13px;margin-bottom:12px;font-size:.8rem;color:rgba(31,217,122,.9);line-height:1.7">🎉 <strong style="color:var(--ink)">Free during launch!</strong> Your website goes live instantly with full ordering system.</div>
+              <button class="btn-next" id="wb-liveBtn" onclick="DS.grow.goLive()">🚀 Create My Website — Free!</button>
+              <div id="wb-successBox" style="display:none;margin-top:16px;text-align:center;background:linear-gradient(135deg,rgba(31,217,122,.07),rgba(7,94,84,.12));border:1.5px solid rgba(31,217,122,.25);border-radius:var(--radius-lg);padding:24px 16px">
+                <div style="font-size:3rem;margin-bottom:10px">🎉</div>
+                <div style="font-family:var(--font-display);font-size:1.3rem;font-weight:800;color:var(--forest);margin-bottom:6px">Website is Live!</div>
+                <div style="font-size:.8rem;color:var(--ink-3);margin-bottom:14px">Share this link with your customers</div>
+                <div style="background:var(--surface-1);border:1.5px solid var(--border-2);border-radius:var(--radius-md);padding:10px 13px;display:flex;align-items:center;gap:9px;margin-bottom:12px">
+                  <span>🌐</span>
+                  <span style="color:var(--blue);font-weight:700;font-size:.8rem;flex:1;word-break:break-all" id="wb-liveUrl"></span>
+                  <button onclick="navigator.clipboard?.writeText(document.getElementById('wb-liveUrl').textContent).then(()=>Utils.toast('✅ Copied!'))" style="background:rgba(8,145,178,.1);border:1px solid rgba(8,145,178,.25);color:var(--blue);border-radius:8px;padding:5px 10px;font-size:.7rem;font-weight:700;cursor:pointer;white-space:nowrap">Copy</button>
+                </div>
+                <a id="wb-downloadBtn" download="shop-website.html" style="display:block;width:100%;padding:12px;background:rgba(74,222,128,.12);border:1.5px solid rgba(74,222,128,.28);color:var(--forest);border-radius:var(--radius-md);font-size:.84rem;font-weight:700;cursor:pointer;margin-bottom:8px;text-decoration:none;text-align:center">⬇️ Download Website File</a>
+                <button onclick="window.open('https://wa.me/?text='+encodeURIComponent('Order from my shop: '+document.getElementById('wb-liveUrl').textContent),'_blank')" style="width:100%;padding:12px;background:#25D366;color:white;border:none;border-radius:var(--radius-md);font-size:.84rem;font-weight:700;cursor:pointer;margin-bottom:8px">💬 Share on WhatsApp</button>
+                <button onclick="DS.nav.go('profile')" style="width:100%;padding:12px;background:var(--surface-2);border:1.5px solid var(--border-2);border-radius:var(--radius-md);font-size:.82rem;font-weight:600;color:var(--ink-2);cursor:pointer">📋 View in Profile →</button>
+              </div>
+            </div>
+          </div>
+          <button class="btn-back" onclick="DS.grow.builderPrev()">← Back</button>
+        </div>
+      </div>`;
+
+    // Init default products on step 1
+    if (_step === 1) initDefaultProds(s);
+    if (_step === 2) { updatePreview(); }
+    if (_step === 3) loadSummary();
+  }
+
+  function initDefaultProds(s) {
+    _prodCount = 0;
+    const list = Utils.el('wb-prodlist');
+    if (!list) return;
+    list.innerHTML = '';
+    const existing = s?.prods || [];
+    if (existing.length) {
+      existing.forEach(p => addProd(p.emoji||'🍽️', p.n||p.name, p.p||p.price, p.cat||'Menu'));
+    } else {
+      const cat = Utils.el('wb-cat')?.value || '🍛';
+      const isGroc = ['🛒'].includes(cat);
+      if (isGroc) {
+        addProd('🌾','Rice (1kg)',55,'Grains'); addProd('🛢️','Cooking Oil (1L)',130,'Oils'); addProd('🧂','Salt (1kg)',20,'Essentials'); addProd('🍅','Tomatoes (1kg)',40,'Vegetables');
+      } else {
+        addProd('🍛','Full Meals',80,'Meals'); addProd('🍲','Sambar Rice',60,'Rice'); addProd('🫓','Chapati (2)',40,'Bread'); addProd('☕','Filter Coffee',20,'Drinks');
+      }
+    }
+  }
+
+  function addProd(emoji='', name='', price='', cat='') {
+    _prodCount++;
+    const id = _prodCount;
+    const list = Utils.el('wb-prodlist');
+    if (!list) return;
+    const row = document.createElement('div');
+    row.id = 'wbpr'+id;
+    row.style.cssText = 'display:grid;grid-template-columns:32px 1fr 72px 74px 26px;gap:5px;align-items:center;margin-bottom:6px';
+    row.innerHTML = `
+      <input id="wbpe${id}" value="${emoji}" placeholder="🍛" style="padding:7px 3px;text-align:center;font-size:.95rem;border:1.5px solid var(--border-2);border-radius:7px;width:100%;background:var(--surface-2);color:var(--ink)"/>
+      <input id="wbpn${id}" value="${name}" placeholder="Item name" style="padding:7px 8px;font-size:.78rem;border:1.5px solid var(--border-2);border-radius:7px;width:100%;background:var(--surface-2);color:var(--ink)"/>
+      <input id="wbpp${id}" value="${price}" placeholder="Price" type="number" style="padding:7px 8px;font-size:.78rem;border:1.5px solid var(--border-2);border-radius:7px;width:100%;background:var(--surface-2);color:var(--ink)"/>
+      <input id="wbpc${id}" value="${cat}" placeholder="Category" style="padding:7px 8px;font-size:.78rem;border:1.5px solid var(--border-2);border-radius:7px;width:100%;background:var(--surface-2);color:var(--ink)"/>
+      <button onclick="document.getElementById('wbpr${id}').remove()" style="background:none;border:none;color:var(--ink-4);font-size:1.1rem;cursor:pointer;padding:0;line-height:1">×</button>`;
+    list.appendChild(row);
+  }
+
+  function getProds() {
+    const rows = [];
+    document.querySelectorAll('[id^=wbpr]').forEach(row => {
+      const id = row.id.slice(4);
+      const n = (document.getElementById('wbpn'+id)||{value:''}).value.trim();
+      const p = parseFloat((document.getElementById('wbpp'+id)||{value:'0'}).value)||0;
+      const e = (document.getElementById('wbpe'+id)||{value:''}).value||'🍽️';
+      const c = (document.getElementById('wbpc'+id)||{value:'Menu'}).value||'Menu';
+      if (n && p > 0) rows.push({ id:'i'+id, emoji:e, n, p, cat:c, desc:'', veg:true, pop:false, inStock:true });
+    });
+    return rows;
+  }
+
+  function getBiz() {
+    const name = (Utils.el('wb-name')?.value||'My Shop').trim();
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    return {
+      id:slug+'-'+Date.now().toString().slice(-4), bizId:slug, name,
+      tagline: (Utils.el('wb-tag')?.value||'Quality service · Best in town').trim(),
+      phone:   (Utils.el('wb-phone')?.value||'').replace(/\D/g,'').slice(-10),
+      city:    (Utils.el('wb-city')?.value||'').trim(),
+      address: (Utils.el('wb-addr')?.value||'').trim(),
+      catEmoji: Utils.el('wb-cat')?.value||'🍛',
+      openTime: Utils.el('wb-open')?.value||'9:00 AM',
+      closeTime: Utils.el('wb-close')?.value||'9:00 PM',
+      theme: _curTheme, websiteTemplate: _curTmpl,
+      slug, menuItems: getProds(),
+    };
+  }
+
+  function pickTmpl(t) {
+    _curTmpl = t;
+    ['restaurant','grocery'].forEach(id => {
+      const el = Utils.el('tmpl-'+id);
+      if (el) el.style.borderColor = id===t ? (t==='restaurant'?'#ff4500':'#16a34a') : 'transparent';
+    });
+    updatePreview();
+  }
+
+  function pickTheme(t) {
+    _curTheme = t;
+    const cols = { dark:'#f59e0b', warm:'#f97316', green:'#22c55e' };
+    ['dark','warm','green'].forEach(id => {
+      const el = Utils.el('theme-'+id);
+      if (el) el.style.borderColor = id===t ? cols[id] : 'transparent';
+    });
+    updatePreview();
+  }
+
+  function updatePreview() {
+    const biz = getBiz();
+    const urlEl = Utils.el('wb-previewUrl');
+    if (urlEl) urlEl.textContent = biz.slug+'.deckscrab.in';
+    const frame = Utils.el('wb-previewFrame');
+    if (frame) frame.srcdoc = buildSiteHtml(biz);
+  }
+
+  function loadSummary() {
+    const biz = getBiz();
+    const el = Utils.el('wb-summary');
+    if (!el) return;
+    const themes = { dark:'🌙 Classic Dark', warm:'¸ Warm Orange', green:'🌿 Fresh Green' };
+    const tmpls = { restaurant:'🍛 Restaurant', grocery:'🛒 Grocery' };
+    el.innerHTML = [
+      ['Business', biz.name],
+      ['Phone', '+91 '+biz.phone],
+      ['City', biz.city],
+      ['Menu Items', biz.menuItems.length+' items'],
+      ['Template', tmpls[_curTmpl]||_curTmpl],
+      ['Theme', themes[_curTheme]||_curTheme],
+      ['Your URL', `<span style="color:var(--blue)">${biz.slug}.deckscrab.in</span>`],
+    ].map(([l,v]) => `<div style="display:flex;justify-content:space-between;font-size:.8rem;padding:6px 0;border-bottom:1px solid var(--border)"><span style="color:var(--ink-3)">${l}</span><strong>${v}</strong></div>`).join('');
+  }
+
+  function buildSiteHtml(biz) {
+    const isGroc = biz.websiteTemplate === 'grocery';
+    const menuJson = JSON.stringify(biz.menuItems||[]);
+    const shopJson = JSON.stringify(biz);
+    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${biz.name}</title><style>${REST_CSS}</style></head><body>
+${REST_HTML}
+<script>
+var _DS_PREFIX="ds_p_${biz.slug}_";
+var _DS_MENU=${menuJson};
+var _DS_BIZ=${shopJson};
+var _DS_SHOP_NAME=${JSON.stringify(biz.name)};
+var _DS_SHOP_PHONE=${JSON.stringify(biz.phone||'')};
+var _DS_SHOP_EMJ=${JSON.stringify(biz.catEmoji||'🏪')};
+var _DS_SHOP_TAGLINE=${JSON.stringify(biz.tagline||'')};
+var _DS_SHOP_ADDR=${JSON.stringify(biz.address||'')};
+var _DS_SHOP_CITY=${JSON.stringify(biz.city||'')};
+var _DS_OPEN=${JSON.stringify(biz.openTime||'9:00 AM')};
+var _DS_CLOSE=${JSON.stringify(biz.closeTime||'9:00 PM')};
+var _DS_THEME=${JSON.stringify(biz.theme||'dark')};
+${SITE_JS}
+<\/script></body></html>`;
+  }
+
+  async function goLive() {
+    const biz = getBiz();
+    if (!biz.name||!biz.phone||!biz.city) { Utils.toast('⚠️ Fill name, phone and city'); return; }
+    const btn = Utils.el('wb-liveBtn');
+    if (btn) { btn.disabled=true; btn.textContent='Creating…'; }
+
+    const websiteHtml = buildSiteHtml(biz);
+    const slug = biz.slug;
+    const websiteUrl = `https://waseem-2007.github.io/deckscrab/?shop=${slug}`;
+
+    // Save to local shop
+    const existingShop = Store.myShops().find(s => API.slugify(s.name)===slug || s.name===biz.name);
+    const shopData = {
+      ...(existingShop||{}), id: existingShop?.id || Utils.uid('my'),
+      name:biz.name, desc:biz.tagline, phone:biz.phone, wa:biz.phone,
+      city:biz.city, addr:biz.address, sectorName:biz.catEmoji,
+      sectorEmoji:biz.catEmoji, e:biz.catEmoji, g:'retail',
+      prods:biz.menuItems, websiteTemplate:_curTmpl, websiteEnabled:true,
+      websiteUrl, customHtml:websiteHtml, reg:Date.now(),
+      oh:'09:00', oc:'21:00',
+    };
+    Store.addLocalShop(shopData);
+
+    // Try server
+    try { await API.createShop(shopData); } catch {}
+
+    // WhatsApp notify
+    const msg = encodeURIComponent(`🏪 New website built!\n\n${biz.name}\n📍 ${biz.city}\n📞 ${biz.phone}\n\n🌐 ${websiteUrl}`);
+    setTimeout(() => window.open(`https://wa.me/919384707706?text=${msg}`,'_blank'), 1500);
+
+    // Download link
+    const blob = new Blob([websiteHtml],{type:'text/html'});
+    const dlUrl = URL.createObjectURL(blob);
+    const dlBtn = Utils.el('wb-downloadBtn');
+    if (dlBtn) { dlBtn.href=dlUrl; dlBtn.download=slug+'-website.html'; }
+
+    Utils.el('wb-liveUrl').textContent = websiteUrl;
+    Utils.el('wb-successBox').style.display = 'block';
+    if (btn) btn.style.display = 'none';
+    Utils.toast('🎉 Website created!');
+  }
+
+  function builderNext(fromStep) {
+    if (fromStep===0) {
+      if (!(Utils.el('wb-name')?.value||'').trim()) { Utils.toast('⚠️ Enter business name'); return; }
+      if ((Utils.el('wb-phone')?.value||'').replace(/\D/g,'').length<10) { Utils.toast('⚠️ Enter valid phone'); return; }
+      if (!(Utils.el('wb-city')?.value||'').trim()) { Utils.toast('⚠️ Enter city'); return; }
+    }
+    _step = fromStep + 1;
+    const c = Utils.el('growContent');
+    if (!c) return;
+    const biz = getBiz();
+    renderBuilderPage({ ...biz, prods:getProds() });
+    window.scrollTo(0,0);
+  }
+
+  function builderPrev() {
+    if (_step > 0) { _step--; const biz=getBiz(); renderBuilderPage({...biz,prods:getProds()}); window.scrollTo(0,0); }
+    else render();
+  }
+
+  return { render, openBuilder, editSite, addProd, pickTmpl, pickTheme, builderNext, builderPrev, goLive };
 })();
 
 
