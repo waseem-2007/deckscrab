@@ -3989,10 +3989,10 @@ const AddShopModule = (() => {
               <span>📍</span><span id="regMapCoords">Tap GPS or tap map to pin your location</span>
             </div>
           </div>
-          <div style="margin-top:10px;background:${_pinned?'var(--forest-soft)':'var(--surface-2)'};border:1.5px solid ${_pinned?'rgba(10,124,74,.25)':'var(--border-2)'};border-radius:var(--radius-md);padding:10px 13px">
-            <div style="font-size:.68rem;font-weight:700;color:${_pinned?'var(--forest)':'var(--ink-3)'};margin-bottom:3px">${_pinned?'✅ Shop location pinned':'⚠️ Location not pinned yet'}</div>
-            <div id="regLatLngDebug" style="font-family:var(--font-mono);font-size:.65rem;color:var(--ink-3)">${_shopLat?`lat: ${_shopLat.toFixed(6)}, lng: ${_shopLng.toFixed(6)}`:'Use GPS or tap the map above'}</div>
-            ${_pinned?'<div style="font-size:.65rem;color:var(--forest);margin-top:2px">Google Maps will use these exact coordinates for your shop</div>':''}
+          <div id="pinStatusBox" style="margin-top:10px;border-radius:var(--radius-md);padding:10px 13px;border:1.5px solid var(--border-2);background:var(--surface-2)">
+            <div id="pinStatusTitle" style="font-size:.68rem;font-weight:700;color:var(--ink-3);margin-bottom:3px">⚠️ Location not pinned yet</div>
+            <div id="pinStatusCoords" style="font-family:var(--font-mono);font-size:.65rem;color:var(--ink-3)">Use GPS button or tap the map to pin</div>
+            <div id="pinStatusNote" style="font-size:.65rem;color:var(--forest);margin-top:2px;display:none">✓ Google Maps will navigate customers to these exact coordinates</div>
           </div>
         </div>
       </div>
@@ -4003,7 +4003,39 @@ const AddShopModule = (() => {
     // Center map: use already-pinned shop loc > user loc > default Tamil Nadu
     const mapLat = _shopLat || Store.location?.lat || 13.0772;
     const mapLng = _shopLng || Store.location?.lng || 79.6712;
-    setTimeout(() => initRegMap(mapLat, mapLng), 300);
+    setTimeout(() => {
+      initRegMap(mapLat, mapLng);
+      updatePinStatus(); // refresh status in case user came back to this step
+    }, 300);
+  }
+
+  // ── Live pin status updater — called every time coords change ──
+  function updatePinStatus() {
+    const box    = document.getElementById('pinStatusBox');
+    const title  = document.getElementById('pinStatusTitle');
+    const coords = document.getElementById('pinStatusCoords');
+    const note   = document.getElementById('pinStatusNote');
+    if (!box) return;
+
+    if (_pinned && _shopLat && _shopLng) {
+      // PINNED — green
+      box.style.background   = 'rgba(10,124,74,.1)';
+      box.style.borderColor  = 'rgba(10,124,74,.35)';
+      title.style.color      = 'var(--forest)';
+      title.textContent      = '✅ Shop location pinned!';
+      coords.style.color     = '#0A7C4A';
+      coords.textContent     = `lat: ${_shopLat.toFixed(6)},  lng: ${_shopLng.toFixed(6)}`;
+      note.style.display     = 'block';
+    } else {
+      // NOT PINNED — grey/warning
+      box.style.background   = 'rgba(217,119,6,.07)';
+      box.style.borderColor  = 'rgba(217,119,6,.3)';
+      title.style.color      = 'var(--amber)';
+      title.textContent      = '⚠️ Location not pinned yet — tap GPS or tap the map';
+      coords.style.color     = 'var(--ink-3)';
+      coords.textContent     = 'Pinning your exact location is required';
+      note.style.display     = 'none';
+    }
   }
 
   function initRegMap(lat, lng) {
@@ -4028,11 +4060,9 @@ const AddShopModule = (() => {
       _shopLat = p.lat;   // ← save to SHOP coords, not user location
       _shopLng = p.lng;
       _pinned = true;
-      const coords = `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`;
       const el = Utils.el('regMapCoords');
-      if (el) el.textContent = `✅ Pinned: ${coords}`;
-      const dbg = Utils.el('regLatLngDebug');
-      if (dbg) dbg.textContent = `lat: ${p.lat.toFixed(6)}, lng: ${p.lng.toFixed(6)}`;
+      if (el) el.textContent = `✅ Pinned: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`;
+      updatePinStatus();
     });
 
     _regMap.on('click', e => {
@@ -4040,12 +4070,10 @@ const AddShopModule = (() => {
       _shopLng = e.latlng.lng;
       _pinned = true;
       if (_regMarker) _regMarker.setLatLng(e.latlng);
-      const coords = `${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
       const el = Utils.el('regMapCoords');
-      if (el) el.textContent = `✅ Pinned: ${coords}`;
-      const dbg = Utils.el('regLatLngDebug');
-      if (dbg) dbg.textContent = `lat: ${e.latlng.lat.toFixed(6)}, lng: ${e.latlng.lng.toFixed(6)}`;
-      Utils.toast('📍 Shop location pinned! Drag pin to fine-tune.');
+      if (el) el.textContent = `✅ Pinned: ${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
+      updatePinStatus();
+      Utils.toast('📍 Shop pinned! Drag the marker to fine-tune.');
     });
 
     if (Store.location?.lat) {
@@ -4069,6 +4097,9 @@ const AddShopModule = (() => {
       _pinned = true;
       if (ico) ico.textContent = '✅';
       if (txt) txt.textContent = `GPS pinned! ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      // Change button bg to green to confirm
+      const gpsBtn = document.getElementById('gpsBtn') || document.querySelector('.gps-btn');
+      if (gpsBtn) { gpsBtn.style.background='rgba(10,124,74,.18)'; gpsBtn.style.borderColor='rgba(10,124,74,.4)'; }
       const geo = await API.reverseGeocode(lat, lng);
       // Also update user location so map centers correctly
       Store.setLocation(lat, lng, geo.name);
@@ -4076,9 +4107,21 @@ const AddShopModule = (() => {
       if (geo.pincode && !Utils.el('f-pc')?.value) { const el=Utils.el('f-pc'); if(el) el.value = geo.pincode; }
       const coordEl = Utils.el('regMapCoords');
       if (coordEl) coordEl.textContent = `✅ GPS pinned: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-      const dbg = Utils.el('regLatLngDebug');
-      if (dbg) dbg.textContent = `lat: ${lat.toFixed(6)}, lng: ${lng.toFixed(6)}`;
       initRegMap(lat, lng);
+      // Make marker visually prominent — pulsing red pin
+      if (_regMarker) {
+        const pulseIcon = L.divIcon({
+          className: '',
+          html: `<div style="position:relative;width:32px;height:32px">
+            <div style="position:absolute;inset:0;border-radius:50%;background:rgba(255,77,0,.25);animation:livePulse 1.5s ease infinite"></div>
+            <div style="position:absolute;inset:4px;border-radius:50%;background:#FF4D00;border:3px solid white;box-shadow:0 2px 8px rgba(255,77,0,.5)"></div>
+          </div>`,
+          iconSize: [32, 32],
+          iconAnchor: [16, 16],
+        });
+        _regMarker.setIcon(pulseIcon);
+      }
+      updatePinStatus();
       Utils.toast('✅ GPS location pinned to your shop!');
     }, () => {
       if (ico) ico.textContent = '📡';
@@ -4104,8 +4147,7 @@ const AddShopModule = (() => {
         const foundName = (results[0].display_name||'').split(',').slice(0,2).join(',');
         const coordEl = Utils.el('regMapCoords');
         if (coordEl) coordEl.textContent = `✅ Found: ${foundName}`;
-        const dbg = Utils.el('regLatLngDebug');
-        if (dbg) dbg.textContent = `lat: ${lat.toFixed(6)}, lng: ${lng.toFixed(6)}`;
+        updatePinStatus();
       }
     }, 1000);
   }
