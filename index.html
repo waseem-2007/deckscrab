@@ -1,1 +1,222 @@
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+<title>Deckscrab — Find Local Businesses Near You</title>
+<meta name="description" content="Find local shops, restaurants, doctors and services near you in Tamil Nadu. Order via WhatsApp."/>
+<meta name="theme-color" content="#FF4D00"/>
+<link rel="manifest" href="manifest.json"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="stylesheet" href="css/reset.css"/>
+<link rel="stylesheet" href="css/tokens.css"/>
+<link rel="stylesheet" href="css/layout.css"/>
+<link rel="stylesheet" href="css/components.css"/>
+<link rel="stylesheet" href="css/pages.css"/>
+<link rel="stylesheet" href="css/animations.css"/>
+</head>
+<body>
+<div id="offlineBanner" class="offline-banner" aria-live="polite" hidden>
+  <span class="offline-dot"></span> No internet — showing cached data
+</div>
+<header class="topnav" role="banner">
+  <button class="logo" onclick="DS.nav.go('home')" aria-label="Deckscrab home">
+    <span class="logo-mark">D</span>
+    <span class="logo-text">deckscrab</span>
+    <span class="logo-live" aria-label="Live"></span>
+  </button>
+  <div class="topnav-right">
+    <button class="loc-chip" id="locChip" onclick="DS.location.openModal()" aria-label="Set location">
+      <span class="loc-chip-dot"></span>
+      <span class="loc-chip-text" id="locChipText">Set location</span>
+    </button>
+    <button class="btn-add-shop" onclick="DS.nav.go('addshop')" aria-label="Add your shop">+ List Shop</button>
+  </div>
+</header>
+<main id="appRoot" role="main">
+  <section id="page-home" class="page active" aria-label="Home">
+    <div class="home-search-block">
+      <div class="home-hero-text">
+        <p class="home-eyebrow">Tamil Nadu's Local Business Finder</p>
+        <h1 class="home-heading">Find what you<br/><em>need nearby</em></h1>
+      </div>
+      <div class="search-bar" role="search">
+        <button class="search-loc-btn" onclick="DS.location.openModal()" aria-label="Location">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 1 8 8c0 5.4-8 14-8 14S4 15.4 4 10a8 8 0 0 1 8-8z"/></svg>
+        </button>
+        <input id="homeSearchInp" class="search-input" type="search" placeholder="Search shops, restaurants, doctors…" autocomplete="off" aria-label="Search businesses" oninput="DS.home.onSearch(this.value)"/>
+        <button class="search-submit" onclick="DS.home.runSearch()" aria-label="Search">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        </button>
+      </div>
+      <div class="quick-chips" role="list">
+        <button class="qchip" onclick="DS.home.quickSearch('Restaurant')">🍛 Food</button>
+        <button class="qchip" onclick="DS.home.quickSearch('Doctor')">🏥 Doctor</button>
+        <button class="qchip" onclick="DS.home.quickSearch('Grocery')">🛒 Grocery</button>
+        <button class="qchip" onclick="DS.home.quickSearch('Mechanic')">🔧 Mechanic</button>
+        <button class="qchip" onclick="DS.home.quickSearch('Salon')">💇 Salon</button>
+        <button class="qchip" onclick="DS.home.quickSearch('Pharmacy')">💊 Pharmacy</button>
+      </div>
+    </div>
+    <div class="section-header">
+      <span class="section-label">Featured</span>
+      <button class="see-all-btn" onclick="DS.nav.go('discover')">Map view →</button>
+    </div>
+    <div class="featured-scroll" id="featuredScroll" role="list"></div>
+    <div class="cat-scroll" id="catBar" role="tablist"></div>
+    <div class="filter-row">
+      <button class="filter-btn" id="filterNear" onclick="DS.home.toggleNear()" aria-pressed="false">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 1 8 8c0 5.4-8 14-8 14S4 15.4 4 10a8 8 0 0 1 8-8z"/></svg>
+        Near me
+      </button>
+      <button class="filter-btn" id="filterOpen" onclick="DS.home.toggleOpen()" aria-pressed="false">
+        <span class="status-dot green"></span>Open now
+      </button>
+      <span class="result-count" id="homeResultCount" aria-live="polite"></span>
+    </div>
+    <div class="shop-list" id="homeShopList" role="list" aria-live="polite"></div>
+    <div class="add-banner" onclick="DS.nav.go('addshop')" role="button" tabindex="0">
+      <div class="add-banner-icon">🏪</div>
+      <div class="add-banner-body">
+        <strong>List Your Business Free</strong>
+        <span>Go live in 60 seconds · No cost ever</span>
+      </div>
+      <span class="add-banner-arrow">→</span>
+    </div>
+  </section>
+  <section id="page-discover" class="page" aria-label="Discover on map">
+    <div id="discoverMap"></div>
+    <div class="disc-search-float">
+      <div class="disc-search-inner">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input id="discSearchInp" class="disc-search-input" type="search" placeholder="Search on map…" oninput="DS.discover.search(this.value)"/>
+        <button id="discClearBtn" class="disc-clear" onclick="DS.discover.clearSearch()" hidden>✕</button>
+      </div>
+      <button class="disc-loc-btn" onclick="DS.location.openModal()">📍</button>
+    </div>
+    <div class="disc-cats" id="discCatBar" role="tablist"></div>
+    <div class="disc-fabs">
+      <button class="disc-fab" id="radarFab" onclick="DS.discover.toggleRadar()" aria-pressed="false" title="Radar">📡</button>
+      <button class="disc-fab" id="openNowFab" onclick="DS.discover.toggleOpenNow()" aria-pressed="false" title="Open now">🟢</button>
+      <button class="disc-fab" onclick="DS.discover.fitAll()" title="Fit all">⊞</button>
+    </div>
+    <div class="disc-sheet" id="discSheet">
+      <div class="disc-sheet-handle" id="discHandle">
+        <div class="handle-bar"></div>
+        <div class="disc-sheet-meta">
+          <span class="disc-count" id="discCount" aria-live="polite">— shops</span>
+          <div class="sort-btns">
+            <button class="sort-btn active" onclick="DS.discover.sort('newest',this)">🆕 New</button>
+            <button class="sort-btn" onclick="DS.discover.sort('rating',this)">⭐ Top</button>
+            <button class="sort-btn" onclick="DS.discover.sort('dist',this)">📍 Near</button>
+          </div>
+        </div>
+      </div>
+      <div class="disc-cards" id="discCards" role="list"></div>
+    </div>
+  </section>
+  <section id="page-addshop" class="page" aria-label="Add your shop">
+    <div class="addshop-wrap">
+      <div class="addshop-hero">
+        <h2 class="addshop-title">List Your Business</h2>
+        <p class="addshop-sub">Free · Instant · Permanent</p>
+      </div>
+      <div class="step-progress" id="stepProgress" role="progressbar" aria-valuemin="1" aria-valuemax="5"></div>
+      <div id="addshopSteps"></div>
+    </div>
+  </section>
+  <section id="page-grow" class="page" aria-label="Grow your business">
+    <div id="growContent"></div>
+  </section>
+  <section id="page-profile" class="page" aria-label="Your profile">
+    <div id="profileContent"></div>
+  </section>
+</main>
+<nav class="bottomnav" role="navigation">
+  <button class="bnav-item active" id="bnav-home" onclick="DS.nav.go('home')" aria-label="Home" aria-current="page">
+    <svg class="bnav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+    <span class="bnav-label">Home</span>
+  </button>
+  <button class="bnav-item" id="bnav-discover" onclick="DS.nav.go('discover')" aria-label="Discover">
+    <svg class="bnav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88 16.24,7.76"/></svg>
+    <span class="bnav-label">Discover</span>
+  </button>
+  <button class="bnav-item bnav-fab" id="bnav-addshop" onclick="DS.nav.go('addshop')" aria-label="Add shop">
+    <svg class="bnav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <span class="bnav-label">Add</span>
+  </button>
+  <button class="bnav-item" id="bnav-grow" onclick="DS.nav.go('grow')" aria-label="Grow">
+    <svg class="bnav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/></svg>
+    <span class="bnav-label">Grow</span>
+  </button>
+  <button class="bnav-item" id="bnav-profile" onclick="DS.nav.go('profile')" aria-label="Profile">
+    <svg class="bnav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    <span class="bnav-label">Profile</span>
+  </button>
+</nav>
+<div class="modal-overlay" id="locModalOv" onclick="if(event.target===this)DS.location.closeModal()" role="dialog" aria-modal="true" hidden>
+  <div class="modal-sheet">
+    <div class="modal-drag-bar"></div>
+    <div class="modal-header">
+      <h3 class="modal-title">Set Your Location</h3>
+      <button class="modal-close" onclick="DS.location.closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <button class="gps-btn" onclick="DS.location.startGPS()">
+        <span class="gps-btn-icon" id="gpsBtnIcon">📡</span>
+        <div class="gps-btn-text">
+          <strong id="gpsBtnTitle">Use My Current Location</strong>
+          <span id="gpsBtnSub">Tap → allow → finds businesses near you</span>
+        </div>
+      </button>
+      <div class="divider"><span>or search</span></div>
+      <div class="loc-search-row">
+        <input id="locSearchInp" class="loc-input" type="text" placeholder="Type city, area, pincode…" oninput="DS.location.autocomplete(this.value)"/>
+        <button class="loc-search-btn" onclick="DS.location.doSearch()">Go</button>
+      </div>
+      <div id="locAcDrop" class="loc-ac-drop" role="listbox"></div>
+      <div class="quick-cities-label">Quick pick</div>
+      <div class="quick-cities">
+        <button class="city-chip" onclick="DS.location.pick('Arakkonam',13.0772,79.6712)">Arakkonam</button>
+        <button class="city-chip" onclick="DS.location.pick('Vellore',12.9165,79.1325)">Vellore</button>
+        <button class="city-chip" onclick="DS.location.pick('Chennai',13.0827,80.2707)">Chennai</button>
+        <button class="city-chip" onclick="DS.location.pick('Coimbatore',11.0168,76.9558)">Coimbatore</button>
+        <button class="city-chip" onclick="DS.location.pick('Madurai',9.9252,78.1198)">Madurai</button>
+        <button class="city-chip" onclick="DS.location.pick('Salem',11.6643,78.1460)">Salem</button>
+        <button class="city-chip" onclick="DS.location.pick('Tiruppur',11.1075,77.3398)">Tiruppur</button>
+        <button class="city-chip" onclick="DS.location.pick('Erode',11.3410,77.7172)">Erode</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="shopDetailOv" onclick="if(event.target===this)DS.detail.close()" role="dialog" aria-modal="true" hidden>
+  <div class="modal-sheet modal-sheet--tall" id="shopDetailSheet">
+    <div class="shop-detail-hero" id="shopDetailHero">
+      <button class="modal-close modal-close--float" onclick="DS.detail.close()">✕</button>
+      <div class="shop-detail-hero-body" id="shopDetailHeroBody"></div>
+    </div>
+    <div class="shop-detail-body" id="shopDetailBody"></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="js/store.js"></script>
+<script src="js/api.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/location.js"></script>
+<script src="js/map.js"></script>
+<script src="js/home.js"></script>
+<script src="js/discover.js"></script>
+<script src="js/detail.js"></script>
+<script src="js/addshop.js"></script>
+<script src="js/profile.js"></script>
+<script src="js/grow.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
