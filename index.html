@@ -3,14 +3,29 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
-<title>Deckscrab — Find Local Businesses Near You</title>
-<meta name="description" content="Find local shops, restaurants, doctors and services near you in Tamil Nadu. Order via WhatsApp."/>
+<title>Deckscrab — Find Local Shops & Businesses Near You in Tamil Nadu</title>
+<meta name="description" content="Find local shops, restaurants, doctors, grocery stores and services near you in Tamil Nadu. Order via WhatsApp. Register your business free."/>
+<meta name="keywords" content="local shops Tamil Nadu, Arakkonam shops, Vellore businesses, grocery near me, restaurant near me, doctor near me"/>
+<meta name="robots" content="index, follow"/>
+<link rel="canonical" href="https://waseem-2007.github.io/deckscrab/"/>
+<meta property="og:type" content="website"/>
+<meta property="og:title" content="Deckscrab — Find Local Businesses in Tamil Nadu"/>
+<meta property="og:description" content="Find shops, restaurants, doctors near you. Order via WhatsApp. List your business free."/>
+<meta property="og:url" content="https://waseem-2007.github.io/deckscrab/"/>
+<meta property="og:image" content="https://waseem-2007.github.io/deckscrab/og-image.png"/>
+<meta property="og:locale" content="en_IN"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="Deckscrab — Tamil Nadu Local Business Finder"/>
+<meta name="twitter:description" content="Find shops near you. Order via WhatsApp. Free business listing."/>
 <meta name="theme-color" content="#FF4D00"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Deckscrab"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Deckscrab","url":"https://waseem-2007.github.io/deckscrab/","description":"Find local shops restaurants doctors and services near you in Tamil Nadu","applicationCategory":"BusinessApplication","operatingSystem":"Any","offers":{"@type":"Offer","price":"0","priceCurrency":"INR"},"areaServed":{"@type":"State","name":"Tamil Nadu"}}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'"/>
+<noscript><link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/></noscript>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <style>
 /* reset.css */
@@ -69,9 +84,9 @@ ul, ol { list-style: none; }
   --shadow-xl:  0 24px 64px rgba(12,11,9,.18);
 
   /* ── Typography ── */
-  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
-  --font-mono:    'Space Mono', monospace;
-  --font-body:    'DM Sans', system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque', 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+  --font-mono:    'Space Mono', 'Courier New', 'Consolas', monospace;
+  --font-body:    'DM Sans', 'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif;
 
   /* ── Sizing ── */
   --radius-sm:  8px;
@@ -622,6 +637,11 @@ body {
 .filter-btn[aria-pressed="true"] {
   background: var(--ink);
   border-color: var(--ink);
+  color: white;
+}
+.dist-chip[aria-pressed="true"] {
+  background: var(--flame);
+  border-color: var(--flame);
   color: white;
 }
 .filter-btn[aria-pressed="true"].open-btn {
@@ -1973,6 +1993,18 @@ select.field-input { appearance: none; cursor: pointer; }
 </style>
 </head>
 <body>
+<div id="appLoadScreen" style="position:fixed;inset:0;z-index:9999;background:#0C0B09;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px">
+  <div style="font-size:3.2rem;margin-bottom:14px">🏪</div>
+  <div style="font-family:'Bricolage Grotesque','Trebuchet MS',system-ui,sans-serif;font-size:1.5rem;font-weight:800;color:#f5f0e8;letter-spacing:-.04em;margin-bottom:5px">deckscrab</div>
+  <div style="font-size:.7rem;color:rgba(245,240,232,.35);margin-bottom:28px;letter-spacing:.08em;text-transform:uppercase">Tamil Nadu's Business Finder</div>
+  <div style="display:flex;gap:8px;margin-bottom:12px">
+    <div style="width:8px;height:8px;border-radius:50%;background:#FF4D00;animation:dotP 1.2s ease infinite 0s"></div>
+    <div style="width:8px;height:8px;border-radius:50%;background:#FF4D00;animation:dotP 1.2s ease infinite .2s"></div>
+    <div style="width:8px;height:8px;border-radius:50%;background:#FF4D00;animation:dotP 1.2s ease infinite .4s"></div>
+  </div>
+  <div id="loadMsg" style="font-size:.7rem;color:rgba(245,240,232,.3)">Connecting…</div>
+  <style>@keyframes dotP{0%,100%{opacity:.25;transform:scale(.7)}50%{opacity:1;transform:scale(1)}}</style>
+</div>
 
 <div id="offlineBanner" class="offline-banner" aria-live="polite" hidden>
   <span class="offline-dot"></span> No internet — showing cached data
@@ -2025,15 +2057,36 @@ select.field-input { appearance: none; cursor: pointer; }
     </div>
     <div class="featured-scroll" id="featuredScroll" role="list"></div>
     <div class="cat-scroll" id="catBar" role="tablist"></div>
-    <div class="filter-row">
-      <button class="filter-btn" id="filterNear" onclick="DS.home.toggleNear()" aria-pressed="false">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 1 8 8c0 5.4-8 14-8 14S4 15.4 4 10a8 8 0 0 1 8-8z"/></svg>
-        Near me
-      </button>
-      <button class="filter-btn" id="filterOpen" onclick="DS.home.toggleOpen()" aria-pressed="false">
-        <span class="status-dot green"></span>Open now
-      </button>
-      <span class="result-count" id="homeResultCount" aria-live="polite"></span>
+    <!-- Distance + filter row -->
+    <div style="overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:7px;padding:10px 16px;min-width:max-content">
+
+        <!-- Distance chips -->
+        <div style="display:flex;align-items:center;gap:5px">
+          <button class="filter-btn dist-chip" id="dist-0" onclick="DS.home.setDist(0,this)" aria-pressed="true">
+            📍 All
+          </button>
+          <button class="filter-btn dist-chip" id="dist-1" onclick="DS.home.setDist(1,this)" aria-pressed="false">
+            1 km
+          </button>
+          <button class="filter-btn dist-chip" id="dist-5" onclick="DS.home.setDist(5,this)" aria-pressed="false">
+            5 km
+          </button>
+          <button class="filter-btn dist-chip" id="dist-10" onclick="DS.home.setDist(10,this)" aria-pressed="false">
+            10 km
+          </button>
+        </div>
+
+        <!-- Divider -->
+        <div style="width:1px;height:18px;background:var(--border-2);flex-shrink:0"></div>
+
+        <!-- Open now toggle -->
+        <button class="filter-btn" id="filterOpen" onclick="DS.home.toggleOpen()" aria-pressed="false">
+          <span class="status-dot green"></span>Open now
+        </button>
+
+        <span class="result-count" id="homeResultCount" aria-live="polite"></span>
+      </div>
     </div>
     <div class="shop-list" id="homeShopList" role="list" aria-live="polite"></div>
     <div class="add-banner" onclick="DS.nav.go('addshop')" role="button" tabindex="0">
@@ -2067,10 +2120,19 @@ select.field-input { appearance: none; cursor: pointer; }
         <div class="handle-bar"></div>
         <div class="disc-sheet-meta">
           <span class="disc-count" id="discCount" aria-live="polite">— shops</span>
-          <div class="sort-btns">
-            <button class="sort-btn active" onclick="DS.discover.sort('newest',this)">🆕 New</button>
-            <button class="sort-btn" onclick="DS.discover.sort('rating',this)">⭐ Top</button>
-            <button class="sort-btn" onclick="DS.discover.sort('dist',this)">📍 Near</button>
+          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+            <div class="sort-btns">
+              <button class="sort-btn active" onclick="DS.discover.sort('newest',this)">🆕 New</button>
+              <button class="sort-btn" onclick="DS.discover.sort('rating',this)">⭐ Top</button>
+              <button class="sort-btn" onclick="DS.discover.sort('dist',this)">📍 Near</button>
+            </div>
+            <div style="width:1px;height:16px;background:var(--border-2)"></div>
+            <div class="sort-btns">
+              <button class="sort-btn active" id="ddisc-0" onclick="DS.discover.setDist(0,this)">All</button>
+              <button class="sort-btn" id="ddisc-1" onclick="DS.discover.setDist(1,this)">1km</button>
+              <button class="sort-btn" id="ddisc-5" onclick="DS.discover.setDist(5,this)">5km</button>
+              <button class="sort-btn" id="ddisc-10" onclick="DS.discover.setDist(10,this)">10km</button>
+            </div>
           </div>
         </div>
       </div>
@@ -2201,6 +2263,7 @@ const Store = (() => {
     searchQuery: '',
     nearMe:      false,
     openOnly:    false,
+    distKm:      0,          // 0 = All, 1, 5, 10
   };
 
   // ── Subscribers ──
@@ -2218,12 +2281,14 @@ const Store = (() => {
     if (val === undefined) {
       try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
     }
-    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {
-      // Storage full — evict oldest cache entries
-      Object.keys(localStorage)
-        .filter(k => k.startsWith('ds_cache_'))
-        .forEach(k => localStorage.removeItem(k));
-      try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+    try {
+      const s = JSON.stringify(Array.isArray(val) ? val.slice(0,100) : val);
+      localStorage.setItem(key, s);
+    } catch (e) {
+      try {
+        ['ds_cache_','ds_p_'].forEach(p => Object.keys(localStorage).filter(k=>k.startsWith(p)).slice(0,5).forEach(k=>localStorage.removeItem(k)));
+        localStorage.setItem(key, JSON.stringify(Array.isArray(val)?val.slice(0,30):val));
+      } catch { console.warn('[DS] Storage full:', key); }
     }
   }
 
@@ -2269,14 +2334,24 @@ const Store = (() => {
   }
 
   function addLocalShop(shop) {
-    // Prevent duplicate by name
-    const norm = n => (n || '').toLowerCase().trim();
-    const idx = state.localShops.findIndex(s => norm(s.name) === norm(shop.name));
-    if (idx >= 0) {
-      state.localShops[idx] = { ...state.localShops[idx], ...shop };
-    } else {
-      state.localShops.unshift(shop);
+    const norm = n => (n||'').toLowerCase().trim();
+    // Update existing if same name+city
+    const dupIdx = state.localShops.findIndex(s =>
+      norm(s.name)===norm(shop.name) && norm(s.city||'')===norm(shop.city||'')
+    );
+    if (dupIdx >= 0) {
+      state.localShops[dupIdx] = { ...state.localShops[dupIdx], ...shop };
+      ls(KEYS.SHOPS, state.localShops);
+      emit('shops-changed');
+      return;
     }
+    // Max 5 shops per phone (prevent spam)
+    const p = (shop.phone||shop.wa||'').replace(/\D/g,'').slice(-10);
+    if (p) {
+      const owned = state.localShops.filter(s=>(s.phone||s.wa||'').replace(/\D/g,'').slice(-10)===p);
+      if (owned.length >= 5) { console.warn('[DS] Max 5 shops per phone'); return; }
+    }
+    state.localShops.unshift(shop);
     ls(KEYS.SHOPS, state.localShops);
     emit('shops-changed');
   }
@@ -2474,9 +2549,24 @@ const API = (() => {
 
   // ── Analytics ──
   async function trackEvent(shopId, event) {
+    // Store locally for instant dashboard
+    try {
+      const key = 'ds_analytics_' + shopId;
+      const existing = JSON.parse(localStorage.getItem(key) || '{}');
+      existing[event] = (existing[event] || 0) + 1;
+      existing._lastSeen = Date.now();
+      localStorage.setItem(key, JSON.stringify(existing));
+    } catch {}
+    // Send to server
     try {
       await post('/api/analytics', { shopId, event, ts: Date.now() });
     } catch {} // Never throw on analytics
+  }
+
+  function getLocalAnalytics(shopId) {
+    try {
+      return JSON.parse(localStorage.getItem('ds_analytics_' + shopId) || '{}');
+    } catch { return {}; }
   }
 
   // ── Geocoding (Nominatim) ──
@@ -2534,9 +2624,13 @@ const API = (() => {
   function startKeepAlive() {
     if (_keepAliveInterval) return;
     _keepAliveInterval = setInterval(async () => {
-      if (!_online) await wake();
+      if (!_online) { const ok=await wake(); if(ok) DS.home.loadAndRender(); }
       else await ping();
-    }, 4 * 60 * 1000);
+    }, 3 * 60 * 1000); // 3min — prevents Railway 5min sleep
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState==='visible' && !_online)
+        wake().then(ok => { if(ok) DS.home.loadAndRender(); });
+    });
   }
 
   // Normalize raw server business into app shape
@@ -2699,9 +2793,14 @@ const Utils = (() => {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   }
 
-  // ── Sanitize string ──
+  // ── Sanitize + safeText ──
   function sanitize(str, maxLen = 200) {
-    return (str || '').replace(/[<>"']/g, '').trim().slice(0, maxLen);
+    return (str || '').replace(/[<>"'`]/g, '').trim().slice(0, maxLen);
+  }
+  function safeText(str) {
+    return (str||'').toString()
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;').slice(0,300);
   }
 
   // ── Compress image in browser ──
@@ -2755,10 +2854,15 @@ const LocationModule = (() => {
   function pick(name, lat, lng) {
     Store.setLocation(lat, lng, name);
     const short = name.split(',')[0];
-    Utils.el('locChipText').textContent = short;
+    const chipEl = Utils.el('locChipText');
+    if (chipEl) chipEl.textContent = short;
     Utils.toast(`📍 ${short}`);
     closeModal();
-    // Refresh views
+    // If a distance filter was active, re-apply it now that location is set
+    const distKm = Store.state.distKm || 0;
+    if (distKm > 0) {
+      Utils.toast(`📍 ${short} · showing within ${distKm} km`);
+    }
     DS.home.render();
     if (DS.discover._map) DS.discover.render();
   }
@@ -2913,13 +3017,15 @@ const MapUtils = (() => {
  */
 const HomeModule = (() => {
   const CAT_GROUPS = {
-    food:       ['food','restaurant','tiffin','biryani','fastfood','cafe','juice','sweets','icecream','catering','cakeshop','bakery','mess','hotel'],
-    grocery:    ['grocery','retail','supermarket','fruits','dairy','kirana','provision'],
-    health:     ['health','doctor','dentist','hospital','lab','physio','pharmacy','clinic','medical','nursing'],
-    service:    ['service','welder','welding','plumber','electrician','mechanic','carpenter','painter','tailor','acrepair','mobilerepair','cleaning','taxi','courier'],
-    beauty:     ['beauty','salon','spa','gym','yoga','cosmetics','parlour'],
-    education:  ['education','school','tuition','computer','driving','music','library','coaching'],
-    finance:    ['finance','bank','insurance','ca','lawyer','realestate','travel'],
+    food:       ['food','restaurant','tiffin','biryani','fastfood','cafe','juice','sweets','icecream','catering','cakeshop','bakery','mess','hotel','coffee','tea','snack','meals','parotta','dosa','idly','chat','🍛','☕','🥐','🍲','🍜'],
+    grocery:    ['grocery','retail','supermarket','fruits','dairy','kirana','provision','vegetables','grains','oil','store','shop','market','general','🛒','🌾','🥛','🍎'],
+    health:     ['health','doctor','dentist','hospital','lab','physio','pharmacy','clinic','medical','nursing','diagnostic','ayur','homeo','eye','ent','surgeon','👨‍⚕️','💊','🏥','🦷'],
+    service:    ['service','welder','welding','fabricat','plumber','electrician','mechanic','carpenter','painter','tailor','acrepair','ac repair','mobilerepair','mobile repair','cleaning','laundry','taxi','auto','courier','repair','work','workshop','garage','contractor','mason','bore','pump','motor','generator','⚡','🔧','🚿','🪚','🚗','✂️','📦'],
+    beauty:     ['beauty','salon','parlour','spa','gym','yoga','cosmetics','ladies','gents','hair','makeup','wellness','fitness','💇','🏋️'],
+    education:  ['education','school','tuition','college','coaching','computer','driving','music','library','institute','training','class','course','🏫','📖','💻'],
+    finance:    ['finance','bank','atm','insurance','ca','accountant','lawyer','realestate','real estate','travel','agent','property','🏦','📊','⚖️','🏠'],
+    religious:  ['religious','temple','church','mosque','kovil','masjid','chapel','prayer','pooja','🛕','⛪','🕌'],
+    retail:     ['retail','clothes','clothing','textile','electronics','hardware','jewellery','jewelry','furniture','shoes','footwear','opticals','books','stationery','bags','toys','gifts','mobile','phone','👗','📱','🔩','💍','👟'],
     religious:  ['religious','temple','church','mosque','pooja'],
     retail:     ['retail','clothes','electronics','hardware','jewellery','furniture','shoes','opticals'],
   };
@@ -2939,9 +3045,15 @@ const HomeModule = (() => {
 
   function shopMatchesCat(shop, cat) {
     if (!cat) return true;
-    const sec = (shop.sector || shop.sectorName || shop.g || '').toLowerCase();
+    // Collect all text fields that describe the shop type
+    const fields = [
+      shop.sector, shop.sectorName, shop.g, shop.sectorEmoji,
+      shop.e, shop.name, shop.description, shop.desc,
+      shop.category, shop.type
+    ].filter(Boolean).join(' ').toLowerCase();
+
     if (shop.g === cat) return true;
-    return (CAT_GROUPS[cat] || []).some(k => sec.includes(k) || shop.g === k);
+    return (CAT_GROUPS[cat] || []).some(k => fields.includes(k));
   }
 
   function buildCatBar() {
@@ -2972,12 +3084,32 @@ const HomeModule = (() => {
   }
 
   function toggleNear() {
+    // Legacy — now handled by setDist()
     const newVal = !Store.state.nearMe;
     Store.setFilter('nearMe', newVal);
-    const btn = Utils.el('filterNear');
-    if (btn) btn.setAttribute('aria-pressed', newVal);
-    if (newVal && !Store.location) { DS.location.openModal(); Store.setFilter('nearMe', false); if (btn) btn.setAttribute('aria-pressed', 'false'); return; }
-    if (newVal) Utils.toast('📍 Showing closest shops first');
+    render();
+  }
+
+  function setDist(km, el) {
+    // If selecting a non-zero distance and no location, prompt first
+    if (km > 0 && !Store.location) {
+      DS.location.openModal();
+      Utils.toast('📍 Set your location first to filter by distance');
+      return;
+    }
+
+    Store.setFilter('distKm', km);
+    Store.setFilter('nearMe', km > 0);
+
+    // Update all chip styles
+    [0, 1, 5, 10].forEach(d => {
+      const btn = Utils.el('dist-' + d);
+      if (btn) btn.setAttribute('aria-pressed', d === km ? 'true' : 'false');
+    });
+
+    if (km === 0) Utils.toast('📍 Showing all shops');
+    else          Utils.toast(`📍 Showing shops within ${km} km`);
+
     render();
   }
 
@@ -3023,7 +3155,19 @@ const HomeModule = (() => {
 
     if (catFilter) shops = shops.filter(s => shopMatchesCat(s, catFilter));
     if (openOnly)  shops = shops.filter(s => Utils.isOpen(s));
-    if (nearMe && loc) {
+
+    // Distance filter
+    const distKm = Store.state.distKm || 0;
+    if (distKm > 0 && loc) {
+      // Filter to shops within radius
+      shops = shops.filter(s => {
+        if (!s.lat || !s.lng || isNaN(+s.lat)) return false; // no coords → exclude
+        return Utils.km(loc.lat, loc.lng, +s.lat, +s.lng) <= distKm;
+      });
+    }
+
+    // Always sort by distance when a distance filter is active or nearMe
+    if ((nearMe || distKm > 0) && loc) {
       shops.sort((a, b) => {
         const da = (a.lat && a.lng) ? Utils.km(loc.lat, loc.lng, +a.lat, +a.lng) : 9999;
         const db = (b.lat && b.lng) ? Utils.km(loc.lat, loc.lng, +b.lat, +b.lng) : 9999;
@@ -3041,21 +3185,29 @@ const HomeModule = (() => {
     const { searchQuery, catFilter, openOnly, nearMe } = Store.state;
     const featWrap = wrap.closest ? wrap.parentElement?.previousElementSibling : null;
 
-    if (searchQuery || catFilter || openOnly || nearMe) {
+    if (searchQuery || catFilter || openOnly || nearMe || Store.state.distKm > 0) {
       wrap.style.display = 'none';
-      const hdr = wrap.previousElementSibling;
+      // Hide section header too
+      const hdr = document.querySelector('.section-header');
       if (hdr) hdr.style.display = 'none';
       return;
     }
     wrap.style.display = '';
-    const prevEl = wrap.previousElementSibling;
-    if (prevEl) prevEl.style.display = '';
+    const hdr2 = document.querySelector('.section-header');
+    if (hdr2) hdr2.style.display = '';
 
     const loc = Store.location;
-    const featured = Store.allShops()
-      .filter(s => Utils.isOpen(s))
-      .sort((a, b) => (b.rating || 0) - (a.rating || 0))
-      .slice(0, 6);
+    const allShops = Store.allShops();
+
+    // Show top-rated first, then newest — include open AND closed
+    const featured = [...allShops]
+      .sort((a, b) => {
+        const aOpen = Utils.isOpen(a) ? 1 : 0;
+        const bOpen = Utils.isOpen(b) ? 1 : 0;
+        if (bOpen !== aOpen) return bOpen - aOpen; // open first
+        return (b.rating || 0) - (a.rating || 0);  // then by rating
+      })
+      .slice(0, 8);
 
     const GRADS = [
       'linear-gradient(150deg,#2d0e00,#7c2d00)',
@@ -3064,37 +3216,52 @@ const HomeModule = (() => {
       'linear-gradient(150deg,#1a0015,#4a0035)',
       'linear-gradient(150deg,#0a0010,#1a0040)',
       'linear-gradient(150deg,#1a1000,#3d2800)',
+      'linear-gradient(150deg,#001a1a,#004040)',
+      'linear-gradient(150deg,#1a0a00,#3d2000)',
     ];
 
-    wrap.innerHTML = featured.length
-      ? featured.map((s, i) => {
-          const open = Utils.isOpen(s);
-          const dist = loc && s.lat && s.lng
-            ? Utils.fmtDist(Utils.km(loc.lat, loc.lng, +s.lat, +s.lng))
-            : null;
-          return `
-          <div class="featured-card" style="background:${GRADS[i % GRADS.length]}" onclick="DS.detail.open('${s.id}')" role="listitem">
-            <div class="feat-bg">${s.e || s.sectorEmoji || '🏪'}</div>
-            <div class="feat-overlay"></div>
-            <div class="feat-body">
-              <div class="feat-category">${s.sectorName || s.sector || ''} · ${s.city || ''}</div>
-              <div class="feat-name">${s.name}</div>
-              <div class="feat-meta">
-                <span class="${open ? 'feat-open' : 'feat-closed'}">${open ? 'Open' : 'Closed'}</span>
-                ${dist ? `<span class="feat-dist">📍 ${dist}</span>` : ''}
-                ${s.rating ? `<span class="feat-stars">★ ${s.rating}</span>` : ''}
-              </div>
+    if (!featured.length) {
+      // No shops loaded yet — show skeleton cards
+      wrap.innerHTML = [1,2,3].map(() =>
+        `<div class="featured-card skel" style="min-width:220px;height:145px;border-radius:var(--radius-lg)"></div>`
+      ).join('');
+      return;
+    }
+
+    wrap.innerHTML = featured.map((s, i) => {
+      const open = Utils.isOpen(s);
+      const color = Utils.sectorColor(s);
+      const dist = loc && s.lat && s.lng
+        ? Utils.fmtDist(Utils.km(loc.lat, loc.lng, +s.lat, +s.lng))
+        : null;
+      return `
+        <div class="featured-card" style="background:${GRADS[i % GRADS.length]}" onclick="DS.detail.open('${s.id}')" role="listitem">
+          <div class="feat-bg">${s.e || s.sectorEmoji || '🏪'}</div>
+          <div class="feat-overlay"></div>
+          <div class="feat-body">
+            <div class="feat-category">${Utils.safeText(s.sectorName || s.sector || '')}${s.city ? ' · ' + Utils.safeText(s.city) : ''}</div>
+            <div class="feat-name">${Utils.safeText(s.name)}</div>
+            <div class="feat-meta">
+              <span class="${open ? 'feat-open' : 'feat-closed'}">${open ? '● Open' : '● Closed'}</span>
+              ${dist ? `<span class="feat-dist">📍 ${dist}</span>` : ''}
+              ${s.rating ? `<span class="feat-stars">★ ${s.rating}</span>` : ''}
             </div>
-          </div>`;
-        }).join('')
-      : '<div style="padding:20px;color:var(--ink-3);font-size:.82rem">Loading nearby businesses…</div>';
+          </div>
+        </div>`;
+    }).join('');
   }
 
   function renderList(shops) {
     const list = Utils.el('homeShopList');
     if (!list) return;
     const count = Utils.el('homeResultCount');
-    if (count) count.textContent = shops.length ? `${shops.length} business${shops.length !== 1 ? 'es' : ''}` : '';
+    if (count) {
+      const distKm = Store.state.distKm || 0;
+      const distLabel = distKm > 0 ? ` within ${distKm}km` : '';
+      count.textContent = shops.length
+        ? `${shops.length} shop${shops.length !== 1 ? 's' : ''}${distLabel}`
+        : '';
+    }
 
     if (!shops.length) {
       const { searchQuery, catFilter } = Store.state;
@@ -3124,7 +3291,7 @@ const HomeModule = (() => {
               ${s.addr || s.city ? `<div class="shop-addr">📍 ${[s.addr, s.city].filter(Boolean).join(', ')}</div>` : ''}
               <div class="shop-foot">
                 <span class="shop-status ${open ? 'open' : 'closed'}">${open ? '● Open' : '● Closed'}</span>
-                ${dist !== null ? `<span class="shop-dist">📍 ${Utils.fmtDist(dist)}</span>` : ''}
+                ${dist !== null ? `<span class="shop-dist" style="${(Store.state.distKm > 0 && dist > Store.state.distKm) ? 'color:var(--rose)' : ''}">📍 ${Utils.fmtDist(dist)}</span>` : ''}
                 ${s.rating ? `<span class="shop-rating">★ ${s.rating}</span>` : ''}
                 <span class="shop-price">${Utils.priceLevel(s)}</span>
               </div>
@@ -3136,10 +3303,18 @@ const HomeModule = (() => {
 
   function showSkeletons(n = 4) {
     const list = Utils.el('homeShopList');
-    if (!list) return;
-    list.innerHTML = Array(n).fill(0).map(() =>
-      `<div class="skel" style="height:88px;margin-bottom:10px;border-radius:var(--radius-lg)"></div>`
-    ).join('');
+    if (list) {
+      list.innerHTML = Array(n).fill(0).map(() =>
+        `<div class="skel" style="height:88px;margin-bottom:10px;border-radius:var(--radius-lg)"></div>`
+      ).join('');
+    }
+    // Also show skeleton featured cards
+    const feat = Utils.el('featuredScroll');
+    if (feat) {
+      feat.innerHTML = [1,2,3].map(() =>
+        `<div class="skel featured-card" style="min-width:220px;height:145px;border-radius:var(--radius-lg);flex-shrink:0"></div>`
+      ).join('');
+    }
   }
 
   async function render() {
@@ -3150,18 +3325,27 @@ const HomeModule = (() => {
   }
 
   async function loadAndRender() {
-    showSkeletons();
-    render(); // render from cache immediately
+    // Render from cache FIRST — instant display
+    const cached = Store.allShops();
+    if (cached.length) {
+      render(); // show cached immediately, no skeleton
+    } else {
+      showSkeletons(); // only show skeleton if truly nothing cached
+    }
 
-    // Fetch fresh from server
+    // Always try to fetch fresh data from server
     try {
       const raw = await API.getShops();
       if (raw.length) {
         Store.setServerShops(raw.map(API.normalize));
+        render(); // update with fresh data
+      } else if (!cached.length) {
+        // Server returned empty — show empty state, not infinite "loading"
         render();
       }
     } catch (e) {
-      // Stay on cached data — no error shown
+      // Server unreachable — keep showing cached, render to clear skeleton
+      if (!cached.length) render();
     }
   }
 
@@ -3203,9 +3387,13 @@ const DiscoverModule = (() => {
       zoomControl: false,
       scrollWheelZoom: true,
       tap: true,
-      tapTolerance: 15,
+      tapTolerance: 20,
       attributionControl: false,
       preferCanvas: true,
+      renderer: L.canvas({ padding: 0.5 }),
+      maxZoom: 19,
+      zoomAnimation: true,
+      markerZoomAnimation: true,
     }).setView(center, loc ? 14 : 8);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -3342,14 +3530,21 @@ const DiscoverModule = (() => {
       );
     }
     if (_catFilter) {
-      shops = shops.filter(s => {
-        const sec = (s.sector || s.sectorName || s.g || '').toLowerCase();
-        return s.g === _catFilter || sec.includes(_catFilter);
-      });
+      shops = shops.filter(s => HomeModule.shopMatchesCat ? HomeModule.shopMatchesCat(s, _catFilter) : (() => {
+        const fields = [s.sector,s.sectorName,s.g,s.name,s.description,s.desc].filter(Boolean).join(' ').toLowerCase();
+        return s.g === _catFilter || fields.includes(_catFilter);
+      })());
     }
     if (_openOnly) shops = shops.filter(s => Utils.isOpen(s));
 
     const loc = Store.location;
+    const distKm = Store.state.distKm || 0;
+    if (distKm > 0 && loc) {
+      shops = shops.filter(s => {
+        if (!s.lat || !s.lng || isNaN(+s.lat)) return false;
+        return Utils.km(loc.lat, loc.lng, +s.lat, +s.lng) <= distKm;
+      });
+    }
     if (_sortMode === 'newest') shops.sort((a, b) => (b.reg || 0) - (a.reg || 0));
     else if (_sortMode === 'rating') shops.sort((a, b) => (b.rating || 0) - (a.rating || 0));
     else if (_sortMode === 'dist' && loc) {
@@ -3428,10 +3623,10 @@ const DiscoverModule = (() => {
 
       const icon = L.divIcon({
         className: '',
-        html: `<div style="background:${color};width:40px;height:40px;border-radius:50%;border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center;font-size:17px">${emoji}</div>`,
-        iconSize: [40, 40],
-        iconAnchor: [20, 20],
-        popupAnchor: [0, -24],
+        html: `<div style="background:${color};width:36px;height:36px;border-radius:50%;border:2.5px solid white;box-shadow:0 2px 6px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-size:16px;will-change:transform">${emoji}</div>`,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+        popupAnchor: [0, -20],
       });
 
       const m = L.marker([+s.lat, +s.lng], { icon, zIndexOffset: open ? 300 : 100 }).addTo(_map);
@@ -3562,8 +3757,20 @@ const DiscoverModule = (() => {
     }
   }
 
+  function setDist(km, el) {
+    if (km > 0 && !Store.location) { DS.location.openModal(); return; }
+    Store.setFilter('distKm', km);
+    [0,1,5,10].forEach(d => {
+      const b = document.getElementById('ddisc-'+d);
+      if (b) b.classList.toggle('active', d === km);
+    });
+    render();
+    if (km > 0) Utils.toast(`📍 Within ${km} km`);
+    else Utils.toast('📍 All shops');
+  }
+
   return {
-    init, render, fitAll,
+    init, render, fitAll, setDist,
     setCat, sort, search, clearSearch,
     toggleOpenNow, toggleRadar,
     get _map() { return _map; },
@@ -3676,7 +3883,7 @@ const DetailModule = (() => {
 
       <!-- Action buttons -->
       <div class="action-grid">
-        ${waLink ? `<button class="action-btn action-btn--wa" onclick="window.open('${waLink}','_blank')">💬 Order on WhatsApp</button>` : ''}
+        ${waLink ? `<button class="action-btn action-btn--wa" onclick="window.open('${waLink}','_blank');setTimeout(()=>DS.detail.promptRating('${shop.id}'),3500)">💬 Order on WhatsApp</button>` : ''}
         ${shop.phone ? `<button class="action-btn action-btn--call" onclick="window.open('tel:${shop.phone}')">📞 Call</button>` : ''}
         <button class="action-btn action-btn--map" onclick="DS.detail.navigate(DS.detail.current)">🧭 Directions</button>
         <button class="action-btn action-btn--share" onclick="Utils.shareShop(DS.detail.current)">🔗 Share</button>
@@ -3766,8 +3973,29 @@ const DetailModule = (() => {
     if (e.state?.modal !== 'detail') close();
   });
 
+  function promptRating(shopId) {
+    const shop = Store.allShops().find(s=>s.id===shopId);
+    if (!shop) return;
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;bottom:calc(var(--bnav-h)+14px);left:50%;transform:translateX(-50%);background:var(--surface-1);border:1.5px solid var(--border-2);border-radius:var(--radius-lg);padding:14px 18px;z-index:9998;box-shadow:var(--shadow-xl);text-align:center;white-space:nowrap';
+    const name = (shop.name||'').replace(/[<>'"]/g,'');
+    el.innerHTML = `<div style="font-size:.76rem;font-weight:700;color:var(--ink);margin-bottom:8px">⭐ Rate ${name}</div><div style="display:flex;justify-content:center;gap:4px;margin-bottom:8px">${[1,2,3,4,5].map(n=>`<button onclick="DS.detail.submitRating('${shopId}',${n},this.parentElement.parentElement)" style="font-size:1.8rem;background:none;border:none;cursor:pointer">★</button>`).join('')}</div><button onclick="this.parentElement.remove()" style="font-size:.68rem;color:var(--ink-4);background:none;border:none;cursor:pointer">Skip</button>`;
+    document.body.appendChild(el);
+    setTimeout(()=>{if(el.parentElement)el.remove();},8000);
+  }
+  function submitRating(shopId, stars, container) {
+    const shop = Store.allShops().find(s=>s.id===shopId);
+    if (!shop) return;
+    const rc = (shop.rc||0)+1;
+    const rating = Math.round((((shop.rating||0)*(shop.rc||0))+stars)/rc*10)/10;
+    Store.addLocalShop({...shop,rating,rc});
+    API.updateShop(shop.bizId||shop.id,{rating,reviewCount:rc}).catch(()=>{});
+    if(container) container.remove();
+    Utils.toast(`⭐ Thanks for rating!`);
+  }
   return {
     open, close, navigate,
+    promptRating, submitRating,
     get current() { return _current; },
   };
 })();
@@ -4363,11 +4591,37 @@ const AddShopModule = (() => {
  */
 const ProfileModule = (() => {
 
+  let _pollT = null;
+  function startOrderPolling() {
+    if (_pollT) return;
+    _pollT = setInterval(async () => {
+      if (!document.getElementById('page-profile')?.classList.contains('active')) { stopOrderPolling(); return; }
+      try {
+        const shops = Store.myShops();
+        if (!shops.length || !API.isOnline) return;
+        const phone = (shops[0].phone||shops[0].wa||'').replace(/\D/g,'').slice(-10);
+        if (!phone) return;
+        const fresh = await API.getOrders({ shopPhone: phone });
+        if (!fresh.length) return;
+        const knownIds = new Set(Store.myOrders().map(o=>o.id||o.orderId));
+        const newOnes = fresh.filter(o=>(o.status==='pending'||o.status==='new') && !knownIds.has(o.id||o.orderId));
+        fresh.forEach(o => Store.updateOrder(o.id||o.orderId, o));
+        if (newOnes.length) {
+          Utils.toast(`🔔 ${newOnes.length} new order${newOnes.length>1?'s':''}!`);
+          const c = Utils.el('profileContent');
+          if (c && Store.isLoggedIn()) renderProfile(c);
+        }
+      } catch {}
+    }, 30000);
+  }
+  function stopOrderPolling() { if(_pollT){clearInterval(_pollT);_pollT=null;} }
+
   // ── Main render ───────────────────────────────────────────────────────────
   function render() {
     const c = Utils.el('profileContent');
     if (!c) return;
     Store.isLoggedIn() ? renderProfile(c) : renderSignIn(c);
+    if (Store.isLoggedIn()) startOrderPolling();
   }
 
   // ── Sign-in screen ────────────────────────────────────────────────────────
@@ -4393,7 +4647,7 @@ const ProfileModule = (() => {
         <!-- Phone sign-in -->
         <div style="display:flex;gap:8px;margin-bottom:10px">
           <input id="phoneSignInInp" class="field-input" type="tel" placeholder="10-digit WhatsApp number" style="flex:1"/>
-          <button class="btn-primary" onclick="DS.profile.phoneSignIn()" style="white-space:nowrap;padding:10px 16px">Go →</button>
+          <button id="phoneSignInBtn" class="btn-primary" onclick="DS.profile.phoneSignIn()" style="white-space:nowrap;padding:10px 16px">Go →</button>
         </div>
         <div style="font-size:.7rem;color:var(--ink-4);text-align:center">Your phone number identifies your shops across devices</div>
       </div>`;
@@ -4543,10 +4797,23 @@ const ProfileModule = (() => {
 
         <div style="padding:12px 14px">
           <!-- Info row -->
-          <div style="font-size:.72rem;color:var(--ink-3);margin-bottom:10px">
+          <div style="font-size:.72rem;color:var(--ink-3);margin-bottom:8px">
             ${s.addr || s.city ? `📍 ${[s.addr, s.city].filter(Boolean).join(', ')}` : ''}
             ${s.phone ? `&nbsp;·&nbsp; 📞 ${s.phone}` : ''}
           </div>
+          <!-- Mini analytics -->
+          ${(() => {
+            const a = API.getLocalAnalytics ? API.getLocalAnalytics(s.id) : {};
+            const views = s.views || a.view || 0;
+            const waClicks = a.whatsapp || a.wa || 0;
+            const navClicks = a.navigate || 0;
+            if (!views && !waClicks && !navClicks) return '';
+            return `<div style="display:flex;gap:8px;margin-bottom:8px;background:var(--surface-2);border-radius:var(--radius-sm);padding:7px 10px">
+              ${views ? `<div style="text-align:center;flex:1"><div style="font-size:.9rem;font-weight:800;color:var(--ink)">${views}</div><div style="font-size:.58rem;color:var(--ink-4);text-transform:uppercase;letter-spacing:.05em">Views</div></div>` : ''}
+              ${waClicks ? `<div style="text-align:center;flex:1"><div style="font-size:.9rem;font-weight:800;color:#25D366">${waClicks}</div><div style="font-size:.58rem;color:var(--ink-4);text-transform:uppercase;letter-spacing:.05em">WhatsApp</div></div>` : ''}
+              ${navClicks ? `<div style="text-align:center;flex:1"><div style="font-size:.9rem;font-weight:800;color:var(--blue)">${navClicks}</div><div style="font-size:.58rem;color:var(--ink-4);text-transform:uppercase;letter-spacing:.05em">Directions</div></div>` : ''}
+            </div>`;
+          })()}
 
           <!-- Website section -->
           <div style="background:${s.websiteEnabled ? 'rgba(10,124,74,.06)' : 'var(--surface-2)'};border:1.5px solid ${s.websiteEnabled ? 'rgba(10,124,74,.2)' : 'var(--border-2)'};border-radius:var(--radius-md);padding:10px 12px;margin-bottom:10px">
@@ -4554,8 +4821,8 @@ const ProfileModule = (() => {
               <div style="font-size:.63rem;font-weight:700;color:var(--forest);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">🟢 Website Live</div>
               <div style="font-size:.69rem;color:var(--blue);word-break:break-all;font-weight:600;margin-bottom:8px">${webUrl}</div>
               <div style="display:flex;gap:5px;flex-wrap:wrap">
-                <a href="${webUrl}" target="_blank" style="padding:5px 10px;background:var(--blue);color:white;border-radius:6px;font-size:.66rem;font-weight:700;text-decoration:none">🌐 Open</a>
-                <button onclick="navigator.clipboard?.writeText('${webUrl}').then(()=>Utils.toast('✅ Link copied!'))" style="padding:5px 10px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--ink-2);border-radius:6px;font-size:.66rem;font-weight:700;cursor:pointer">📋 Copy</button>
+                <button onclick="DS.profile.openWebsite('${s.id}')" style="padding:5px 10px;background:var(--blue);color:white;border:none;border-radius:6px;font-size:.66rem;font-weight:700;cursor:pointer">🌐 Open</button>
+                <button onclick="DS.profile.downloadWebsite('${s.id}')" style="padding:5px 10px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--ink-2);border-radius:6px;font-size:.66rem;font-weight:700;cursor:pointer">⬇️ Save</button>
                 <button onclick="window.open('https://wa.me/?text='+encodeURIComponent('Order from ${s.name}:\\n${webUrl}'),'_blank')" style="padding:5px 10px;background:#25D366;color:white;border:none;border-radius:6px;font-size:.66rem;font-weight:700;cursor:pointer">💬 Share</button>
                 <button onclick="DS.grow.editSite('${s.id}')" style="padding:5px 10px;background:var(--flame-soft);border:1px solid var(--flame-mid);color:var(--flame);border-radius:6px;font-size:.66rem;font-weight:700;cursor:pointer">✏️ Edit</button>
               </div>` : `
@@ -4652,12 +4919,22 @@ const ProfileModule = (() => {
   }
 
   function phoneSignIn() {
-    const raw   = (Utils.el('phoneSignInInp')?.value || '').replace(/\D/g, '');
-    const phone = raw.slice(-10);
-    if (phone.length !== 10) { Utils.toast('⚠️ Enter a valid 10-digit number'); return; }
-    Store.setUser({ uid:'phone_'+phone, phone, name:'Shop Owner', email:'' });
+    const phone = (Utils.el('phoneSignInInp')?.value||'').replace(/\D/g,'').slice(-10);
+    if (phone.length!==10) { Utils.toast('⚠️ Enter a valid 10-digit number'); return; }
+    if (window._fbAuth && typeof firebase !== 'undefined') {
+      try {
+        if (!window._rcv) window._rcv = new firebase.auth.RecaptchaVerifier('phoneSignInBtn',{size:'invisible',callback:()=>{}});
+        Utils.toast('📱 Sending OTP to +91 '+phone+'…');
+        window._fbAuth.signInWithPhoneNumber('+91'+phone, window._rcv)
+          .then(cr => { const c=prompt('Enter OTP sent to +91 '+phone+':'); return c?cr.confirm(c):null; })
+          .then(r => { if(!r) return; Store.setUser({uid:r.user.uid,phone,name:'Shop Owner',email:''}); render(); Utils.toast('✅ Phone verified!'); })
+          .catch(() => { Store.setUser({uid:'ph_'+phone,phone,name:'Shop Owner',email:''}); render(); Utils.toast('✅ Signed in'); });
+        return;
+      } catch(e) { console.warn('OTP:',e); }
+    }
+    Store.setUser({uid:'ph_'+phone,phone,name:'Shop Owner',email:''});
     render();
-    Utils.toast('✅ Signed in with +91 ' + phone);
+    Utils.toast('✅ Signed in with +91 '+phone);
   }
 
   function signOut() {
@@ -4734,17 +5011,47 @@ const ProfileModule = (() => {
     Utils.toast('✅ PIN updated for all your shops!');
   }
 
+  // ── Open generated website as blob ──────────────────────────────────────
+  function openWebsite(shopId) {
+    const shop = Store.myShops().find(s => s.id === shopId);
+    if (!shop) { Utils.toast('Shop not found'); return; }
+
+    if (shop.customHtml) {
+      // Open the actual generated website HTML
+      const blob = new Blob([shop.customHtml], { type: 'text/html' });
+      const url  = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } else {
+      // No website built yet — send to builder
+      Utils.toast('Build your website first in Grow →');
+      DS.nav.go('grow');
+    }
+  }
+
+  // ── Download website HTML file ────────────────────────────────────────────
+  function downloadWebsite(shopId) {
+    const shop = Store.myShops().find(s => s.id === shopId);
+    if (!shop?.customHtml) { Utils.toast('Build your website first'); return; }
+    const blob = new Blob([shop.customHtml], { type: 'text/html' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = API.slugify(shop.name) + '-website.html';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    Utils.toast('⬇️ Website downloaded!');
+  }
+
   return {
     render,
     googleSignIn, phoneSignIn, signOut,
-    syncShops, deleteShop,
-    updateOrder,
+    syncShops, deleteShop, updateOrder,
     openPinModal, closePinModal, savePin,
-    showShops: render,
-    showOrders: render,
-    generateQR: () => {},
-    downloadQR: () => {},
-    generateAllQRs: () => {},
+    openWebsite, downloadWebsite,
+    startOrderPolling, stopOrderPolling,
+    showShops: render, showOrders: render,
+    generateQR:()=>{}, downloadQR:()=>{}, generateAllQRs:()=>{},
   };
 })();
 
@@ -4979,7 +5286,7 @@ document.addEventListener('DOMContentLoaded',function(){
 });`;
 
   // ══ BUILDER STATE ══
-  let _step = 0, _prodCount = 0, _curTmpl = 'restaurant', _curTheme = 'dark';
+  let _step = 0, _prodCount = 0, _curTmpl = 'restaurant', _curTheme = 'dark', _lastBuiltShopId = null;
 
   // ══ MAIN RENDER ══
   function render() {
@@ -5054,6 +5361,14 @@ document.addEventListener('DOMContentLoaded',function(){
     _step = 0; _prodCount = 0;
     const myShops = Store.myShops();
     const preShop = shopId ? myShops.find(s=>s.id===shopId) : myShops[0];
+    // Auto-pick template based on shop type
+    if (preShop && !_curTmpl) {
+      const g = (preShop.g || preShop.sector || '').toLowerCase();
+      const name = (preShop.sectorName || preShop.name || '').toLowerCase();
+      if (['food','mess','restaurant','cafe','bakery','hotel'].some(k=>g.includes(k)||name.includes(k))) _curTmpl = 'restaurant';
+      else if (['grocery','kirana','retail','supermarket','fruit'].some(k=>g.includes(k)||name.includes(k))) _curTmpl = 'grocery';
+      else _curTmpl = 'service';
+    }
     renderBuilderPage(preShop);
   }
 
@@ -5142,12 +5457,17 @@ document.addEventListener('DOMContentLoaded',function(){
                 <div id="tmpl-restaurant" onclick="DS.grow.pickTmpl('restaurant')" style="border-radius:10px;overflow:hidden;cursor:pointer;border:2.5px solid ${_curTmpl==='restaurant'?'#ff4500':'transparent'};transition:.2s">
                   <div style="height:72px;background:linear-gradient(135deg,#0f0800,#3d1500);display:flex;align-items:center;justify-content:center;gap:8px;padding:0 10px"><span style="font-size:1.5rem">🍛</span><div><div style="font-size:.7rem;font-weight:800;color:#fff">RESTAURANT</div><div style="font-size:.56rem;color:rgba(255,255,255,.5)">Menu · Cart · Orders</div></div></div>
                   <div style="background:#ff4500;height:3px"></div>
-                  <div style="background:#1a0a00;padding:4px;text-align:center;font-size:.6rem;font-weight:700;color:#ff8c00">🔥 Also: Mess · Cafe · Bakery</div>
+                  <div style="background:#1a0a00;padding:4px;text-align:center;font-size:.6rem;font-weight:700;color:#ff8c00">🔥 Mess · Cafe · Bakery · Hotel</div>
                 </div>
                 <div id="tmpl-grocery" onclick="DS.grow.pickTmpl('grocery')" style="border-radius:10px;overflow:hidden;cursor:pointer;border:2.5px solid ${_curTmpl==='grocery'?'#16a34a':'transparent'};transition:.2s">
-                  <div style="height:72px;background:linear-gradient(135deg,#071a0e,#14532d);display:flex;align-items:center;justify-content:center;gap:8px;padding:0 10px"><span style="font-size:1.5rem">🛒</span><div><div style="font-size:.7rem;font-weight:800;color:#fff">GROCERY</div><div style="font-size:.56rem;color:rgba(255,255,255,.5)">Products · Cart · Orders</div></div></div>
+                  <div style="height:72px;background:linear-gradient(135deg,#071a0e,#14532d);display:flex;align-items:center;justify-content:center;gap:8px;padding:0 10px"><span style="font-size:1.5rem">🛒</span><div><div style="font-size:.7rem;font-weight:800;color:#fff">GROCERY / RETAIL</div><div style="font-size:.56rem;color:rgba(255,255,255,.5)">Products · Cart · Orders</div></div></div>
                   <div style="background:#16a34a;height:3px"></div>
-                  <div style="background:#0a1a10;padding:4px;text-align:center;font-size:.6rem;font-weight:700;color:#22c55e">🌿 Also: Kirana · Dairy · Fruits</div>
+                  <div style="background:#0a1a10;padding:4px;text-align:center;font-size:.6rem;font-weight:700;color:#22c55e">🌿 Kirana · Supermarket · Fruits</div>
+                </div>
+                <div id="tmpl-service" onclick="DS.grow.pickTmpl('service')" style="border-radius:10px;overflow:hidden;cursor:pointer;border:2.5px solid ${_curTmpl==='service'?'#1A56DB':'transparent'};transition:.2s;grid-column:1/-1">
+                  <div style="height:64px;background:linear-gradient(135deg,#0a0f1a,#1a2d4a);display:flex;align-items:center;justify-content:center;gap:12px;padding:0 14px"><span style="font-size:1.5rem">🏪</span><div><div style="font-size:.72rem;font-weight:800;color:#fff">UNIVERSAL — All Businesses</div><div style="font-size:.58rem;color:rgba(255,255,255,.5)">Services · Shops · Welding · Salon · Clinic · Any business</div></div><span style="font-size:.6rem;background:#1A56DB;color:white;border-radius:99px;padding:2px 8px;font-weight:700;flex-shrink:0">DEFAULT</span></div>
+                  <div style="background:#1A56DB;height:3px"></div>
+                  <div style="background:#060d1a;padding:4px;text-align:center;font-size:.6rem;font-weight:700;color:#93c5fd">Works for every type of business · WhatsApp enquiry · Service list</div>
                 </div>
               </div>
               <div style="font-size:.75rem;font-weight:600;color:#888;margin-bottom:8px">Colour Theme</div>
@@ -5191,7 +5511,10 @@ document.addEventListener('DOMContentLoaded',function(){
                   <span style="color:var(--blue);font-weight:700;font-size:.8rem;flex:1;word-break:break-all" id="wb-liveUrl"></span>
                   <button onclick="navigator.clipboard?.writeText(document.getElementById('wb-liveUrl').textContent).then(()=>Utils.toast('✅ Copied!'))" style="background:rgba(8,145,178,.1);border:1px solid rgba(8,145,178,.25);color:var(--blue);border-radius:8px;padding:5px 10px;font-size:.7rem;font-weight:700;cursor:pointer;white-space:nowrap">Copy</button>
                 </div>
-                <a id="wb-downloadBtn" download="shop-website.html" style="display:block;width:100%;padding:12px;background:rgba(74,222,128,.12);border:1.5px solid rgba(74,222,128,.28);color:var(--forest);border-radius:var(--radius-md);font-size:.84rem;font-weight:700;cursor:pointer;margin-bottom:8px;text-decoration:none;text-align:center">⬇️ Download Website File</a>
+                <div style="display:flex;gap:8px;margin-bottom:8px">
+                  <button onclick="if(DS.profile.openWebsite)DS.profile.openWebsite(DS.grow.selectedShopId)" style="flex:1;padding:12px;background:rgba(74,222,128,.12);border:1.5px solid rgba(74,222,128,.28);color:var(--forest);border-radius:var(--radius-md);font-size:.82rem;font-weight:700;cursor:pointer">🌐 Preview Website</button>
+                  <button onclick="if(DS.profile.downloadWebsite)DS.profile.downloadWebsite(DS.grow.selectedShopId)" style="flex:1;padding:12px;background:var(--surface-2);border:1.5px solid var(--border-2);color:var(--ink-2);border-radius:var(--radius-md);font-size:.82rem;font-weight:700;cursor:pointer">⬇️ Download File</button>
+                </div>
                 <button onclick="window.open('https://wa.me/?text='+encodeURIComponent('Order from my shop: '+document.getElementById('wb-liveUrl').textContent),'_blank')" style="width:100%;padding:12px;background:#25D366;color:white;border:none;border-radius:var(--radius-md);font-size:.84rem;font-weight:700;cursor:pointer;margin-bottom:8px">💬 Share on WhatsApp</button>
                 <button onclick="DS.nav.go('profile')" style="width:100%;padding:12px;background:var(--surface-2);border:1.5px solid var(--border-2);border-radius:var(--radius-md);font-size:.82rem;font-weight:600;color:var(--ink-2);cursor:pointer">📋 View in Profile →</button>
               </div>
@@ -5275,9 +5598,10 @@ document.addEventListener('DOMContentLoaded',function(){
 
   function pickTmpl(t) {
     _curTmpl = t;
-    ['restaurant','grocery'].forEach(id => {
+    const colors = { restaurant:'#ff4500', grocery:'#16a34a', service:'#1A56DB' };
+    ['restaurant','grocery','service'].forEach(id => {
       const el = Utils.el('tmpl-'+id);
-      if (el) el.style.borderColor = id===t ? (t==='restaurant'?'#ff4500':'#16a34a') : 'transparent';
+      if (el) el.style.borderColor = id===t ? (colors[id]||'#ff4500') : 'transparent';
     });
     updatePreview();
   }
@@ -5319,10 +5643,14 @@ document.addEventListener('DOMContentLoaded',function(){
 
   function buildSiteHtml(biz) {
     const isGroc = biz.websiteTemplate === 'grocery';
+    const isService = biz.websiteTemplate === 'service';
     const menuJson = JSON.stringify(biz.menuItems||[]);
     const shopJson = JSON.stringify(biz);
-    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${biz.name}</title><style>${REST_CSS}</style></head><body>
-${REST_HTML}
+    // Service template uses REST layout but with blue theme auto-applied
+    const templateCss = REST_CSS;
+    const templateHtml = REST_HTML;
+    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${biz.name}</title><style>${templateCss}${isService?`:root{--fire:#1A56DB;--gold:#3b82f6;--dark:#060d1a;--surface:#0a1628;--card:#0f1f38;--border:rgba(59,130,246,.12);--text:#f0f4ff;--muted:#7fa8d0}`:''}</style></head><body>
+${templateHtml}
 <script>
 var _DS_PREFIX="ds_p_${biz.slug}_";
 var _DS_MENU=${menuJson};
@@ -5362,6 +5690,7 @@ ${SITE_JS}
       oh:'09:00', oc:'21:00',
     };
     Store.addLocalShop(shopData);
+    _lastBuiltShopId = shopData.id;
 
     // Try server
     try { await API.createShop(shopData); } catch {}
@@ -5401,7 +5730,7 @@ ${SITE_JS}
     else render();
   }
 
-  return { render, openBuilder, editSite, addProd, pickTmpl, pickTheme, builderNext, builderPrev, goLive };
+  return { render, openBuilder, editSite, addProd, pickTmpl, pickTheme, builderNext, builderPrev, goLive, get selectedShopId() { return _lastBuiltShopId; } };
 })();
 
 
@@ -5544,31 +5873,140 @@ function updateNetStatus() {
 window.addEventListener('online',  () => { updateNetStatus(); DS.home.loadAndRender(); Utils.toast('✅ Back online'); });
 window.addEventListener('offline', () => { updateNetStatus(); Utils.toast('📡 Offline — cached data shown', 4000); });
 
-// Pull-to-refresh
-let _pty = 0;
-document.addEventListener('touchstart', e => { if (window.scrollY===0) _pty = e.touches[0].clientY; }, { passive:true });
-document.addEventListener('touchend',   e => {
-  if (_pty > 0 && (e.changedTouches[0].clientY - _pty) > 72) {
-    if (DS.nav.current === 'home')     { DS.home.loadAndRender(); Utils.toast('🔄 Refreshed'); }
-    if (DS.nav.current === 'discover') { DS.discover.render();    Utils.toast('🔄 Refreshed'); }
+// ── Pull to Refresh — floating pill design ──
+(function() {
+  let _pty = 0, _dy = 0, _active = false, _spinning = false;
+
+  // Create floating pill indicator
+  const pill = document.createElement('div');
+  pill.id = 'ptrPill';
+  pill.innerHTML = `
+    <div id="ptrIcon" style="font-size:1.1rem;transition:transform .3s ease">↓</div>
+    <span id="ptrLabel" style="font-size:.72rem;font-weight:700;letter-spacing:.01em">Pull to refresh</span>`;
+  pill.style.cssText = `
+    position: fixed;
+    top: 72px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-80px);
+    z-index: 9997;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--surface-1);
+    color: var(--ink);
+    border: 1.5px solid var(--border-2);
+    border-radius: 999px;
+    padding: 9px 18px 9px 14px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.15);
+    pointer-events: none;
+    transition: transform .25s cubic-bezier(.34,1.56,.64,1), opacity .25s ease, border-color .2s ease;
+    opacity: 0;
+    white-space: nowrap;
+  `;
+  document.body.appendChild(pill);
+
+  // Spinner animation style
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes ptrSpin { to { transform: rotate(360deg); } }
+    #ptrPill.ptr-ready { border-color: var(--flame); color: var(--flame); }
+    #ptrPill.ptr-ready #ptrIcon { transform: rotate(180deg); }
+    #ptrPill.ptr-loading #ptrIcon { animation: ptrSpin .7s linear infinite; }
+  `;
+  document.head.appendChild(style);
+
+  function showPill(dy) {
+    const progress  = Math.min((dy - 20) / 60, 1);
+    const yOffset   = Math.round(-80 + progress * 90); // slides down from -80 to +10
+    pill.style.transform = `translateX(-50%) translateY(${yOffset}px)`;
+    pill.style.opacity   = String(Math.min(progress * 1.5, 1));
+    const ready = dy > 70;
+    pill.classList.toggle('ptr-ready', ready);
+    document.getElementById('ptrIcon').textContent  = ready ? '↑' : '↓';
+    document.getElementById('ptrLabel').textContent = ready ? 'Release to refresh' : 'Pull to refresh';
   }
-  _pty = 0;
-}, { passive:true });
+
+  function hidePill() {
+    pill.style.transform = 'translateX(-50%) translateY(-80px)';
+    pill.style.opacity   = '0';
+    pill.classList.remove('ptr-ready','ptr-loading');
+    document.getElementById('ptrIcon').textContent  = '↓';
+    document.getElementById('ptrLabel').textContent = 'Pull to refresh';
+  }
+
+  function triggerRefresh() {
+    pill.classList.add('ptr-loading');
+    pill.style.transform = 'translateX(-50%) translateY(10px)';
+    pill.style.opacity   = '1';
+    document.getElementById('ptrIcon').textContent  = '↻';
+    document.getElementById('ptrLabel').textContent = 'Refreshing…';
+    const page = DS.nav.current;
+    if (page === 'home')     DS.home.loadAndRender();
+    if (page === 'discover') DS.discover.render();
+    if (page === 'profile')  DS.profile.render();
+    setTimeout(hidePill, 900);
+  }
+
+  document.addEventListener('touchstart', e => {
+    if (window.scrollY === 0 && !_spinning) {
+      _pty = e.touches[0].clientY;
+      _dy  = 0;
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    if (!_pty || window.scrollY > 0) return;
+    _dy = e.touches[0].clientY - _pty;
+    if (_dy > 8) { _active = true; showPill(_dy); }
+  }, { passive: true });
+
+  document.addEventListener('touchend', () => {
+    if (_active && _dy > 70) triggerRefresh();
+    else hidePill();
+    _pty = 0; _dy = 0; _active = false;
+  }, { passive: true });
+})();
 
 // Service worker
 if ('serviceWorker' in navigator && location.hostname === 'waseem-2007.github.io') {
   window.addEventListener('load', () => navigator.serviceWorker.register('/deckscrab/sw.js', { scope:'/deckscrab/' }).catch(()=>{}));
 }
 
-// Boot
+// ── Boot ──
 document.addEventListener('DOMContentLoaded', () => {
   updateNetStatus();
   Store.init();
   DS.nav.init();
-  API.wake().then(ok => { if (ok) DS.home.loadAndRender(); });
-  API.startKeepAlive();
   const loc = Store.location;
   if (loc) Utils.setText('locChipText', (loc.name||'').split(',')[0] || 'Location set');
+
+  const hideLoader = (delay=0) => setTimeout(() => {
+    const el = document.getElementById('appLoadScreen');
+    if (!el) return;
+    el.style.transition = 'opacity .35s ease';
+    el.style.opacity = '0';
+    setTimeout(() => el && (el.style.display='none'), 370);
+  }, delay);
+
+  // Show cached immediately
+  const hasCached = Store.allShops().length > 0;
+  if (hasCached) { DS.home.render(); hideLoader(500); }
+
+  // Cycle loading messages
+  const msgs = ['Connecting to server…','Loading nearby shops…','Almost ready…','Getting fresh data…'];
+  let mi = 0;
+  const mt = setInterval(() => { const e=document.getElementById('loadMsg'); if(e) e.textContent=msgs[++mi%msgs.length]; }, 2000);
+
+  // Wake Railway
+  API.wake().then(ok => {
+    clearInterval(mt);
+    const e = document.getElementById('loadMsg');
+    if (e) e.textContent = ok ? '✅ Connected!' : '📱 Offline mode';
+    if (ok) DS.home.loadAndRender();
+    hideLoader(hasCached ? 0 : 600);
+  });
+
+  API.startKeepAlive();
 });
 
 </script>
