@@ -5395,7 +5395,7 @@ document.addEventListener('DOMContentLoaded',function(){
     c.innerHTML = `
       <div style="background:#0f0800;padding:16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,140,0,.12)">
         <button onclick="DS.grow.render()" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 12px;font-size:.78rem;color:#f5f0e8;cursor:pointer">← Back</button>
-        <div style="font-family:var(--font-display);font-size:.97rem;font-weight:700;color:#f5f0e8">Website Builder</div>
+        <div style="font-family:var(--font-display);font-size:.97rem;font-weight:700;color:#f5f0e8">${preShop?.websiteEnabled ? "✏️ Edit Website" : "🌐 Website Builder"}</div>
       </div>
 
       <!-- Step bar -->
@@ -5431,8 +5431,8 @@ document.addEventListener('DOMContentLoaded',function(){
               <label style="font-size:.7rem;font-weight:600;color:#888;display:block;margin-bottom:4px;margin-top:10px">Address</label>
               <input id="wb-addr" class="field-input" placeholder="Shop No., Street, Area" value="${s.addr||''}"/>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-                <div><label style="font-size:.7rem;font-weight:600;color:#888;display:block;margin-bottom:4px">Opens at</label><input id="wb-open" class="field-input" value="9:00 AM"/></div>
-                <div><label style="font-size:.7rem;font-weight:600;color:#888;display:block;margin-bottom:4px">Closes at</label><input id="wb-close" class="field-input" value="9:00 PM"/></div>
+                <div><label style="font-size:.7rem;font-weight:600;color:#888;display:block;margin-bottom:4px">Opens at</label><input id="wb-open" class="field-input" value="${s.oh ? (s.oh.replace(':',':')||'9:00 AM') : (s.openTime||'9:00 AM')}"/></div>
+                <div><label style="font-size:.7rem;font-weight:600;color:#888;display:block;margin-bottom:4px">Closes at</label><input id="wb-close" class="field-input" value="${s.oc ? (s.oc.replace(':',':')||'9:00 PM') : (s.closeTime||'9:00 PM')}"/></div>
               </div>
             </div>
           </div>
@@ -5513,7 +5513,7 @@ document.addEventListener('DOMContentLoaded',function(){
             <div style="padding:14px">
               <div id="wb-summary" style="background:var(--surface-2);border-radius:var(--radius-md);padding:12px;margin-bottom:14px;font-size:.82rem"></div>
               <div style="background:rgba(31,217,122,.07);border:1.5px solid rgba(31,217,122,.2);border-radius:var(--radius-md);padding:13px;margin-bottom:12px;font-size:.8rem;color:rgba(31,217,122,.9);line-height:1.7">🎉 <strong style="color:var(--ink)">Free during launch!</strong> Your website goes live instantly with full ordering system.</div>
-              <button class="btn-next" id="wb-liveBtn" onclick="DS.grow.goLive()">🚀 Create My Website — Free!</button>
+              <button class="btn-next" id="wb-liveBtn" onclick="DS.grow.goLive()">${preShop?.websiteEnabled ? "✅ Update My Website" : "🚀 Create My Website — Free!"}</button>
               <div id="wb-successBox" style="display:none;margin-top:16px;text-align:center;background:linear-gradient(135deg,rgba(31,217,122,.07),rgba(7,94,84,.12));border:1.5px solid rgba(31,217,122,.25);border-radius:var(--radius-lg);padding:24px 16px">
                 <div style="font-size:3rem;margin-bottom:10px">🎉</div>
                 <div style="font-family:var(--font-display);font-size:1.3rem;font-weight:800;color:var(--forest);margin-bottom:6px">Website is Live!</div>
@@ -5547,7 +5547,11 @@ document.addEventListener('DOMContentLoaded',function(){
     const list = Utils.el('wb-prodlist');
     if (!list) return;
     list.innerHTML = '';
-    const existing = s?.prods || [];
+    // Support both local format (prods) and server format (products)
+    const existing = (s?.prods?.length ? s.prods : null) ||
+                     (s?.products?.length ? s.products.map(p => ({
+                       n: p.name||p.n, p: p.price||p.p, emoji: p.emoji||'🍽️', cat: p.category||p.cat||'Menu'
+                     })) : null) || [];
     if (existing.length) {
       existing.forEach(p => addProd(p.emoji||'🍽️', p.n||p.name, p.p||p.price, p.cat||'Menu'));
     } else {
@@ -5594,8 +5598,12 @@ document.addEventListener('DOMContentLoaded',function(){
   function getBiz() {
     const name = (Utils.el('wb-name')?.value||'My Shop').trim();
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    // Preserve existing shop ID so we UPDATE not create new
+    const existingShop = Store.myShops().find(s => API.slugify(s.name)===slug || s.name===name);
+    const existingId   = existingShop?.id   || slug+'-'+Date.now().toString().slice(-4);
+    const existingBizId= existingShop?.bizId || slug;
     return {
-      id:slug+'-'+Date.now().toString().slice(-4), bizId:slug, name,
+      id: existingId, bizId: existingBizId, name,
       tagline: (Utils.el('wb-tag')?.value||'Quality service · Best in town').trim(),
       phone:   (Utils.el('wb-phone')?.value||'').replace(/\D/g,'').slice(-10),
       city:    (Utils.el('wb-city')?.value||'').trim(),
@@ -5690,16 +5698,45 @@ ${SITE_JS}
     const slug = biz.slug;
     const websiteUrl = `https://waseem-2007.github.io/deckscrab/?shop=${slug}`;
 
-    // Save to local shop
-    const existingShop = Store.myShops().find(s => API.slugify(s.name)===slug || s.name===biz.name);
+    // UPDATE existing shop — never create duplicate
+    const existingShop = Store.myShops().find(s =>
+      s.id === biz.id ||
+      API.slugify(s.name) === slug ||
+      s.name === biz.name
+    );
     const shopData = {
-      ...(existingShop||{}), id: existingShop?.id || Utils.uid('my'),
-      name:biz.name, desc:biz.tagline, phone:biz.phone, wa:biz.phone,
-      city:biz.city, addr:biz.address, sectorName:biz.catEmoji,
-      sectorEmoji:biz.catEmoji, e:biz.catEmoji, g:'retail',
-      prods:biz.menuItems, websiteTemplate:_curTmpl, websiteEnabled:true,
-      websiteUrl, customHtml:websiteHtml, reg:Date.now(),
-      oh:'09:00', oc:'21:00',
+      ...(existingShop || {}),         // keep all existing fields
+      id:            existingShop?.id   || Utils.uid('my'),
+      bizId:         existingShop?.bizId || slug,
+      name:          biz.name,
+      desc:          biz.tagline,
+      description:   biz.tagline,
+      phone:         biz.phone,
+      wa:            biz.phone,
+      whatsapp:      biz.phone,
+      city:          biz.city,
+      addr:          biz.address,
+      address:       biz.address,
+      sectorName:    existingShop?.sectorName || biz.catEmoji,
+      sectorEmoji:   existingShop?.sectorEmoji || biz.catEmoji,
+      e:             existingShop?.e || biz.catEmoji,
+      g:             existingShop?.g || 'retail',
+      prods:         biz.menuItems,
+      products:      biz.menuItems.map(p => ({ name:p.n, price:p.p, emoji:p.emoji||'🍽️', category:p.cat||'Menu' })),
+      websiteTemplate: _curTmpl,
+      websiteEnabled:  true,
+      websiteUrl,
+      customHtml:    websiteHtml,
+      // Keep original registration time — don't update reg
+      reg:           existingShop?.reg || Date.now(),
+      oh:            existingShop?.oh  || '09:00',
+      oc:            existingShop?.oc  || '21:00',
+      lat:           existingShop?.lat || null,
+      lng:           existingShop?.lng || null,
+      rating:        existingShop?.rating || 0,
+      rc:            existingShop?.rc    || 0,
+      views:         existingShop?.views || 1,
+      ownerUID:      existingShop?.ownerUID || Store.user?.uid || '',
     };
     Store.addLocalShop(shopData);
     _lastBuiltShopId = shopData.id;
