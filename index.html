@@ -2002,7 +2002,8 @@ select.field-input { appearance: none; cursor: pointer; }
     <div style="width:8px;height:8px;border-radius:50%;background:#FF4D00;animation:dotP 1.2s ease infinite .2s"></div>
     <div style="width:8px;height:8px;border-radius:50%;background:#FF4D00;animation:dotP 1.2s ease infinite .4s"></div>
   </div>
-  <div id="loadMsg" style="font-size:.7rem;color:rgba(245,240,232,.3)">Connecting…</div>
+  <div id="loadMsg" style="font-size:.72rem;color:rgba(245,240,232,.35);margin-bottom:20px">Connecting to server…</div>
+  <button onclick="document.getElementById('appLoadScreen').style.display='none';DS.home.render()" style="background:none;border:1px solid rgba(255,77,0,.3);color:rgba(255,77,0,.6);border-radius:99px;padding:8px 20px;font-size:.72rem;cursor:pointer;font-family:inherit">Skip → View Cached</button>
   <style>@keyframes dotP{0%,100%{opacity:.25;transform:scale(.7)}50%{opacity:1;transform:scale(1)}}</style>
 </div>
 
@@ -3267,9 +3268,10 @@ const HomeModule = (() => {
       const { searchQuery, catFilter } = Store.state;
       list.innerHTML = `
         <div class="empty-state">
-          <div class="empty-state-icon">🏪</div>
-          <div class="empty-state-title">${searchQuery ? `No results for "${searchQuery}"` : 'No businesses yet'}</div>
-          <div class="empty-state-sub">${searchQuery || catFilter ? 'Try a different search.' : 'Be the first to register!'}</div>
+          <div class="empty-state-icon">${searchQuery ? '🔍' : '🏪'}</div>
+          <div class="empty-state-title">${searchQuery ? `No results for "${searchQuery}"` : catFilter ? 'No shops in this category yet' : 'Loading shops…'}</div>
+          <div class="empty-state-sub">${searchQuery ? 'Try different keywords or browse all.' : catFilter ? 'Try another category or register your shop free.' : 'Server is starting up — this takes about 10 seconds on first load.'}</div>
+          ${!searchQuery && !catFilter ? `<div style="display:flex;gap:6px;justify-content:center;margin-top:14px"><div style="width:8px;height:8px;border-radius:50%;background:var(--flame);animation:dotP 1.2s ease infinite 0s"></div><div style="width:8px;height:8px;border-radius:50%;background:var(--flame);animation:dotP 1.2s ease infinite .2s"></div><div style="width:8px;height:8px;border-radius:50%;background:var(--flame);animation:dotP 1.2s ease infinite .4s"></div></div>` : ''}
           <button class="btn-primary" style="margin-top:16px" onclick="DS.nav.go('addshop')">+ Register Your Business</button>
         </div>`;
       return;
@@ -3325,27 +3327,23 @@ const HomeModule = (() => {
   }
 
   async function loadAndRender() {
-    // Render from cache FIRST — instant display
-    const cached = Store.allShops();
-    if (cached.length) {
-      render(); // show cached immediately, no skeleton
-    } else {
-      showSkeletons(); // only show skeleton if truly nothing cached
-    }
+    // Always render immediately — never show blank screen
+    render();
 
-    // Always try to fetch fresh data from server
+    // Fetch fresh from server in background
     try {
       const raw = await API.getShops();
       if (raw.length) {
+        // Filter out sample shops when real data arrives
         Store.setServerShops(raw.map(API.normalize));
-        render(); // update with fresh data
-      } else if (!cached.length) {
-        // Server returned empty — show empty state, not infinite "loading"
+        render();
+      } else {
+        // Server returned empty but alive — keep current display
         render();
       }
     } catch (e) {
-      // Server unreachable — keep showing cached, render to clear skeleton
-      if (!cached.length) render();
+      // Network error — stay on current display, no blank screen
+      render();
     }
   }
 
@@ -4824,18 +4822,18 @@ const ProfileModule = (() => {
                 <button onclick="DS.profile.openWebsite('${s.id}')" style="padding:5px 10px;background:var(--blue);color:white;border:none;border-radius:6px;font-size:.66rem;font-weight:700;cursor:pointer">🌐 Open</button>
                 <button onclick="DS.profile.downloadWebsite('${s.id}')" style="padding:5px 10px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--ink-2);border-radius:6px;font-size:.66rem;font-weight:700;cursor:pointer">⬇️ Save</button>
                 <button onclick="window.open('https://wa.me/?text='+encodeURIComponent('Order from ${s.name}:\\n${webUrl}'),'_blank')" style="padding:5px 10px;background:#25D366;color:white;border:none;border-radius:6px;font-size:.66rem;font-weight:700;cursor:pointer">💬 Share</button>
-                <button onclick="DS.grow.editSite('${s.id}')" style="padding:5px 10px;background:var(--flame-soft);border:1px solid var(--flame-mid);color:var(--flame);border-radius:6px;font-size:.66rem;font-weight:700;cursor:pointer">✏️ Edit</button>
+                <button onclick="DS.grow.editSite('${s.id}')" style="padding:5px 10px;background:var(--flame-soft);border:1px solid var(--flame-mid);color:var(--flame);border-radius:6px;font-size:.66rem;font-weight:700;cursor:pointer">✏️ Edit Site</button>
               </div>` : `
               <div style="font-size:.7rem;color:var(--ink-3);margin-bottom:7px">📵 No website yet — build one free in 60 seconds</div>
-              <button onclick="DS.grow.openBuilder('${s.id}')" style="width:100%;padding:8px;background:var(--flame);color:white;border:none;border-radius:var(--radius-sm);font-size:.75rem;font-weight:700;cursor:pointer">🌐 Build Website Free →</button>`}
+              <button onclick="DS.grow.openBuilder('${s.id}')" style="width:100%;padding:9px;background:var(--flame);color:white;border:none;border-radius:var(--radius-sm);font-size:.78rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">🌐 Build My Website Free →</button>`}
           </div>
 
           <!-- Action buttons -->
           <div style="display:flex;gap:6px">
-            <button onclick="DS.detail.open('${s.id}')" style="flex:1;padding:8px 4px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:var(--radius-sm);font-size:.68rem;font-weight:700;color:var(--ink-2);cursor:pointer">👁 View</button>
-            <button onclick="DS.nav.go('grow')" style="flex:1;padding:8px 4px;background:var(--flame-soft);border:1px solid var(--flame-mid);border-radius:var(--radius-sm);font-size:.68rem;font-weight:700;color:var(--flame);cursor:pointer">🚀 Boost</button>
-            <button onclick="DS.profile.syncShops()" style="flex:1;padding:8px 4px;background:rgba(26,86,219,.08);border:1px solid rgba(26,86,219,.2);border-radius:var(--radius-sm);font-size:.68rem;font-weight:700;color:var(--blue);cursor:pointer">☁️ Sync</button>
-            <button onclick="DS.profile.deleteShop('${s.id}')" style="flex:1;padding:8px 4px;background:var(--rose-soft);border:1px solid rgba(192,57,43,.2);border-radius:var(--radius-sm);font-size:.68rem;font-weight:700;color:var(--rose);cursor:pointer">🗑 Delete</button>
+            <button onclick="DS.detail.open('${s.id}')" style="flex:1;padding:8px 4px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:var(--radius-sm);font-size:.65rem;font-weight:700;color:var(--ink-2);cursor:pointer">👁 View</button>
+            <button onclick="DS.grow.editSite('${s.id}')" style="flex:1;padding:8px 4px;background:var(--flame-soft);border:1px solid var(--flame-mid);border-radius:var(--radius-sm);font-size:.65rem;font-weight:700;color:var(--flame);cursor:pointer">✏️ Edit</button>
+            <button onclick="DS.profile.syncShops()" style="flex:1;padding:8px 4px;background:rgba(26,86,219,.08);border:1px solid rgba(26,86,219,.2);border-radius:var(--radius-sm);font-size:.65rem;font-weight:700;color:var(--blue);cursor:pointer">☁️ Sync</button>
+            <button onclick="DS.profile.deleteShop('${s.id}')" style="flex:1;padding:8px 4px;background:var(--rose-soft);border:1px solid rgba(192,57,43,.2);border-radius:var(--radius-sm);font-size:.65rem;font-weight:700;color:var(--rose);cursor:pointer">🗑 Del</button>
           </div>
         </div>
       </div>`;
@@ -5286,10 +5284,11 @@ document.addEventListener('DOMContentLoaded',function(){
 });`;
 
   // ══ BUILDER STATE ══
-  let _step = 0, _prodCount = 0, _curTmpl = 'restaurant', _curTheme = 'dark', _lastBuiltShopId = null;
+  let _step = 0, _prodCount = 0, _curTmpl = 'restaurant', _curTheme = 'dark', _lastBuiltShopId = null, _builderActive = false;
 
   // ══ MAIN RENDER ══
   function render() {
+    _builderActive = false;
     const c = Utils.el('growContent');
     if (!c) return;
     const myShops = Store.myShops();
@@ -5358,23 +5357,36 @@ document.addEventListener('DOMContentLoaded',function(){
 
   // ══ BUILDER ══
   function openBuilder(shopId) {
-    _step = 0; _prodCount = 0;
+    _step = 0;
+    _prodCount = 0;
+    _curTmpl = ''; // reset so template auto-picks correctly each time
+
     const myShops = Store.myShops();
-    const preShop = shopId ? myShops.find(s=>s.id===shopId) : myShops[0];
+    const preShop = shopId ? myShops.find(s => s.id === shopId) : myShops[0];
+
     // Auto-pick template based on shop type
-    if (preShop && !_curTmpl) {
-      const g = (preShop.g || preShop.sector || '').toLowerCase();
-      const name = (preShop.sectorName || preShop.name || '').toLowerCase();
-      if (['food','mess','restaurant','cafe','bakery','hotel'].some(k=>g.includes(k)||name.includes(k))) _curTmpl = 'restaurant';
-      else if (['grocery','kirana','retail','supermarket','fruit'].some(k=>g.includes(k)||name.includes(k))) _curTmpl = 'grocery';
-      else _curTmpl = 'service';
-    }
-    renderBuilderPage(preShop);
+    const g    = (preShop?.g || preShop?.sector || '').toLowerCase();
+    const name = (preShop?.sectorName || preShop?.name || '').toLowerCase();
+    if (['food','mess','restaurant','cafe','bakery','hotel'].some(k => g.includes(k) || name.includes(k)))
+      _curTmpl = 'restaurant';
+    else if (['grocery','kirana','retail','supermarket','fruit'].some(k => g.includes(k) || name.includes(k)))
+      _curTmpl = 'grocery';
+    else
+      _curTmpl = 'service';
+
+    // ← KEY FIX: switch to Grow page first, then render builder into it
+    DS.nav.go('grow', false);
+    setTimeout(() => renderBuilderPage(preShop), 50);
   }
 
-  function editSite(shopId) { openBuilder(shopId); }
+  function editSite(shopId) {
+    // Reset template so it picks fresh for this shop
+    _curTmpl = '';
+    openBuilder(shopId);
+  }
 
   function renderBuilderPage(preShop) {
+    _builderActive = true;
     const c = Utils.el('growContent');
     if (!c) return;
     const myShops = Store.myShops();
@@ -5730,7 +5742,7 @@ ${SITE_JS}
     else render();
   }
 
-  return { render, openBuilder, editSite, addProd, pickTmpl, pickTheme, builderNext, builderPrev, goLive, get selectedShopId() { return _lastBuiltShopId; } };
+  return { render, openBuilder, editSite, addProd, pickTmpl, pickTheme, builderNext, builderPrev, goLive, get selectedShopId() { return _lastBuiltShopId; }, get _builderActive() { return _builderActive; } };
 })();
 
 
@@ -5779,7 +5791,7 @@ const NavModule = (() => {
         }, t));
         break;
       case 'addshop':  DS.addshop.init();          break;
-      case 'grow':     DS.grow.render();           break;
+      case 'grow':     if (!DS.grow._builderActive) DS.grow.render(); break;
       case 'profile':  DS.profile.render();        break;
     }
 
@@ -5976,34 +5988,64 @@ if ('serviceWorker' in navigator && location.hostname === 'waseem-2007.github.io
 document.addEventListener('DOMContentLoaded', () => {
   updateNetStatus();
   Store.init();
-  DS.nav.init();
-  const loc = Store.location;
-  if (loc) Utils.setText('locChipText', (loc.name||'').split(',')[0] || 'Location set');
 
+  const loc = Store.location;
+
+  // ── Helper: hide loading screen ──
   const hideLoader = (delay=0) => setTimeout(() => {
     const el = document.getElementById('appLoadScreen');
     if (!el) return;
-    el.style.transition = 'opacity .35s ease';
+    el.style.transition = 'opacity .3s ease';
     el.style.opacity = '0';
-    setTimeout(() => el && (el.style.display='none'), 370);
+    setTimeout(() => { if(el) el.style.display='none'; }, 320);
   }, delay);
 
-  // Show cached immediately
-  const hasCached = Store.allShops().length > 0;
-  if (hasCached) { DS.home.render(); hideLoader(500); }
+  // ── STEP 1: Show app immediately — never wait for server ──
+  DS.nav.init();
+  if (loc) Utils.setText('locChipText', (loc.name||'').split(',')[0] || 'Location set');
 
-  // Cycle loading messages
-  const msgs = ['Connecting to server…','Loading nearby shops…','Almost ready…','Getting fresh data…'];
-  let mi = 0;
-  const mt = setInterval(() => { const e=document.getElementById('loadMsg'); if(e) e.textContent=msgs[++mi%msgs.length]; }, 2000);
+  const cached = Store.allShops();
+  if (cached.length > 0) {
+    // Has cached shops — show immediately, hide loader fast
+    DS.home.render();
+    hideLoader(300);
+  } else {
+    // No cache — show sample shops so screen is never blank
+    Store.setServerShops([
+      { id:'s1', name:'Murugan Mess', sector:'restaurant', sectorName:'Restaurant', sectorEmoji:'🍛', e:'🍛', g:'food',
+        description:'Authentic South Indian meals', address:'Main Street', city:'Arakkonam',
+        lat:13.0772, lng:79.6712, phone:'9384707706', whatsapp:'9384707706',
+        hours:{Monday:{open:'09:00',close:'21:00'}}, rating:4.5, reviewCount:12, views:45,
+        delivery:true, priceLevel:1, products:[], photos:[], ownerUID:'', registeredAt:Date.now() },
+      { id:'s2', name:'Sri Balaji Grocery', sector:'grocery', sectorName:'Grocery', sectorEmoji:'🛒', e:'🛒', g:'grocery',
+        description:'Fresh groceries and provisions', address:'Market Road', city:'Arakkonam',
+        lat:13.0780, lng:79.6720, phone:'9876543210', whatsapp:'9876543210',
+        hours:{Monday:{open:'07:00',close:'21:00'}}, rating:4.2, reviewCount:8, views:32,
+        delivery:true, priceLevel:1, products:[], photos:[], ownerUID:'', registeredAt:Date.now()-1000 },
+      { id:'s3', name:'City Pharmacy', sector:'pharmacy', sectorName:'Pharmacy', sectorEmoji:'💊', e:'💊', g:'health',
+        description:'Medicines and healthcare products', address:'Hospital Road', city:'Arakkonam',
+        lat:13.0760, lng:79.6700, phone:'9123456789', whatsapp:'9123456789',
+        hours:{Monday:{open:'08:00',close:'22:00'}}, rating:4.0, reviewCount:5, views:28,
+        delivery:false, priceLevel:2, products:[], photos:[], ownerUID:'', registeredAt:Date.now()-2000 },
+    ].map(API.normalize));
+    DS.home.render();
+    hideLoader(400);
+  }
 
-  // Wake Railway
+  // ── STEP 2: Fetch real data from server in background ──
+  // Max wait: 8 seconds then show whatever we have
+  const maxWait = setTimeout(() => {
+    DS.home.render(); // render with cache/samples if server never responds
+  }, 8000);
+
   API.wake().then(ok => {
-    clearInterval(mt);
-    const e = document.getElementById('loadMsg');
-    if (e) e.textContent = ok ? '✅ Connected!' : '📱 Offline mode';
-    if (ok) DS.home.loadAndRender();
-    hideLoader(hasCached ? 0 : 600);
+    clearTimeout(maxWait);
+    if (ok) {
+      DS.home.loadAndRender(); // fetch fresh shops silently
+    }
+    // If server fails — samples/cache already showing, no blank screen
+  }).catch(() => {
+    clearTimeout(maxWait);
   });
 
   API.startKeepAlive();
